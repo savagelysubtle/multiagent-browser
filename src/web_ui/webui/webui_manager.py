@@ -145,11 +145,11 @@ class WebuiManager:
         try:
             # Initialize document pipeline
             self.document_pipeline = DocumentPipeline()
-            logger.info("✅ Document pipeline initialized")
+            logger.info("Document pipeline initialized successfully")
 
             # Initialize MCP service
             self.mcp_service = MCPService(self)
-            logger.info("✅ MCP service initialized")
+            logger.info("MCP service initialized successfully")
 
         except Exception as e:
             logger.error(f"Failed to initialize database and services: {e}")
@@ -170,10 +170,10 @@ class WebuiManager:
             success = await self.mcp_service.start_service()
 
             if success:
-                logger.info("✅ MCP configuration loaded from database and applied")
+                logger.info("MCP configuration loaded from database and applied")
                 return True
             else:
-                logger.info("⚠️ MCP service started but no active configuration found")
+                logger.info("MCP service started but no active configuration found")
                 return False
 
         except Exception as e:
@@ -206,10 +206,10 @@ class WebuiManager:
                 success = await self.mcp_service.load_active_configuration()
 
             if success:
-                logger.info("✅ MCP client setup completed")
+                logger.info("MCP client setup completed")
                 return True
             else:
-                logger.warning("⚠️ MCP client setup failed or no configuration available")
+                logger.warning("MCP client setup failed or no configuration available")
                 return False
 
         except Exception as e:

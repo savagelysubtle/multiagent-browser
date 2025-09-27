@@ -45,7 +45,14 @@ from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
-from langchain_ibm import ChatWatsonx
+# Conditional import for IBM Watson (known to have issues)
+try:
+    from langchain_ibm import ChatWatsonx
+    WATSONX_AVAILABLE = True
+except (ImportError, TypeError) as e:
+    WATSONX_AVAILABLE = False
+    import warnings
+    warnings.warn(f"IBM Watson integration disabled due to import error: {e}")
 from langchain_aws import ChatBedrock
 from pydantic import SecretStr
 
@@ -290,6 +297,9 @@ def get_llm_model(provider: str, **kwargs):
             api_key=api_key,
         )
     elif provider == "ibm":
+        if not WATSONX_AVAILABLE:
+            raise ValueError("IBM Watson integration is not available due to import issues. Try using a different provider.")
+        
         parameters = {
             "temperature": kwargs.get("temperature", 0.0),
             "max_tokens": kwargs.get("num_ctx", 32000)

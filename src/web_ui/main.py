@@ -11,11 +11,14 @@ This serves as a unified orchestrator that can:
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
-# Ensure we can import from src
-sys.path.insert(0, str(Path(__file__).parent))
+# Ensure we can import from both src and root
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "src"))
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -38,24 +41,52 @@ def setup_logging(level: str = "INFO"):
 def start_webui(args):
     """Start the Gradio web interface."""
     logger.info("Starting Web UI...")
-
-    # Import and run the existing webui
-    from webui import main as webui_main
-
-    # Override sys.argv to pass args to webui
-    original_argv = sys.argv.copy()
-    sys.argv = ['webui.py']
-    if args.ip:
-        sys.argv.extend(['--ip', args.ip])
-    if args.port:
-        sys.argv.extend(['--port', str(args.port)])
-    if args.theme:
-        sys.argv.extend(['--theme', args.theme])
-
+    
     try:
-        webui_main()
-    finally:
-        sys.argv = original_argv
+        # Import UI components with corrected import strategy
+        # This allows the relative imports in webui modules to work properly
+        sys.path.insert(0, str(Path(__file__).parent))
+        from src.web_ui.webui.interface import theme_map, create_ui
+        
+        # Validate theme choice
+        if args.theme not in theme_map:
+            logger.warning(f"Theme '{args.theme}' not found, using 'Ocean'")
+            args.theme = "Ocean"
+        
+        # Create and launch the UI
+        demo = create_ui(theme_name=args.theme)
+        logger.info(f"Starting Web UI on {args.ip}:{args.port} with theme '{args.theme}'")
+        demo.queue().launch(server_name=args.ip, server_port=args.port)
+        
+    except ImportError as e:
+        logger.error(f"Failed to import UI components: {e}")
+        logger.error("This may be due to missing dependencies or import issues.")
+        logger.info("Try running with --init-services first to initialize dependencies")
+        
+        # Try alternative import strategy
+        logger.info("Attempting alternative import strategy...")
+        try:
+            # Change working directory temporarily for imports
+            original_cwd = Path.cwd()
+            os.chdir(project_root)
+            
+            from src.web_ui.webui.interface import theme_map, create_ui
+            
+            # Restore working directory
+            os.chdir(original_cwd)
+            
+            # Create and launch the UI
+            demo = create_ui(theme_name=args.theme)
+            logger.info(f"Starting Web UI on {args.ip}:{args.port} with theme '{args.theme}'")
+            demo.queue().launch(server_name=args.ip, server_port=args.port)
+            
+        except Exception as e2:
+            logger.error(f"Alternative import strategy also failed: {e2}")
+            raise
+            
+    except Exception as e:
+        logger.error(f"Web UI startup failed: {e}")
+        raise
 
 
 async def start_services():
@@ -64,15 +95,15 @@ async def start_services():
 
     # Initialize ChromaDB
     try:
-        from src.web_ui.database.connection import get_chroma_client
-        from src.web_ui.database.utils import DatabaseUtils
+        from web_ui.database.connection import get_chroma_client
+        from web_ui.database.utils import DatabaseUtils
 
         client = get_chroma_client()
         utils = DatabaseUtils()
         utils.setup_default_collections()
-        logger.info("✅ Database initialized")
+        logger.info("Database initialized successfully")
     except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
+        logger.error(f"Database initialization failed: {e}")
 
     # TODO: Add other service initializations here
     # - MCP servers
@@ -100,10 +131,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py                      # Start web UI (default)
-  python main.py --headless          # Run services only
-  python main.py --port 8080         # Web UI on custom port
-  python main.py --log-level DEBUG   # Verbose logging
+  python webui.py                      # Start web UI (default)
+  python webui.py --headless           # Run services only
+  python webui.py --port 8080          # Web UI on custom port
+  python webui.py --log-level DEBUG    # Verbose logging
+  python webui.py --init-services      # Initialize services first
         """
     )
 

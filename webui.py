@@ -1,19 +1,27 @@
+#!/usr/bin/env python3
+"""
+Web-UI Entry Point - Simple router to orchestrator.
+
+This is the "front door" that routes user commands to the application orchestrator.
+Follows the orchestrator pattern: keep entry point minimal (< 50 lines).
+"""
+
+import sys
+from pathlib import Path
+
+# Ensure we can import from src
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
 from dotenv import load_dotenv
 load_dotenv()
-import argparse
-from src.web_ui.webui.interface import theme_map, create_ui
-
 
 def main():
-    parser = argparse.ArgumentParser(description="Gradio WebUI for Browser Agent")
-    parser.add_argument("--ip", type=str, default="127.0.0.1", help="IP address to bind to")
-    parser.add_argument("--port", type=int, default=8000, help="Port to listen on")
-    parser.add_argument("--theme", type=str, default="Ocean", choices=theme_map.keys(), help="Theme to use for the UI")
-    args = parser.parse_args()
-
-    demo = create_ui(theme_name=args.theme)
-    demo.queue().launch(server_name=args.ip, server_port=args.port)
-
+    """Route all commands to the application orchestrator."""
+    # Import the orchestrator
+    from web_ui.main import main as orchestrator_main
+    
+    # Let the orchestrator handle everything
+    orchestrator_main()
 
 if __name__ == '__main__':
     main()
