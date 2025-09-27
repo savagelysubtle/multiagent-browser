@@ -113,9 +113,15 @@ cp .env.example .env
 #### Step 5: Enjoy the web-ui
 1.  **Run the WebUI:**
 ```bash
-python webui.py --ip 127.0.0.1 --port 7788
+# Quick development setup (React + API)
+python start_dev.py
 ```
-2. **Access the WebUI:** Open your web browser and navigate to `http://127.0.0.1:7788`.
+
+2. **Access the WebUI:**
+   - React Frontend: http://localhost:3000
+   - API Documentation: http://localhost:8000/api/docs
+   - Health Check: http://localhost:8000/api/health
+
 3. **Using Your Own Browser(Optional):**
   - Set `BROWSER_PATH` to the executable path of your browser and `BROWSER_USER_DATA` to the user data directory of your browser. Leave `BROWSER_USER_DATA` empty if you want to use local user data.
     - Windows

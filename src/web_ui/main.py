@@ -6,6 +6,7 @@ This serves as a unified orchestrator that can:
 - Start the web UI (default)
 - Initialize background services
 - Run in different modes (web-only, headless, etc.)
+- Start the API server for React frontend integration
 """
 
 import argparse
@@ -13,6 +14,7 @@ import asyncio
 import logging
 import os
 import sys
+import threading
 from pathlib import Path
 
 # Ensure we can import from both src and root
@@ -41,52 +43,99 @@ def setup_logging(level: str = "INFO"):
 def start_webui(args):
     """Start the Gradio web interface."""
     logger.info("Starting Web UI...")
-    
+
     try:
         # Import UI components with corrected import strategy
         # This allows the relative imports in webui modules to work properly
         sys.path.insert(0, str(Path(__file__).parent))
         from src.web_ui.webui.interface import theme_map, create_ui
-        
+
         # Validate theme choice
         if args.theme not in theme_map:
             logger.warning(f"Theme '{args.theme}' not found, using 'Ocean'")
             args.theme = "Ocean"
-        
+
         # Create and launch the UI
         demo = create_ui(theme_name=args.theme)
         logger.info(f"Starting Web UI on {args.ip}:{args.port} with theme '{args.theme}'")
         demo.queue().launch(server_name=args.ip, server_port=args.port)
-        
+
     except ImportError as e:
         logger.error(f"Failed to import UI components: {e}")
         logger.error("This may be due to missing dependencies or import issues.")
         logger.info("Try running with --init-services first to initialize dependencies")
-        
+
         # Try alternative import strategy
         logger.info("Attempting alternative import strategy...")
         try:
             # Change working directory temporarily for imports
             original_cwd = Path.cwd()
             os.chdir(project_root)
-            
+
             from src.web_ui.webui.interface import theme_map, create_ui
-            
+
             # Restore working directory
             os.chdir(original_cwd)
-            
+
             # Create and launch the UI
             demo = create_ui(theme_name=args.theme)
             logger.info(f"Starting Web UI on {args.ip}:{args.port} with theme '{args.theme}'")
             demo.queue().launch(server_name=args.ip, server_port=args.port)
-            
+
         except Exception as e2:
             logger.error(f"Alternative import strategy also failed: {e2}")
             raise
-            
+
     except Exception as e:
         logger.error(f"Web UI startup failed: {e}")
         raise
+
+
+def start_api_server(args):
+    """Start the FastAPI server for React frontend integration."""
+    logger.info("Starting API server...")
+
+    try:
+        from .api.server import run_api_server
+
+        run_api_server(
+            host=args.api_host,
+            port=args.api_port,
+            reload=args.reload,
+            log_level=args.log_level.lower()
+        )
+
+    except ImportError as e:
+        logger.error(f"Failed to import API server: {e}")
+        logger.error("API server module not available")
+        raise
+    except Exception as e:
+        logger.error(f"API server startup failed: {e}")
+        raise
+
+
+def start_dual_mode(args):
+    """Start both Gradio UI and API server in parallel."""
+    logger.info("Starting in dual mode (Gradio + API server)")
+
+    # Start API server in a separate thread
+    def run_api():
+        try:
+            start_api_server(args)
+        except Exception as e:
+            logger.error(f"API server failed: {e}")
+
+    api_thread = threading.Thread(target=run_api, daemon=True)
+    api_thread.start()
+
+    # Give API server time to start
+    import time
+    time.sleep(2)
+
+    # Start Gradio UI in main thread
+    # Adjust Gradio port to avoid conflict
+    args.port = args.port + 1 if args.port == args.api_port else args.port
+    start_webui(args)
 
 
 async def start_services():
@@ -131,17 +180,23 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python webui.py                      # Start web UI (default)
-  python webui.py --headless           # Run services only
-  python webui.py --port 8080          # Web UI on custom port
-  python webui.py --log-level DEBUG    # Verbose logging
-  python webui.py --init-services      # Initialize services first
+  python webui.py                          # Start web UI (default)
+  python webui.py --api-only               # Start API server only
+  python webui.py --dual-mode              # Start both Gradio and API server
+  python webui.py --headless               # Run services only
+  python webui.py --port 8080              # Web UI on custom port
+  python webui.py --log-level DEBUG        # Verbose logging
+  python webui.py --init-services          # Initialize services first
         """
     )
 
     # Operational modes
     parser.add_argument('--headless', action='store_true',
                        help='Run in headless mode (services only, no web UI)')
+    parser.add_argument('--api-only', action='store_true',
+                       help='Start API server only (no Gradio UI)')
+    parser.add_argument('--dual-mode', action='store_true',
+                       help='Start both Gradio UI and API server')
 
     # Web UI options
     parser.add_argument('--ip', type=str, default='127.0.0.1',
@@ -150,6 +205,14 @@ Examples:
                        help='Port to listen on (default: 8000)')
     parser.add_argument('--theme', type=str, default='Ocean',
                        help='UI theme (default: Ocean)')
+
+    # API server options
+    parser.add_argument('--api-host', type=str, default='127.0.0.1',
+                       help='API server host (default: 127.0.0.1)')
+    parser.add_argument('--api-port', type=int, default=8000,
+                       help='API server port (default: 8000)')
+    parser.add_argument('--reload', action='store_true',
+                       help='Enable auto-reload for API server development')
 
     # System options
     parser.add_argument('--log-level', type=str, default='INFO',
@@ -162,12 +225,29 @@ Examples:
 
     # Setup logging
     setup_logging(args.log_level)
-    logger.info(f"Starting Web-UI Application in {'headless' if args.headless else 'web'} mode")
+
+    # Determine mode
+    if args.headless:
+        mode = "headless"
+    elif args.api_only:
+        mode = "api-only"
+    elif args.dual_mode:
+        mode = "dual"
+    else:
+        mode = "web"
+
+    logger.info(f"Starting Web-UI Application in '{mode}' mode")
 
     try:
         if args.headless:
             # Run in headless mode
             asyncio.run(run_headless_mode())
+        elif args.api_only:
+            # Start only the API server
+            start_api_server(args)
+        elif args.dual_mode:
+            # Start both Gradio and API server
+            start_dual_mode(args)
         else:
             # Initialize services if requested
             if args.init_services:

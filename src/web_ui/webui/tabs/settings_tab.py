@@ -6,7 +6,7 @@ from gradio.components import Component
 from typing import Any, Dict, Optional
 from functools import partial
 
-from ...webui_manager import WebuiManager
+from ..webui_manager import WebuiManager
 from ...utils import config
 
 logger = logging.getLogger(__name__)

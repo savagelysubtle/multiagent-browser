@@ -64,7 +64,7 @@ class WebuiManager:
         """
         init document editor
         """
-        from .components.document_editor_tab import DocumentEditorManager
+        from .tabs.document_editor_tab import DocumentEditorManager
         self.de_manager: Optional[DocumentEditorManager] = DocumentEditorManager()
         self.de_current_file: Optional[str] = None
         self.de_recent_files: List[str] = []

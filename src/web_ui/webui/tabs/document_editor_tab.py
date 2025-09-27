@@ -10,7 +10,7 @@ import mimetypes
 import gradio as gr
 from gradio.components import Component
 
-from ...webui_manager import WebuiManager
+from ..webui_manager import WebuiManager
 from ...utils import llm_provider
 from ...database import DocumentPipeline, DatabaseUtils
 
