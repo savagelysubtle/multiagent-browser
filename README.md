@@ -3,7 +3,7 @@
 <br/>
 
 [![GitHub stars](https://img.shields.io/github/stars/savagelysubtle/multiagent-browser?style=social)](https://github.com/savagelysubtle/multiagent-browser/stargazers)
-[![License](https://img.shields.io/github/license/savagelysubtle/multiagent-browser)](https://github.com/savagelysubtle/multiagent-browser/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/savagelysubtle/multiagent-browser/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.13-blue)](https://python.org)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Enhanced-green)](https://www.trychroma.com/)
 
