@@ -22,7 +22,7 @@ from ...agent.browser_use.browser_use_agent import BrowserUseAgent
 from ...browser.custom_browser import CustomBrowser
 from ...controller.custom_controller import CustomController
 from ...utils import llm_provider
-from ..webui_manager import WebuiManager
+from ...webui_manager import WebuiManager
 
 logger = logging.getLogger(__name__)
 

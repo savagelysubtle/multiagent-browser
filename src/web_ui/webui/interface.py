@@ -1,10 +1,9 @@
 import gradio as gr
 
 from .webui_manager import WebuiManager
-from .components.unified_settings_tab import create_unified_settings_tab
-from .components.browser_use_agent_tab import create_browser_use_agent_tab
-from .components.deep_research_agent_tab import create_deep_research_agent_tab
-from .components.document_editor_tab import create_document_editor_tab
+from .pages.document_editor_page import create_document_editor_page
+from .pages.settings_page import create_settings_page
+from .pages.agents_page import create_agents_page
 
 theme_map = {
     "Default": gr.themes.Default(),
@@ -69,23 +68,12 @@ def create_ui(theme_name="Ocean"):
 
         with gr.Tabs() as tabs:
             with gr.TabItem("📝 Document Editor & Chat"):
-                create_document_editor_tab(ui_manager)
+                create_document_editor_page(ui_manager)
+
+            with gr.TabItem("🤖 AI Agents"):
+                create_agents_page(ui_manager)
 
             with gr.TabItem("⚙️ Settings"):
-                create_unified_settings_tab(ui_manager)
-
-            with gr.TabItem("🤖 Run Agent"):
-                create_browser_use_agent_tab(ui_manager)
-
-            with gr.TabItem("Deep Research"):
-                gr.Markdown(
-                    """
-                    ### Agents built on Browser-Use
-                    """,
-                    elem_classes=["tab-header-text"],
-                )
-                with gr.Tabs():
-                    with gr.TabItem("Deep Research"):
-                        create_deep_research_agent_tab(ui_manager)
+                create_settings_page(ui_manager)
 
     return demo

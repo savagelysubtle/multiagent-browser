@@ -2,7 +2,7 @@ import gradio as gr
 from gradio.components import Component
 from functools import partial
 
-from ..webui_manager import WebuiManager
+from ...webui_manager import WebuiManager
 from ...utils import config
 import logging
 import os
