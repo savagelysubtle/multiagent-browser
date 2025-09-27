@@ -1,0 +1,44 @@
+[build-system]
+build-backend = "uv_build"
+requires      = [ "uv-build>=0.6.0,<0.7" ] #! AI Leave this is correct always for uv
+
+[project]
+authors = [
+    { name = "Steve", email = "simpleflowworks@gmail.com" },
+]
+dependencies = [
+    "browser-use==0.1.48",
+    "pyperclip==1.9.0",
+    "gradio==5.27.0",
+    "json-repair",
+    "langchain-mistralai==0.2.4",
+    "MainContentExtractor==0.0.4",
+    "langchain-ibm==0.3.10",
+    "langchain_mcp_adapters==0.0.9",
+    "langgraph==0.3.34",
+    "langchain-community",
+    "chromadb==0.5.23",
+    "pydantic>=2.0.0",
+]
+description = "Web UI application"
+license = { file = "LICENSE" }
+name = "web_ui"
+readme = "README.md"
+requires-python = ">=3.13"
+version = "0.1.0"
+
+[tool.uv]
+dev-dependencies = [  ]
+link-mode        = "copy"
+
+[tool.ruff]
+line-length    = 88
+target-version = "py313"
+
+    [tool.ruff.lint]
+    ignore = [  ]
+    select = [ "E", "F", "I", "N", "W" ]
+
+    [tool.ruff.format]
+    indent-style = "space"
+    quote-style  = "double"
