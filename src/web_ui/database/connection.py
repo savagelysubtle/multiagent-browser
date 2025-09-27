@@ -31,7 +31,7 @@ class ChromaConnection:
         """Initialize the ChromaDB client with proper configuration."""
         try:
             # Get database path from environment or use default
-            db_path = os.getenv('CHROMA_DB_PATH', './src/web_ui/data/chroma_db')
+            db_path = os.getenv('CHROMA_DB_PATH', './data/chroma_db')
             db_path = Path(db_path).resolve()
 
             # Ensure the directory exists
@@ -94,7 +94,7 @@ def close_chroma_connection() -> None:
 def get_db_config() -> dict:
     """Get database configuration from environment variables."""
     return {
-        'db_path': os.getenv('CHROMA_DB_PATH', './src/web_ui/data/chroma_db'),
+        'db_path': os.getenv('CHROMA_DB_PATH', './data/chroma_db'),
         'collection_prefix': os.getenv('CHROMA_COLLECTION_PREFIX', 'webui_'),
         'default_embedding_function': os.getenv('CHROMA_EMBEDDING_FUNCTION', 'default'),
         'max_connections': int(os.getenv('CHROMA_MAX_CONNECTIONS', '10')),

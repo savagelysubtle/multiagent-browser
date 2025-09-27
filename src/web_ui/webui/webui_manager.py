@@ -1,13 +1,16 @@
 import json
+import logging
 from collections.abc import Generator
 from typing import TYPE_CHECKING
 import os
 import gradio as gr
 from datetime import datetime
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 import uuid
 import asyncio
 import time
+
+logger = logging.getLogger(__name__)
 
 from gradio.components import Component
 from browser_use.browser.browser import Browser
@@ -17,6 +20,8 @@ from ..browser.custom_browser import CustomBrowser
 from ..browser.custom_context import CustomBrowserContext
 from ..controller.custom_controller import CustomController
 from ..agent.deep_research.deep_research_agent import DeepResearchAgent
+from ..services.mcp_service import MCPService
+from ..database.document_pipeline import DocumentPipeline
 
 
 class WebuiManager:
@@ -26,6 +31,11 @@ class WebuiManager:
 
         self.settings_save_dir = settings_save_dir
         os.makedirs(self.settings_save_dir, exist_ok=True)
+
+        # Initialize database and MCP service
+        self.document_pipeline: Optional[DocumentPipeline] = None
+        self.mcp_service: Optional[MCPService] = None
+        self._initialize_database_and_services()
 
     def init_browser_use_agent(self) -> None:
         """
@@ -129,3 +139,117 @@ class WebuiManager:
             }
         )
         yield update_components
+
+    def _initialize_database_and_services(self) -> None:
+        """Initialize document pipeline and MCP service."""
+        try:
+            # Initialize document pipeline
+            self.document_pipeline = DocumentPipeline()
+            logger.info("✅ Document pipeline initialized")
+
+            # Initialize MCP service
+            self.mcp_service = MCPService(self)
+            logger.info("✅ MCP service initialized")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize database and services: {e}")
+
+    async def initialize_mcp_from_database(self) -> bool:
+        """
+        Load and apply MCP configuration from ChromaDB at startup.
+
+        Returns:
+            True if configuration loaded successfully, False otherwise
+        """
+        try:
+            if not self.mcp_service:
+                logger.error("MCP service not available")
+                return False
+
+            # Start the MCP service which will load active configuration
+            success = await self.mcp_service.start_service()
+
+            if success:
+                logger.info("✅ MCP configuration loaded from database and applied")
+                return True
+            else:
+                logger.info("⚠️ MCP service started but no active configuration found")
+                return False
+
+        except Exception as e:
+            logger.error(f"Failed to load MCP config from database: {e}")
+            return False
+
+    async def setup_mcp_client(self, mcp_server_config: Optional[Dict] = None) -> bool:
+        """
+        Setup MCP client with provided configuration or load from database.
+
+        Args:
+            mcp_server_config: Optional MCP configuration to apply
+
+        Returns:
+            True if setup successful, False otherwise
+        """
+        try:
+            if not self.mcp_service:
+                logger.error("MCP service not available")
+                return False
+
+            if mcp_server_config:
+                # Apply provided configuration
+                success = await self.mcp_service.apply_configuration(
+                    config_data=mcp_server_config,
+                    config_name="ui_provided_config"
+                )
+            else:
+                # Load from database
+                success = await self.mcp_service.load_active_configuration()
+
+            if success:
+                logger.info("✅ MCP client setup completed")
+                return True
+            else:
+                logger.warning("⚠️ MCP client setup failed or no configuration available")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error setting up MCP client: {e}")
+            return False
+
+    async def get_mcp_service_status(self) -> Dict:
+        """Get current MCP service status."""
+        try:
+            if not self.mcp_service:
+                return {"error": "MCP service not available", "is_running": False}
+
+            return await self.mcp_service.get_service_status()
+
+        except Exception as e:
+            logger.error(f"Error getting MCP service status: {e}")
+            return {"error": str(e), "is_running": False}
+
+    async def list_mcp_configurations(self) -> List[Dict]:
+        """List all available MCP configurations."""
+        try:
+            if not self.mcp_service:
+                return []
+
+            return await self.mcp_service.list_available_configs()
+
+        except Exception as e:
+            logger.error(f"Error listing MCP configurations: {e}")
+            return []
+
+    async def switch_mcp_configuration(self, config_id: str) -> Tuple[bool, str]:
+        """Switch to a different MCP configuration."""
+        try:
+            if not self.mcp_service:
+                return False, "MCP service not available"
+
+            return await self.mcp_service.switch_configuration(config_id)
+
+        except Exception as e:
+            logger.error(f"Error switching MCP configuration: {e}")
+            return False, f"Error switching configuration: {str(e)}"
+
+

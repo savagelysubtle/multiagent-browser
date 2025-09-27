@@ -11,7 +11,7 @@ class DatabaseConfig:
     """Configuration class for the database settings."""
 
     # Database path settings
-    db_path: str = "./src/web_ui/data/chroma_db"
+    db_path: str = "./data/chroma_db"
     collection_prefix: str = "webui_"
 
     # Connection settings
@@ -100,7 +100,7 @@ class DatabaseConfig:
 
 # Environment variable documentation
 ENV_VARS_DOCS = {
-    'CHROMA_DB_PATH': 'Path to the ChromaDB database directory (default: ./src/web_ui/data/chroma_db)',
+    'CHROMA_DB_PATH': 'Path to the ChromaDB database directory (default: ./data/chroma_db)',
     'CHROMA_COLLECTION_PREFIX': 'Prefix for collection names (default: webui_)',
     'CHROMA_MAX_CONNECTIONS': 'Maximum number of connections (default: 10)',
     'CHROMA_CONNECTION_TIMEOUT': 'Connection timeout in seconds (default: 30)',
