@@ -5,313 +5,282 @@ Provides CRUD operations for documents with ChromaDB integration
 and DocumentEditingAgent support.
 """
 
-import uuid
-from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ...api.server import document_agent
-from ...database.chroma_manager import ChromaManager
-from ...database.models import DocumentModel
+from ...agent.document_editor import DocumentEditingAgent
 from ...utils.logging_config import get_logger
-from ..auth.auth_service import User
-from ..auth.dependencies import get_current_user
+from ..dependencies import get_document_agent
 
 logger = get_logger(__name__)
 
 # Create router
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter()
 
-# Document manager instance
-document_manager = ChromaManager()
+# --- Pydantic Models for Document API Requests/Responses ---
 
 
-# Request/Response models
 class DocumentCreateRequest(BaseModel):
-    """Request model for document creation."""
-
-    title: str
+    filename: str
     content: str = ""
     document_type: str = "document"
     metadata: dict[str, Any] | None = None
 
 
-class DocumentUpdateRequest(BaseModel):
-    """Request model for document updates."""
-
-    title: str | None = None
-    content: str | None = None
-    metadata: dict[str, Any] | None = None
+class DocumentEditRequest(BaseModel):
+    document_id: str
+    instruction: str
+    use_llm: bool = True
 
 
-class DocumentResponse(BaseModel):
-    """Response model for document information."""
+class DocumentSearchRequest(BaseModel):
+    query: str
+    collection_type: str = "documents"
+    limit: int = 10
+    use_mcp_tools: bool = True
 
-    id: str
-    title: str
+
+class DocumentSuggestionsRequest(BaseModel):
     content: str
-    document_type: str
-    metadata: dict[str, Any]
-    created_at: str
-    updated_at: str
-    owner_id: str
+    document_type: str = "document"
 
 
-class DocumentListResponse(BaseModel):
-    """Response model for document lists."""
-
-    documents: list[DocumentResponse]
-    total: int
-    page: int
-    page_size: int
+class PolicyStoreRequest(BaseModel):
+    document_id: str
+    policy_title: str
+    policy_type: str = "manual"
+    authority_level: str = "medium"
 
 
-class MessageResponse(BaseModel):
-    """Generic message response."""
-
-    message: str
-
-
-# Document management endpoints
+class BatchProcessRequest(BaseModel):
+    file_paths: list[str]
+    document_type: str = "document"
 
 
-@router.post("/", response_model=DocumentResponse)
+# --- Document Management Endpoints ---
+
+
+@router.post("/create")
 async def create_document(
-    document_data: DocumentCreateRequest, current_user: User = Depends(get_current_user)
-):
-    """
-    Create a new document.
-
-    Creates a document and stores it in ChromaDB with user ownership.
-    """
-    try:
-        doc_id = str(uuid.uuid4())
-
-        # Create document model
-        document = DocumentModel(
-            id=doc_id,
-            content=f"Title: {document_data.title}\n\n{document_data.content}",
-            metadata={
-                "title": document_data.title,
-                "document_type": document_data.document_type,
-                "owner_id": current_user.id,
-                "created_by": current_user.email,
-                **(document_data.metadata or {}),
-            },
-            source="document_api",
-        )
-
-        # Store in ChromaDB
-        success = document_manager.add_document("documents", document)
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create document",
-            )
-
-        logger.info(f"Created document {doc_id} for user {current_user.email}")
-
-        return DocumentResponse(
-            id=doc_id,
-            title=document_data.title,
-            content=document_data.content,
-            document_type=document_data.document_type,
-            metadata=document.metadata,
-            created_at=document.timestamp.isoformat(),
-            updated_at=document.timestamp.isoformat(),
-            owner_id=current_user.id,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating document: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create document",
-        )
-
-
-@router.get("/", response_model=DocumentListResponse)
-async def list_documents(
-    page: int = 1,
-    page_size: int = 20,
-    document_type: str | None = None,
-    current_user: User = Depends(get_current_user),
-):
-    """
-    List user's documents.
-
-    Returns paginated list of documents owned by the current user.
-    """
-    try:
-        # Get user's documents
-        # Note: This is a simplified implementation
-        # In a real scenario, you'd want to filter by owner_id
-
-        # For now, return empty list as placeholder
-        return DocumentListResponse(
-            documents=[],
-            total=0,
-            page=page,
-            page_size=page_size,
-        )
-
-    except Exception as e:
-        logger.error(f"Error listing documents: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list documents",
-        )
-
-
-@router.post("/create-live", response_model=DocumentResponse)
-async def create_document_live(
     request: DocumentCreateRequest,
-    current_user: User = Depends(get_current_user),
+    agent: DocumentEditingAgent = Depends(get_document_agent),
 ):
-    """Create a new document using the document agent directly."""
-    logger.info(f"Creating document for user {current_user.id}: {request.title}")
-
+    """Create a new document using the DocumentEditingAgent."""
     try:
-        # Get or create document agent
-        from ...api.server import document_agent
-
-        if not document_agent:
-            raise HTTPException(status_code=503, detail="Document agent not available")
-
-        # Create document using agent
-        success, message, document_id = await document_agent.create_document(
-            filename=request.title,
+        success, message, document_id = await agent.create_document(
+            filename=request.filename,
             content=request.content,
-            document_type=request.document_type or "markdown",
-            metadata={
-                "user_id": current_user.id,
-                "created_via": "web_ui",
-                "tags": request.metadata.get("tags", []) if request.metadata else [],
-            },
+            document_type=request.document_type,
+            metadata=request.metadata,
         )
-
-        if success and document_id:
-            # Get the created document
-            document = document_manager.get_document("documents", document_id)
-            if document:
-                return DocumentResponse(
-                    id=document.id,
-                    title=document.metadata.get("filename", request.title),
-                    content=document.content,
-                    document_type=document.metadata.get("document_type", "markdown"),
-                    created_at=document.metadata.get(
-                        "created_at", datetime.now().isoformat()
-                    ),
-                    updated_at=document.metadata.get(
-                        "updated_at", datetime.now().isoformat()
-                    ),
-                    metadata=document.metadata,
-                    owner_id=current_user.id,
-                )
-
-        raise HTTPException(
-            status_code=400, detail=message or "Failed to create document"
-        )
-
-    except HTTPException:
-        raise
+        if success:
+            return {"success": True, "message": message, "document_id": document_id}
+        else:
+            raise HTTPException(status_code=400, detail=message)
     except Exception as e:
-        logger.error(f"Error creating document: {e}")
+        logger.error(f"Error creating document: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Internal error creating document: {str(e)}"
+            status_code=500, detail=f"Error creating document: {str(e)}"
         )
 
 
-@router.put("/edit-live/{document_id}", response_model=DocumentResponse)
-async def edit_document_live(
+@router.post("/edit")
+async def edit_document(
+    request: DocumentEditRequest,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
+):
+    """Edit a document using the DocumentEditingAgent."""
+    try:
+        success, message, document_id = await agent.edit_document(
+            document_id=request.document_id,
+            instruction=request.instruction,
+            use_llm=request.use_llm,
+        )
+        if success:
+            document = agent.chroma_manager.get_document(
+                "documents", document_id or request.document_id
+            )
+            return {
+                "success": True,
+                "message": message,
+                "document_id": document_id,
+                "content": document.content if document else None,
+                "metadata": document.metadata if document else None,
+            }
+        else:
+            raise HTTPException(status_code=400, detail=message)
+    except Exception as e:
+        logger.error(f"Error editing document: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error editing document: {str(e)}")
+
+
+@router.post("/search")
+async def search_documents(
+    request: DocumentSearchRequest,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
+):
+    """Search documents using the DocumentEditingAgent."""
+    try:
+        results = await agent.search_documents(
+            query=request.query,
+            collection_type=request.collection_type,
+            limit=request.limit,
+            use_mcp_tools=request.use_mcp_tools,
+        )
+        return {"success": True, "results": results, "total": len(results)}
+    except Exception as e:
+        logger.error(f"Error searching documents: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error searching documents: {str(e)}"
+        )
+
+
+@router.post("/suggestions")
+async def get_document_suggestions(
+    request: DocumentSuggestionsRequest,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
+):
+    """Get document suggestions using the DocumentEditingAgent."""
+    try:
+        suggestions = await agent.get_document_suggestions(
+            content=request.content, document_type=request.document_type
+        )
+        return {"success": True, "suggestions": suggestions}
+    except Exception as e:
+        logger.error(f"Error getting suggestions: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error getting suggestions: {str(e)}"
+        )
+
+
+@router.post("/batch")
+async def process_batch_documents(
+    request: BatchProcessRequest,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
+):
+    """Process multiple documents in a batch."""
+    try:
+        results = await agent.process_batch_documents(
+            file_paths=request.file_paths, document_type=request.document_type
+        )
+        return {"success": True, "results": results}
+    except Exception as e:
+        logger.error(f"Error in batch processing: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error in batch processing: {str(e)}"
+        )
+
+
+@router.post("/store-policy")
+async def store_as_policy(
+    request: PolicyStoreRequest,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
+):
+    """Store a document as a policy manual."""
+    try:
+        success, message = await agent.store_as_policy(
+            document_id=request.document_id,
+            policy_title=request.policy_title,
+            policy_type=request.policy_type,
+            authority_level=request.authority_level,
+        )
+        if success:
+            return {"success": True, "message": message}
+        else:
+            raise HTTPException(status_code=400, detail=message)
+    except Exception as e:
+        logger.error(f"Error storing policy: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error storing policy: {str(e)}")
+
+
+@router.get("/{document_id}")
+async def get_document(
     document_id: str,
-    request: DocumentUpdateRequest,
-    current_user: User = Depends(get_current_user),
+    agent: DocumentEditingAgent = Depends(get_document_agent),
 ):
-    """Edit an existing document using the document agent directly."""
-    logger.info(f"Editing document {document_id} for user {current_user.id}")
-
+    """Get a specific document by its ID."""
     try:
-        # Get or create document agent
-        from ...api.server import document_agent
-
-        if not document_agent:
-            raise HTTPException(status_code=503, detail="Document agent not available")
-
-        # Prepare instruction from update request
-        instruction = request.content if request.content else ""
-        if request.title:
-            instruction = f"Update title to: {request.title}\n{instruction}"
-
-        # Edit document using agent
-        success, message, updated_id = await document_agent.edit_document(
-            document_id=document_id,
-            instruction=instruction,
-            use_llm=False,  # Direct edit without LLM processing
-        )
-
-        if success and updated_id:
-            # Get the updated document
-            document = document_manager.get_document("documents", updated_id)
-            if document:
-                return DocumentResponse(
-                    id=document.id,
-                    title=document.metadata.get(
-                        "filename", document.metadata.get("title", "Untitled")
-                    ),
-                    content=document.content,
-                    document_type=document.metadata.get("document_type", "markdown"),
-                    created_at=document.metadata.get(
-                        "created_at", datetime.now().isoformat()
-                    ),
-                    updated_at=document.metadata.get(
-                        "updated_at", datetime.now().isoformat()
-                    ),
-                    metadata=document.metadata,
-                    owner_id=current_user.id,
-                )
-
-        raise HTTPException(
-            status_code=400, detail=message or "Failed to edit document"
-        )
-
+        document = agent.chroma_manager.get_document("documents", document_id)
+        if not document:
+            raise HTTPException(
+                status_code=404, detail=f"Document not found: {document_id}"
+            )
+        return {
+            "id": document.id,
+            "content": document.content,
+            "metadata": document.metadata,
+            "created_at": document.timestamp.isoformat(),
+            "updated_at": document.metadata.get(
+                "updated_at", document.timestamp.isoformat()
+            ),
+        }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error editing document: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Internal error editing document: {str(e)}"
-        )
+        logger.error(f"Error getting document {document_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error getting document: {str(e)}")
 
 
-@router.post("/chat", response_model=dict)
-async def chat_with_document_agent(
-    request: dict,
-    current_user: User = Depends(get_current_user),
+@router.delete("/{document_id}")
+async def delete_document(
+    document_id: str,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
 ):
-    """Chat with the document agent for assistance."""
-    logger.info(f"Chat request from user {current_user.id}")
-
+    """Delete a document by its ID."""
     try:
-        # Get or create document agent
-
-        if not document_agent:
-            raise HTTPException(status_code=503, detail="Document agent not available")
-
-        message = request.get("message", "")
-        context_document_id = request.get("context_document_id")
-
-        # Get response from agent
-        response = await document_agent.chat_with_user(
-            message=message, context_document_id=context_document_id
+        success = agent.chroma_manager.delete_document("documents", document_id)
+        if success:
+            return {"success": True, "message": f"Document {document_id} deleted"}
+        else:
+            raise HTTPException(
+                status_code=404, detail=f"Document not found: {document_id}"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting document {document_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error deleting document: {str(e)}"
         )
 
-        return {"response": response, "timestamp": datetime.now().isoformat()}
 
+@router.get("/")
+async def list_documents(
+    collection_type: str = "documents",
+    limit: int = 100,
+    offset: int = 0,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
+):
+    """List all documents in a collection with pagination."""
+    try:
+        documents = agent.chroma_manager.get_all_documents(collection_type)
+        total = len(documents)
+        paginated_docs = documents[offset : offset + limit]
+        return {
+            "documents": [
+                {
+                    "id": doc.id,
+                    "name": doc.metadata.get(
+                        "filename", doc.metadata.get("title", "Untitled")
+                    ),
+                    "content": doc.content,
+                    "metadata": doc.metadata,
+                    "created_at": doc.timestamp.isoformat(),
+                    "updated_at": doc.metadata.get(
+                        "updated_at", doc.timestamp.isoformat()
+                    ),
+                    "type": collection_type,
+                }
+                for doc in paginated_docs
+            ],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
     except Exception as e:
-        logger.error(f"Error in chat: {e}")
-        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+        logger.error(f"Error listing documents: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error listing documents: {str(e)}"
+        )

@@ -5,137 +5,72 @@ This server provides REST API endpoints for the DocumentEditingAgent
 to enable seamless integration with the React frontend.
 """
 
-import json
 import os
-
-# Ensure we can import from src
 import sys
-import uuid
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from ..utils.logging_config import get_logger
-
+# Ensure we can import from src
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
 from ..agent.document_editor import DocumentEditingAgent
+from ..agent.orchestrator.simple_orchestrator import (
+    SimpleAgentOrchestrator,
+    initialize_orchestrator,
+)
+from ..utils.logging_config import get_logger
+from .dependencies import set_document_agent, set_orchestrator
+from .middleware.error_handler import (
+    AppException,
+    app_exception_handler,
+    generic_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+)
+from .routes.agents import router as agents_router
+from .routes.auth import router as auth_router
+from .routes.documents import router as documents_router
 
 logger = get_logger(__name__)
 
-# Global agent instance
+# --- Singleton Service Instances (Managed by Lifespan) ---
 document_agent: DocumentEditingAgent | None = None
-
-
-# Pydantic models for API requests/responses
-class DocumentCreateRequest(BaseModel):
-    filename: str
-    content: str = ""
-    document_type: str = "document"
-    metadata: dict[str, Any] | None = None
-
-
-class DocumentEditRequest(BaseModel):
-    document_id: str
-    instruction: str
-    use_llm: bool = True
-
-
-class DocumentSearchRequest(BaseModel):
-    query: str
-    collection_type: str = "documents"
-    limit: int = 10
-    use_mcp_tools: bool = True
-
-
-class DocumentSuggestionsRequest(BaseModel):
-    content: str
-    document_type: str = "document"
-
-
-class ChatMessage(BaseModel):
-    sender: str
-    text: str
-
-
-class ChatRequest(BaseModel):
-    message: str
-    context_document_id: str | None = None
-    use_streaming: bool = True
-
-
-class ChatResponse(BaseModel):
-    id: str
-    sender: str = "assistant"
-    text: str
-
-
-class AgentStatusResponse(BaseModel):
-    initialized: bool
-    mcp_tools_available: int
-    session_id: str | None
-    current_document: str | None
-    database_stats: dict[str, Any] | None
-    message: str
+orchestrator: SimpleAgentOrchestrator | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
-    global document_agent
+    """
+    Application lifespan manager. Initializes and shuts down services gracefully.
+    """
+    global document_agent, orchestrator
 
-    # Startup
-    logger.info("Starting API server...")
+    # --- Startup ---
+    logger.info("Starting API server and initializing services...")
 
-    # Initialize WebSocket manager first
-    # Initialize agent orchestrator
-    from ..agent.orchestrator.simple_orchestrator import initialize_orchestrator
-    from .dependencies import set_orchestrator
+    # 1. Initialize WebSocket manager (it's a global instance)
     from .websocket.websocket_manager import ws_manager
 
+    # 2. Initialize agent orchestrator
     orchestrator = initialize_orchestrator(ws_manager)
-    set_orchestrator(orchestrator)  # Make it available to other routes
+    set_orchestrator(orchestrator)
     logger.info("Agent orchestrator initialized")
 
-    # Initialize document agent
-    await initialize_document_agent()
-
-    # Register document agent with orchestrator if available
-    if document_agent and orchestrator:
-        orchestrator.register_agent("document_editor", document_agent)
-        logger.info("DocumentEditingAgent registered with orchestrator")
-
-    yield
-
-    # Shutdown
-    logger.info("Shutting down API server...")
-    if document_agent:
-        await document_agent.close()
-
-
-async def initialize_document_agent():
-    """Initialize the DocumentEditingAgent."""
-    global document_agent
-
+    # 3. Initialize document agent
     try:
-        # Get environment variables for LLM configuration
         llm_provider_name = os.getenv("LLM_PROVIDER", "ollama")
         llm_model_name = os.getenv("LLM_MODEL", "llama3.2")
         llm_temperature = float(os.getenv("LLM_TEMPERATURE", "0.3"))
         llm_api_key = os.getenv("LLM_API_KEY")
         llm_base_url = os.getenv("LLM_BASE_URL")
 
-        # Initialize the agent
         document_agent = DocumentEditingAgent(
             llm_provider_name=llm_provider_name,
             llm_model_name=llm_model_name,
@@ -144,20 +79,33 @@ async def initialize_document_agent():
             llm_base_url=llm_base_url,
             working_directory="./tmp/documents",
         )
+        await document_agent.initialize()
+        set_document_agent(document_agent)
+        logger.info("DocumentEditingAgent initialized successfully")
 
-        # Initialize with MCP tools
-        success = await document_agent.initialize()
-        if success:
-            logger.info("DocumentEditingAgent initialized successfully with MCP tools")
-        else:
-            logger.warning("DocumentEditingAgent initialized without MCP tools")
+        # 4. Register agent with orchestrator
+        if orchestrator:
+            orchestrator.register_agent("document_editor", document_agent)
+            logger.info("DocumentEditingAgent registered with orchestrator")
 
     except Exception as e:
-        logger.error(f"Failed to initialize DocumentEditingAgent: {e}")
+        logger.critical(
+            f"Failed to initialize DocumentEditingAgent at startup: {e}", exc_info=True
+        )
+        # Set to None to indicate failure
         document_agent = None
+        set_document_agent(None)
+
+    yield
+
+    # --- Shutdown ---
+    logger.info("Shutting down API server and services...")
+    if document_agent:
+        await document_agent.close()
+        logger.info("DocumentEditingAgent shut down gracefully.")
 
 
-# Create FastAPI app
+# --- FastAPI App Initialization ---
 app = FastAPI(
     title="Web UI Document Editor API",
     description="API for AI-powered document editing with DocumentEditingAgent",
@@ -168,539 +116,67 @@ app = FastAPI(
 # Add CORS middleware for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "*",
-    ],  # Allow React dev server
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include authentication routes
-from .auth.google_auth import setup_google_oauth
-from .routes.auth import router as auth_router
+# --- Register Routers ---
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(documents_router, prefix="/api/documents", tags=["Documents"])
+app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
 
-app.include_router(auth_router, prefix="/api/auth")
-
-# Setup Google OAuth (if enabled)
-setup_google_oauth(app)
-
-# Add WebSocket and error handling support
-from .middleware.error_handler import (
-    AppException,
-    app_exception_handler,
-    generic_exception_handler,
-    http_exception_handler,
-    validation_exception_handler,
-)
-
-# Register error handlers
+# --- Register Error Handlers ---
 app.add_exception_handler(AppException, app_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
-# Include document routes
-from .routes.agents import router as agents_router
-from .routes.documents import router as documents_router
 
-app.include_router(documents_router)
-app.include_router(agents_router)  # agents_router already has /api/agents prefix
-
-
-# WebSocket endpoint for real-time communication
+# --- WebSocket Endpoint ---
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str):
     """WebSocket endpoint with authentication."""
+    from .auth.auth_service import auth_service
+    from .websocket.websocket_manager import ws_manager
+
+    user_id = auth_service.verify_token(token)
+    if not user_id:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
+    await ws_manager.connect(websocket, user_id)
     try:
-        # Import auth service for token verification
-        from .auth.auth_service import AuthService
-
-        auth_service = AuthService()
-
-        # Verify authentication token
-        user_id = auth_service.verify_token(token)
-        if not user_id:
-            await websocket.close(code=4001, reason="Unauthorized")
-            return
-
-        # Import WebSocket manager
-        from .websocket.websocket_manager import ws_manager
-
-        # Connect user
-        await ws_manager.connect(websocket, user_id)
-
-        try:
-            # Handle incoming messages
-            while True:
-                data = await websocket.receive_json()
-                await ws_manager.handle_user_message(user_id, data)
-
-        except WebSocketDisconnect:
-            await ws_manager.disconnect(user_id)
-        except Exception as e:
-            logger.error(f"WebSocket error for user {user_id}: {e}")
-            await ws_manager.disconnect(user_id)
-
+        while True:
+            data = await websocket.receive_json()
+            await ws_manager.handle_user_message(user_id, data)
+    except WebSocketDisconnect:
+        logger.info(f"User {user_id} disconnected from WebSocket.")
     except Exception as e:
-        logger.error(f"WebSocket connection failed: {e}")
-        try:
-            await websocket.close(code=4000, reason="Connection failed")
-        except:
-            pass
+        logger.error(f"WebSocket error for user {user_id}: {e}", exc_info=True)
+    finally:
+        await ws_manager.disconnect(user_id)
 
 
-@app.get("/")
+# --- Root and Health Check Endpoints ---
+@app.get("/", tags=["System"])
 async def root():
     """Root endpoint."""
     return {"message": "Web UI Document Editor API", "status": "running"}
 
 
-@app.get("/health")
-async def health_check():
+@app.get("/health", tags=["System"])
+async def health_check(agent: DocumentEditingAgent = Depends(get_document_agent)):
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "agent_initialized": document_agent is not None,
-        "mcp_tools_available": len(document_agent.mcp_tools) if document_agent else 0,
+        "agent_initialized": agent is not None,
+        "mcp_tools_available": len(agent.mcp_tools) if agent else 0,
     }
 
 
-@app.get("/agent/status", response_model=AgentStatusResponse)
-async def get_agent_status():
-    """Get DocumentEditingAgent status."""
-    if not document_agent:
-        return AgentStatusResponse(
-            initialized=False,
-            mcp_tools_available=0,
-            session_id=None,
-            current_document=None,
-            database_stats=None,
-            message="Agent not initialized",
-        )
-
-    try:
-        stats = await document_agent.get_database_stats()
-        return AgentStatusResponse(
-            initialized=True,
-            mcp_tools_available=len(document_agent.mcp_tools),
-            session_id=document_agent.session_id,
-            current_document=document_agent.current_document_id,
-            database_stats=stats,
-            message="Agent ready",
-        )
-    except Exception as e:
-        logger.error(f"Error getting agent status: {e}")
-        return AgentStatusResponse(
-            initialized=True,
-            mcp_tools_available=len(document_agent.mcp_tools),
-            session_id=document_agent.session_id,
-            current_document=document_agent.current_document_id,
-            database_stats=None,
-            message=f"Error: {str(e)}",
-        )
-
-
-@app.post("/documents/create")
-async def create_document(request: DocumentCreateRequest):
-    """Create a new document using DocumentEditingAgent."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        success, message, document_id = await document_agent.create_document(
-            filename=request.filename,
-            content=request.content,
-            document_type=request.document_type,
-            metadata=request.metadata,
-        )
-
-        if success:
-            return {"success": True, "message": message, "document_id": document_id}
-        else:
-            raise HTTPException(status_code=400, detail=message)
-
-    except Exception as e:
-        logger.error(f"Error creating document: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error creating document: {str(e)}"
-        )
-
-
-@app.post("/documents/edit")
-async def edit_document(request: DocumentEditRequest):
-    """Edit a document using DocumentEditingAgent."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        success, message, document_id = await document_agent.edit_document(
-            document_id=request.document_id,
-            instruction=request.instruction,
-            use_llm=request.use_llm,
-        )
-
-        if success:
-            # Get the updated document content
-            document = document_agent.chroma_manager.get_document(
-                "documents", document_id or request.document_id
-            )
-            return {
-                "success": True,
-                "message": message,
-                "document_id": document_id,
-                "content": document.content if document else None,
-                "metadata": document.metadata if document else None,
-            }
-        else:
-            raise HTTPException(status_code=400, detail=message)
-
-    except Exception as e:
-        logger.error(f"Error editing document: {e}")
-        raise HTTPException(status_code=500, detail=f"Error editing document: {str(e)}")
-
-
-@app.post("/documents/search")
-async def search_documents(request: DocumentSearchRequest):
-    """Search documents using DocumentEditingAgent."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        results = await document_agent.search_documents(
-            query=request.query,
-            collection_type=request.collection_type,
-            limit=request.limit,
-            use_mcp_tools=request.use_mcp_tools,
-        )
-
-        return {"success": True, "results": results, "total": len(results)}
-
-    except Exception as e:
-        logger.error(f"Error searching documents: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error searching documents: {str(e)}"
-        )
-
-
-@app.post("/documents/suggestions")
-async def get_document_suggestions(request: DocumentSuggestionsRequest):
-    """Get document suggestions using DocumentEditingAgent."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        suggestions = await document_agent.get_document_suggestions(
-            content=request.content, document_type=request.document_type
-        )
-
-        return {"success": True, "suggestions": suggestions}
-
-    except Exception as e:
-        logger.error(f"Error getting suggestions: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error getting suggestions: {str(e)}"
-        )
-
-
-@app.post("/documents/batch")
-async def process_batch_documents(
-    file_paths: list[str], document_type: str = "document"
-):
-    """Process multiple documents in batch using DocumentEditingAgent."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        results = await document_agent.process_batch_documents(
-            file_paths=file_paths, document_type=document_type
-        )
-
-        return {"success": True, "results": results}
-
-    except Exception as e:
-        logger.error(f"Error in batch processing: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error in batch processing: {str(e)}"
-        )
-
-
-@app.post("/documents/store-policy")
-async def store_as_policy(
-    document_id: str,
-    policy_title: str,
-    policy_type: str = "manual",
-    authority_level: str = "medium",
-):
-    """Store a document as a policy manual using DocumentEditingAgent."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        success, message = await document_agent.store_as_policy(
-            document_id=document_id,
-            policy_title=policy_title,
-            policy_type=policy_type,
-            authority_level=authority_level,
-        )
-
-        if success:
-            return {"success": True, "message": message}
-        else:
-            raise HTTPException(status_code=400, detail=message)
-
-    except Exception as e:
-        logger.error(f"Error storing policy: {e}")
-        raise HTTPException(status_code=500, detail=f"Error storing policy: {str(e)}")
-
-
-@app.get("/llm/providers")
-async def get_llm_providers():
-    """Get available LLM providers and models."""
-    if not document_agent:
-        await initialize_document_agent()
-
-    if document_agent:
-        return document_agent.get_available_providers()
-    else:
-        # Fallback to basic provider info
-        return {
-            "providers": ["ollama", "openai", "anthropic"],
-            "models_by_provider": {
-                "ollama": ["llama3.2", "llama3.1", "codellama"],
-                "openai": ["gpt-4", "gpt-3.5-turbo"],
-                "anthropic": ["claude-3-opus", "claude-3-sonnet"],
-            },
-        }
-
-
-@app.get("/llm/config")
-async def get_llm_config():
-    """Get current LLM configuration."""
-    if not document_agent:
-        await initialize_document_agent()
-
-    if document_agent:
-        return document_agent.get_current_llm_config()
-    else:
-        return {
-            "provider": None,
-            "model": None,
-            "temperature": 0.3,
-            "has_llm": False,
-            "base_url": None,
-            "api_key_set": False,
-        }
-
-
-@app.post("/chat/message")
-async def send_chat_message(request: ChatRequest):
-    """Send a chat message to the DocumentEditingAgent."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        # Ensure LLM is available
-        if not document_agent.llm:
-            success = await document_agent.setup_llm()
-            if not success:
-                raise HTTPException(
-                    status_code=503,
-                    detail="LLM not available. Please configure LLM settings.",
-                )
-
-        # Generate response
-        response_text = await document_agent.chat_with_user(
-            message=request.message, context_document_id=request.context_document_id
-        )
-
-        message_id = str(uuid.uuid4())
-
-        return ChatResponse(id=message_id, sender="assistant", text=response_text)
-
-    except Exception as e:
-        logger.error(f"Error in chat: {e}")
-        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
-
-
-@app.post("/chat/stream")
-async def stream_chat_message(request: ChatRequest):
-    """Stream a chat response from the DocumentEditingAgent."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        # Ensure LLM is available
-        if not document_agent.llm:
-            success = await document_agent.setup_llm()
-            if not success:
-                raise HTTPException(
-                    status_code=503,
-                    detail="LLM not available. Please configure LLM settings.",
-                )
-
-        async def generate_response() -> AsyncGenerator[str]:
-            """Generate streaming response."""
-            async for chunk in document_agent.chat_with_user_stream(
-                message=request.message, context_document_id=request.context_document_id
-            ):
-                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-            yield "data: [DONE]\n\n"
-
-        return StreamingResponse(
-            generate_response(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
-        )
-
-    except Exception as e:
-        logger.error(f"Error in streaming chat: {e}")
-        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
-
-
-@app.get("/documents/{document_id}")
-async def get_document(document_id: str):
-    """Get a specific document by ID."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        document = document_agent.chroma_manager.get_document("documents", document_id)
-        if not document:
-            raise HTTPException(
-                status_code=404, detail=f"Document not found: {document_id}"
-            )
-
-        return {
-            "id": document.id,
-            "content": document.content,
-            "metadata": document.metadata,
-            "created_at": document.created_at,
-            "updated_at": document.updated_at,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting document: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting document: {str(e)}")
-
-
-@app.delete("/documents/{document_id}")
-async def delete_document(document_id: str):
-    """Delete a document."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        success = document_agent.chroma_manager.delete_document(
-            "documents", document_id
-        )
-        if success:
-            return {"success": True, "message": f"Document {document_id} deleted"}
-        else:
-            raise HTTPException(
-                status_code=404, detail=f"Document not found: {document_id}"
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting document: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error deleting document: {str(e)}"
-        )
-
-
-@app.get("/documents")
-async def list_documents(
-    collection_type: str = "documents", limit: int = 100, offset: int = 0
-):
-    """List all documents."""
-    if not document_agent:
-        await initialize_document_agent()
-        if not document_agent:
-            raise HTTPException(
-                status_code=500, detail="DocumentEditingAgent not available"
-            )
-
-    try:
-        # Get all documents from the collection
-        documents = document_agent.chroma_manager.get_all_documents(collection_type)
-
-        # Apply pagination
-        total = len(documents)
-        documents = documents[offset : offset + limit]
-
-        return {
-            "documents": [
-                {
-                    "id": doc.id,
-                    "name": doc.metadata.get(
-                        "filename", doc.metadata.get("title", "Untitled")
-                    ),
-                    "content": doc.content,
-                    "metadata": doc.metadata,
-                    "created_at": doc.created_at,
-                    "updated_at": doc.updated_at,
-                    "type": collection_type,
-                }
-                for doc in documents
-            ],
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-        }
-
-    except Exception as e:
-        logger.error(f"Error listing documents: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error listing documents: {str(e)}"
-        )
-
-
+# --- Server Runner ---
 def run_api_server(
     host: str = "127.0.0.1",
     port: int = 8000,
@@ -713,8 +189,6 @@ def run_api_server(
     from ..utils.logging_config import LoggingConfig
 
     logger.info(f"Starting API server on {host}:{port}")
-
-    # Get uvicorn-specific logging configuration to prevent duplicates
     log_config = LoggingConfig.configure_uvicorn_logging(log_level.upper())
 
     uvicorn.run(
@@ -722,7 +196,7 @@ def run_api_server(
         host=host,
         port=port,
         reload=reload,
-        log_config=log_config,  # Use our custom log config instead of log_level
+        log_config=log_config,
     )
 
 

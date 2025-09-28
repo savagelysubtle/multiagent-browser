@@ -4,7 +4,26 @@ export interface User {
   email: string;
   name?: string;
   picture?: string;
+  is_active: boolean;
   created_at: string;
+  state?: {
+    preferences: {
+      theme: 'light' | 'dark';
+      sidebarWidth: number;
+      editorFontSize: number;
+      [key: string]: any;
+    };
+    workspace: {
+      openDocuments: string[];
+      activeDocument: string | null;
+      recentFiles: string[];
+      [key: string]: any;
+    };
+    agentSettings: {
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
 }
 
 // Document types
