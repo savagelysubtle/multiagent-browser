@@ -239,3 +239,39 @@ The React frontend is now complete and ready for deployment setup. All core func
 - ✅ ChromaDB integration working for agent data storage
 - ✅ Authentication system securing all agent endpoints
 - ✅ FastAPI server ready for Phase 4 frontend integration
+
+## Recent Updates
+
+### ✅ Logging Centralization (September 28, 2025)
+**Status**: COMPLETED
+
+Successfully centralized all logging across the backend to use the new `logging_config.py` module:
+
+#### Changes Made:
+- **Central Configuration**: Created `backend/src/web_ui/utils/logging_config.py` with `LoggingConfig` class and `get_logger()` function
+- **Updated Files**: All Python files in the backend directory updated to use centralized logging:
+  - All `import logging` statements removed (except in the central config file)
+  - All `logger = logging.getLogger(__name__)` replaced with `from ...utils.logging_config import get_logger` and `logger = get_logger(__name__)`
+  - All `print()` statements converted to proper logging calls
+
+#### Files Updated:
+- **Agent Adapters**: All adapter files updated (browser_use, deep_research, document_editor)
+- **Agent Implementations**: All agent files updated (browser_use_agent, deep_research_agent, document_agent, etc.)
+- **API Layer**: All API files updated (auth, routes, middleware, websocket)
+- **Browser Components**: Custom browser and context files updated
+- **Controller**: Custom controller updated
+- **Database Layer**: All database files updated (chroma_manager, connection, pipeline, etc.)
+- **Services**: MCP service updated
+- **Utils**: All utility files updated, including mcp_client and utils.py
+
+#### Benefits:
+- Consistent logging format across the entire application
+- Centralized log level management
+- Proper separation of concerns with logging configuration
+- Better debugging and monitoring capabilities
+- Eliminated scattered `print()` statements
+
+#### Next Steps:
+- Monitor logs for any issues with the new configuration
+- Consider adding structured logging with JSON format for production
+- Add log rotation configuration if needed

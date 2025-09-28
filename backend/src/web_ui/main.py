@@ -1,43 +1,42 @@
 #!/usr/bin/env python3
 """
-Main entry point for the Web-UI Application.
+Web-UI Application Orchestrator.
 
-This serves as a unified orchestrator that can:
-- Start the FastAPI backend server for React frontend integration
-- Initialize background services
-- Run in different modes (API server, headless, etc.)
-- Manage ChromaDB, AI agents, and MCP servers
+This orchestrator manages the entire application lifecycle including:
+- FastAPI server for React frontend
+- Background services (if needed)
+- Database connections
+- Service initialization
+
+Architecture: Entry point (webui.py) -> Orchestrator (this file) -> Services
 """
 
 import argparse
 import asyncio
-import logging
 import sys
 from pathlib import Path
 
-# Ensure we can import from both src and root
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / "src"))
+# Add the backend src to path for imports
+backend_root = Path(__file__).parent.parent.parent  # Navigate up to backend/
+sys.path.insert(0, str(backend_root))
+sys.path.insert(0, str(backend_root / "src"))
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+# Import centralized logging configuration
+from web_ui.utils.logging_config import LoggingConfig, get_logger
+
+# Project root is the backend directory
+project_root = backend_root
+
+logger = get_logger(__name__)
 
 
 def setup_logging(level: str = "INFO") -> None:
-    """Configure logging for the application."""
-    # Ensure logs directory exists
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
-
-    logging.basicConfig(
-        level=getattr(logging, level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(), logging.FileHandler(log_dir / "web-ui.log")],
-    )
+    """Configure logging for the application using centralized configuration."""
+    LoggingConfig.setup_logging(level=level)
 
 
 def start_api_server(args: argparse.Namespace) -> None:

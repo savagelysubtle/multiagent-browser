@@ -6,14 +6,14 @@ with ChromaDB backend storage.
 """
 
 import json
-import logging
 from datetime import datetime
 from typing import Any
 
+from ..utils.logging_config import get_logger
 from .chroma_manager import ChromaManager
 from .models import CollectionConfig, DocumentModel
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class UserStateManager:

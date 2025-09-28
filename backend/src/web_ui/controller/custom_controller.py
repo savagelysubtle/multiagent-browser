@@ -1,5 +1,4 @@
 import inspect
-import logging
 import os
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
@@ -12,9 +11,10 @@ from browser_use.utils import time_execution_sync
 from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import BaseModel
 
+from ..utils.logging_config import get_logger
 from ..utils.mcp_client import create_tool_param_model, setup_mcp_client_and_tools
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 Context = TypeVar("Context")
 

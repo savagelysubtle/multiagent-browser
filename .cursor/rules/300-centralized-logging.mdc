@@ -1,0 +1,498 @@
+---
+description:
+  globs: **/*.py
+alwaysApply: false
+---
+# Centralized Logging Configuration
+
+<cursor-rule>
+<version>1.0.0</version>
+
+<context>
+This rule defines the centralized logging system implemented across the web-ui backend. All logging operations use the centralized configuration from [logging_config.py](mdc:backend/src/web_ui/utils/logging_config.py) to ensure consistent formatting, file output, and log management across the entire application.
+</context>
+
+<project-scope>
+<target>All Python files in backend/src/web_ui/ directory</target>
+<central-config>[backend/src/web_ui/utils/logging_config.py](mdc:backend/src/web_ui/utils/logging_config.py)</central-config>
+<log-output>./logs/web-ui.log with rotation (10MB max, 5 backups)</log-output>
+</project-scope>
+
+<logging-architecture>
+<central-configuration>
+<file>backend/src/web_ui/utils/logging_config.py</file>
+<class>LoggingConfig</class>
+<key-features>
+<feature>Automatic log directory creation (./logs/)</feature>
+<feature>Dual output: console (stdout) and rotating file</feature>
+<feature>Configurable log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)</feature>
+<feature>Consistent formatting with timestamps</feature>
+<feature>Uvicorn integration for FastAPI servers</feature>
+<feature>Prevention of duplicate log handlers</feature>
+</key-features>
+</central-configuration>
+
+<usage-pattern>
+<import>from ...utils.logging_config import get_logger</import>
+<instantiation>logger = get_logger(__name__)</instantiation>
+<log-calls>logger.info(), logger.error(), logger.warning(), logger.debug()</log-calls>
+</usage-pattern>
+</logging-architecture>
+
+<implementation-standards>
+<required-imports>
+<pattern>from ...utils.logging_config import get_logger</pattern>
+<notes>
+<note>Use relative imports with correct path depth based on file location</note>
+<note>For files in agent/: from ...utils.logging_config import get_logger</note>
+<note>For files in api/: from ...utils.logging_config import get_logger</note>
+<note>For files in database/: from ..utils.logging_config import get_logger</note>
+<note>For files in utils/: from .logging_config import get_logger</note>
+</notes>
+</required-imports>
+
+<logger-instantiation>
+<standard>logger = get_logger(__name__)</standard>
+<placement>After all imports, before any class or function definitions</placement>
+<forbidden>
+<pattern>import logging</pattern>
+<pattern>logger = logging.getLogger(__name__)</pattern>
+<pattern>logging.basicConfig()</pattern>
+</forbidden>
+</logger-instantiation>
+
+<log-levels-usage>
+<debug>Detailed debugging information, typically only of interest when diagnosing problems</debug>
+<info>General information about application flow and important events</info>
+<warning>An indication that something unexpected happened, but the software is still working</warning>
+<error>A serious problem occurred; the software has not been able to perform some function</error>
+<critical>A serious error occurred; the program itself may be unable to continue running</critical>
+</log-levels-usage>
+
+<message-formatting>
+<f-strings>Use f-strings for log messages: logger.info(f"Processing {count} documents")</f-strings>
+<context>Include relevant context: logger.error(f"Failed to connect to database {db_name}: {error}")</context>
+<user-data>Be careful with sensitive data in logs</user-data>
+<structured>Consider structured data for complex logs: logger.info(f"Operation completed", extra={"duration": duration, "items": count})</structured>
+</message-formatting>
+</implementation-standards>
+
+<migration-completed>
+<status>All backend files successfully migrated to centralized logging</status>
+<files-updated>
+<category name="agent-layer">
+<file>backend/src/web_ui/agent/adapters/browser_use_adapter.py</file>
+<file>backend/src/web_ui/agent/adapters/deep_research_adapter.py</file>
+<file>backend/src/web_ui/agent/adapters/document_editor_adapter.py</file>
+<file>backend/src/web_ui/agent/browser_use/browser_use_agent.py</file>
+<file>backend/src/web_ui/agent/deep_research/deep_research_agent.py</file>
+<file>backend/src/web_ui/agent/document_editor/document_agent.py</file>
+<file>backend/src/web_ui/agent/document_editor/integration.py</file>
+<file>backend/src/web_ui/agent/google_a2a/interface.py</file>
+<file>backend/src/web_ui/agent/orchestrator/simple_orchestrator.py</file>
+</category>
+<category name="api-layer">
+<file>backend/src/web_ui/api/auth/auth_service.py</file>
+<file>backend/src/web_ui/api/auth/dependencies.py</file>
+<file>backend/src/web_ui/api/auth/google_auth.py</file>
+<file>backend/src/web_ui/api/middleware/error_handler.py</file>
+<file>backend/src/web_ui/api/routes/agents.py</file>
+<file>backend/src/web_ui/api/routes/auth.py</file>
+<file>backend/src/web_ui/api/routes/documents.py</file>
+<file>backend/src/web_ui/api/websocket/websocket_manager.py</file>
+<file>backend/src/web_ui/api/server.py</file>
+</category>
+<category name="database-layer">
+<file>backend/src/web_ui/database/chroma_manager.py</file>
+<file>backend/src/web_ui/database/connection.py</file>
+<file>backend/src/web_ui/database/document_pipeline.py</file>
+<file>backend/src/web_ui/database/mcp_config_manager.py</file>
+<file>backend/src/web_ui/database/user_state_manager.py</file>
+<file>backend/src/web_ui/database/utils.py</file>
+</category>
+<category name="infrastructure">
+<file>backend/src/web_ui/browser/custom_browser.py</file>
+<file>backend/src/web_ui/browser/custom_context.py</file>
+<file>backend/src/web_ui/controller/custom_controller.py</file>
+<file>backend/src/web_ui/services/mcp_service.py</file>
+<file>backend/src/web_ui/utils/mcp_client.py</file>
+<file>backend/src/web_ui/utils/utils.py</file>
+<file>backend/src/web_ui/main.py</file>
+</category>
+</files-updated>
+</migration-completed>
+
+<usage-examples>
+<basic-logging>
+<description>Standard logging setup in any backend module</description>
+<example>
+# File: backend/src/web_ui/database/chroma_manager.py
+"""ChromaDB manager for document storage and retrieval."""
+
+from typing import Any
+from uuid import uuid4
+
+from chromadb.api.models.Collection import Collection
+
+from .connection import get_chroma_client, get_db_config
+from .models import CollectionConfig, DocumentModel, QueryRequest, SearchResult
+from ..utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+class ChromaManager:
+def __init__(self):
+logger.info("Initializing ChromaDB manager")
+
+def create_document(self, content: str) -> str:
+try:
+# Implementation here
+logger.info(f"Document created successfully with ID: {doc_id}")
+return doc_id
+except Exception as e:
+logger.error(f"Failed to create document: {e}")
+raise
+</example>
+</basic-logging>
+
+<fastapi-integration>
+<description>Logging in FastAPI server with uvicorn configuration</description>
+<example>
+# File: backend/src/web_ui/api/server.py
+from ...utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+def run_api_server(host: str = "127.0.0.1", port: int = 8000, log_level: str = "info"):
+"""Run the FastAPI server."""
+import uvicorn
+from ..utils.logging_config import LoggingConfig
+
+logger.info(f"Starting API server on {host}:{port}")
+
+# Get uvicorn-specific logging configuration to prevent duplicates
+log_config = LoggingConfig.configure_uvicorn_logging(log_level.upper())
+
+uvicorn.run(
+"src.web_ui.api.server:app",
+host=host,
+port=port,
+log_config=log_config,  # Use our custom log config
+)
+</example>
+</fastapi-integration>
+
+<agent-operations>
+<description>Logging in AI agent operations with context</description>
+<example>
+# File: backend/src/web_ui/agent/document_editor/document_agent.py
+from ...utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+class DocumentEditingAgent:
+async def edit_document(self, document_id: str, instruction: str):
+logger.info(f"Starting document edit operation", extra={
+"document_id": document_id,
+"instruction_length": len(instruction)
+})
+
+try:
+result = await self._process_edit(document_id, instruction)
+logger.info(f"Document edit completed successfully for {document_id}")
+return result
+except ValidationError as e:
+logger.warning(f"Validation failed for document {document_id}: {e}")
+raise
+except Exception as e:
+logger.error(f"Unexpected error editing document {document_id}: {e}")
+raise
+</example>
+</agent-operations>
+</usage-examples>
+
+<configuration-management>
+<initialization>
+<automatic>LoggingConfig automatically initializes on first get_logger() call</automatic>
+<manual>Call LoggingConfig.setup_logging(level="DEBUG") for custom initialization</manual>
+<orchestrator>Main orchestrator ([main.py](mdc:backend/src/web_ui/main.py)) handles logging setup</orchestrator>
+</initialization>
+
+<customization>
+<log-level>Set via LoggingConfig.setup_logging(level="DEBUG")</log-level>
+<log-directory>Custom directory via LoggingConfig.setup_logging(log_dir=Path("custom/logs"))</log-directory>
+<log-filename>Custom filename via LoggingConfig.setup_logging(log_file="custom-app.log")</log-filename>
+</customization>
+
+<file-rotation>
+<max-size>10MB per log file</max-size>
+<backup-count>5 backup files retained</backup-count>
+<encoding>UTF-8 encoding for all log files</encoding>
+</file-rotation>
+</configuration-management>
+
+<anti-patterns>
+<forbidden-practices>
+<practice>
+<description>Direct logging module import and configuration</description>
+<bad>
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+</bad>
+<good>
+from ...utils.logging_config import get_logger
+logger = get_logger(__name__)
+</good>
+</practice>
+
+<practice>
+<description>Using print() for runtime messages</description>
+<bad>
+def process_data(data):
+print(f"Processing {len(data)} items")
+# Process data
+print("Processing complete")
+</bad>
+<good>
+def process_data(data):
+logger.info(f"Processing {len(data)} items")
+# Process data
+logger.info("Processing complete")
+</good>
+</practice>
+
+<practice>
+<description>Creating multiple logging configurations</description>
+<bad>
+# In multiple files
+import logging
+logging.basicConfig()  # Causes conflicts
+logger = logging.getLogger(__name__)
+</bad>
+<good>
+# In all files
+from ...utils.logging_config import get_logger
+logger = get_logger(__name__)
+</good>
+</practice>
+</forbidden-practices>
+</anti-patterns>
+
+<troubleshooting>
+<common-issues>
+<issue name="duplicate-logs">
+<problem>Log messages appearing twice</problem>
+<cause>Multiple handler configurations or uvicorn conflicts</cause>
+<solution>Use LoggingConfig.configure_uvicorn_logging() for FastAPI servers</solution>
+</issue>
+
+<issue name="missing-logs">
+<problem>Log messages not appearing in files</problem>
+<cause>Logging not initialized or wrong log level</cause>
+<solution>Ensure LoggingConfig.setup_logging() is called with appropriate level</solution>
+</issue>
+
+<issue name="import-errors">
+<problem>Cannot import get_logger</problem>
+<cause>Incorrect relative import path</cause>
+<solution>Adjust import path based on file location in directory structure</solution>
+</issue>
+</common-issues>
+</troubleshooting>
+
+<requirements>
+<requirement>
+<type>ImportStandard</type>
+<guideline>ALWAYS use `from ...utils.logging_config import get_logger` instead of `import logging`</guideline>
+</requirement>
+
+<requirement>
+<type>LoggerInstantiation</type>
+<guideline>ALWAYS use `logger = get_logger(__name__)` for logger instances</guideline>
+</requirement>
+
+<requirement>
+<type>NoDirectLogging</type>
+<guideline>NEVER import logging module directly or use logging.basicConfig() in application files</guideline>
+</requirement>
+
+<requirement>
+<type>NoPrintStatements</type>
+<guideline>NEVER use print() for runtime messages - always use appropriate logger methods</guideline>
+</requirement>
+
+<requirement>
+<type>LogDirectory</type>
+<guideline>ALL logs automatically write to ./logs/ directory via centralized configuration</guideline>
+</requirement>
+
+<requirement>
+<type>ContextLogging</type>
+<guideline>INCLUDE relevant context in log messages (IDs, counts, error details, operation names)</guideline>
+</requirement>
+</requirements>
+
+<integration-patterns>
+<fastapi-servers>
+<description>Special handling for FastAPI/uvicorn servers to prevent log duplication</description>
+<pattern>
+def run_api_server(log_level: str = "info"):
+import uvicorn
+from ..utils.logging_config import LoggingConfig
+
+logger.info("Starting API server")
+log_config = LoggingConfig.configure_uvicorn_logging(log_level.upper())
+
+uvicorn.run(
+"app:app",
+log_config=log_config,  # Use centralized config
+)
+</pattern>
+</fastapi-servers>
+
+<agent-operations>
+<description>Structured logging for AI agent operations with context</description>
+<pattern>
+class DocumentEditingAgent:
+async def edit_document(self, document_id: str, instruction: str):
+logger.info(f"Starting document edit", extra={
+"document_id": document_id,
+"operation": "edit_document"
+})
+
+try:
+result = await self._process_edit(document_id, instruction)
+logger.info(f"Document edit completed for {document_id}")
+return result
+except Exception as e:
+logger.error(f"Document edit failed for {document_id}: {e}")
+raise
+</pattern>
+</agent-operations>
+
+<database-operations>
+<description>Database operation logging with transaction context</description>
+<pattern>
+class ChromaManager:
+def add_documents(self, documents: List[str]) -> bool:
+logger.info(f"Adding {len(documents)} documents to collection {self.collection_name}")
+
+try:
+self.collection.add(documents=documents)
+logger.info(f"Successfully added {len(documents)} documents")
+return True
+except Exception as e:
+logger.error(f"Failed to add documents to {self.collection_name}: {e}")
+return False
+</pattern>
+</database-operations>
+</integration-patterns>
+
+<log-format-specification>
+<format-string>%(asctime)s - %(name)s - %(levelname)s - %(message)s</format-string>
+<date-format>%Y-%m-%d %H:%M:%S</date-format>
+<example-output>2025-09-28 14:30:15 - web_ui.database.chroma_manager - INFO - ChromaDB manager initialized</example-output>
+<file-location>./logs/web-ui.log</file-location>
+<rotation>10MB max size, 5 backup files (web-ui.log.1, web-ui.log.2, etc.)</rotation>
+</log-format-specification>
+
+<examples>
+<correct-implementation>
+<description>Proper logging implementation in a backend module</description>
+<example>
+# backend/src/web_ui/api/routes/documents.py
+"""Document management API routes."""
+
+import uuid
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+
+from ...database.chroma_manager import ChromaManager
+from ...database.models import DocumentModel
+from ..auth.auth_service import User
+from ..auth.dependencies import get_current_user
+from ...utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+router = APIRouter(prefix="/api/documents", tags=["documents"])
+
+@router.post("/create")
+async def create_document(
+document_data: DocumentCreateRequest,
+current_user: User = Depends(get_current_user)
+):
+logger.info(f"Creating document for user {current_user.id}")
+
+try:
+doc_id = str(uuid.uuid4())
+# Document creation logic here
+logger.info(f"Document {doc_id} created successfully")
+return {"document_id": doc_id, "status": "created"}
+except ValidationError as e:
+logger.warning(f"Document validation failed: {e}")
+raise HTTPException(status_code=400, detail=str(e))
+except Exception as e:
+logger.error(f"Unexpected error creating document: {e}")
+raise HTTPException(status_code=500, detail="Internal server error")
+</example>
+</correct-implementation>
+
+<import-path-reference>
+<description>Correct import paths based on file location</description>
+<examples>
+<example>
+<location>backend/src/web_ui/agent/adapters/</location>
+<import>from ...utils.logging_config import get_logger</import>
+</example>
+<example>
+<location>backend/src/web_ui/api/routes/</location>
+<import>from ...utils.logging_config import get_logger</import>
+</example>
+<example>
+<location>backend/src/web_ui/database/</location>
+<import>from ..utils.logging_config import get_logger</import>
+</example>
+<example>
+<location>backend/src/web_ui/utils/</location>
+<import>from .logging_config import get_logger</import>
+</example>
+</examples>
+</import-path-reference>
+</examples>
+
+<maintenance>
+<monitoring>
+<log-files>Monitor ./logs/web-ui.log for application health and errors</log-files>
+<rotation>Log files automatically rotate when reaching 10MB size limit</rotation>
+<cleanup>Old log files (beyond 5 backups) are automatically removed</cleanup>
+</monitoring>
+
+<configuration-changes>
+<level-changes>Modify log level via LoggingConfig.setup_logging(level="DEBUG")</level-changes>
+<format-changes>Update format strings in LoggingConfig class constants</format-changes>
+<output-changes>Configure custom log directories and filenames via setup_logging parameters</output-changes>
+</configuration-changes>
+
+<debugging>
+<enable-debug>LoggingConfig.setup_logging(level="DEBUG") for detailed debugging</enable-debug>
+<reset-config>LoggingConfig.reset() to clear and reinitialize logging configuration</reset-config>
+<check-handlers>Inspect logger.handlers to verify correct handler configuration</check-handlers>
+</debugging>
+</maintenance>
+
+<critical-instructions>
+<instruction>NEVER import logging module directly in application files</instruction>
+<instruction>ALWAYS use get_logger(__name__) from centralized logging_config</instruction>
+<instruction>REPLACE all print() statements with appropriate logger method calls</instruction>
+<instruction>INCLUDE meaningful context and data in all log messages</instruction>
+<instruction>USE LoggingConfig.configure_uvicorn_logging() for FastAPI server integration</instruction>
+<instruction>MAINTAIN consistent log message formatting across all backend modules</instruction>
+<instruction>ENSURE all new backend files follow the centralized logging pattern from day one</instruction>
+</critical-instructions>
+</cursor-rule>
+
+

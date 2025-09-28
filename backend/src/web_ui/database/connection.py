@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from pathlib import Path
 
 from chromadb import PersistentClient
 from chromadb.config import Settings
 
-logger = logging.getLogger(__name__)
+from ..utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ChromaConnection:

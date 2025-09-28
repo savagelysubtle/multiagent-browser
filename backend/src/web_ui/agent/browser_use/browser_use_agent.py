@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 
 # from lmnr.sdk.decorators import observe
@@ -19,8 +18,10 @@ from browser_use.browser.views import BrowserStateHistory
 from browser_use.utils import time_execution_async
 from dotenv import load_dotenv
 
+from ...utils.logging_config import get_logger
+
 load_dotenv()
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 SKIP_LLM_API_KEY_VERIFICATION = (
     os.environ.get("SKIP_LLM_API_KEY_VERIFICATION", "false").lower()[0] in "ty1"

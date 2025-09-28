@@ -5,7 +5,6 @@ Provides CRUD operations for documents with ChromaDB integration
 and DocumentEditingAgent support.
 """
 
-import logging
 import uuid
 from typing import Any
 
@@ -14,10 +13,11 @@ from pydantic import BaseModel
 
 from ...database.chroma_manager import ChromaManager
 from ...database.models import DocumentModel
+from ...utils.logging_config import get_logger
 from ..auth.auth_service import User
 from ..auth.dependencies import get_current_user
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Create router
 router = APIRouter(prefix="/documents", tags=["documents"])

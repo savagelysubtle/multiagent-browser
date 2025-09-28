@@ -2,26 +2,24 @@
 Authentication Service for React Frontend Integration.
 
 This service provides JWT-based authentication with user management
-and ChromaDB integration for persistent user state.
+and SQLite integration for persistent user storage.
 """
 
 from __future__ import annotations
 
-import json
-import logging
 import os
 from datetime import datetime, timedelta
 from typing import Any
-from uuid import uuid4
 
 from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-from ...database import ChromaManager, DocumentModel
+from ...database.user_db import UserDatabase
+from ...utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Password hashing - use pbkdf2_sha256 for compatibility
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -54,30 +52,9 @@ class AuthService:
         self.secret_key = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
         self.algorithm = "HS256"
         self.access_token_expire_minutes = 1440  # 24 hours
-        self.chroma_manager = ChromaManager()
-        self._ensure_users_collection()
+        self.user_db = UserDatabase()
 
-        logger.info("AuthService initialized")
-
-    def _ensure_users_collection(self):
-        """Ensure the users collection exists in ChromaDB."""
-        try:
-            from ...database.models import CollectionConfig
-
-            config = CollectionConfig(
-                name="users",
-                metadata={
-                    "description": "User accounts and authentication data",
-                    "type": "users",
-                    "version": "1.0.0",
-                    "created_at": datetime.now().isoformat(),
-                },
-                embedding_function=None,
-            )
-            self.chroma_manager.create_collection(config)
-            logger.info("Users collection ensured in ChromaDB")
-        except Exception as e:
-            logger.error(f"Failed to ensure users collection: {e}")
+        logger.info("AuthService initialized with SQLite user database")
 
     async def ensure_admin_user(self):
         """Create admin user if it doesn't exist and we're in development mode."""
@@ -157,28 +134,27 @@ class AuthService:
             return None
 
     async def get_user_by_id(self, user_id: str) -> User | None:
-        """Get a user by their ID from ChromaDB."""
+        """Get a user by their ID from SQLite."""
         try:
-            document = self.chroma_manager.get_document("users", user_id)
-            if document:
-                user_data = json.loads(
-                    document.content
-                )  # Use json.loads instead of eval
+            user_data = self.user_db.get_user_by_id(user_id)
+            if user_data:
                 # Convert datetime strings back to datetime objects
-                if "created_at" in user_data and isinstance(
-                    user_data["created_at"], str
-                ):
+                if isinstance(user_data["created_at"], str):
                     user_data["created_at"] = datetime.fromisoformat(
                         user_data["created_at"]
                     )
-                if (
-                    "last_login" in user_data
-                    and user_data["last_login"]
-                    and isinstance(user_data["last_login"], str)
+                if user_data.get("last_login") and isinstance(
+                    user_data["last_login"], str
                 ):
                     user_data["last_login"] = datetime.fromisoformat(
                         user_data["last_login"]
                     )
+
+                # Remove password_hash before creating User object
+                user_data.pop("password_hash", None)
+                user_data.pop("metadata", None)
+                user_data.pop("auth_provider", None)
+
                 return User(**user_data)
             return None
         except Exception as e:
@@ -186,38 +162,27 @@ class AuthService:
             return None
 
     async def get_user_by_email(self, email: str) -> User | None:
-        """Get a user by their email from ChromaDB."""
+        """Get a user by their email from SQLite."""
         try:
-            from ...database.models import QueryRequest
-
-            query_request = QueryRequest(
-                query=f"email:{email}",
-                collection_name="users",
-                limit=1,
-                metadata_filters={"email": email},
-                distance_threshold=None,
-            )
-
-            results = self.chroma_manager.search(query_request)
-            if results:
-                user_data = json.loads(
-                    results[0].content
-                )  # Use json.loads instead of eval
+            user_data = self.user_db.get_user_by_email(email)
+            if user_data:
                 # Convert datetime strings back to datetime objects
-                if "created_at" in user_data and isinstance(
-                    user_data["created_at"], str
-                ):
+                if isinstance(user_data["created_at"], str):
                     user_data["created_at"] = datetime.fromisoformat(
                         user_data["created_at"]
                     )
-                if (
-                    "last_login" in user_data
-                    and user_data["last_login"]
-                    and isinstance(user_data["last_login"], str)
+                if user_data.get("last_login") and isinstance(
+                    user_data["last_login"], str
                 ):
                     user_data["last_login"] = datetime.fromisoformat(
                         user_data["last_login"]
                     )
+
+                # Remove password_hash before creating User object
+                user_data.pop("password_hash", None)
+                user_data.pop("metadata", None)
+                user_data.pop("auth_provider", None)
+
                 return User(**user_data)
             return None
         except Exception as e:
@@ -231,54 +196,36 @@ class AuthService:
         picture: str | None = None,
         password: str | None = None,
     ) -> User:
-        """Create a new user in ChromaDB."""
+        """Create a new user in SQLite."""
         try:
             # Check if user already exists
-            existing_user = await self.get_user_by_email(email)
-            if existing_user:
+            if self.user_db.user_exists(email):
                 raise ValueError(f"User with email {email} already exists")
 
-            user_id = str(uuid4())
-            user_data = {
-                "id": user_id,
-                "email": email,
-                "name": name or email.split("@")[0],
-                "picture": picture,
-                "is_active": True,
-                "created_at": datetime.now().isoformat(),  # Store as ISO string
-                "last_login": None,
-            }
+            # Hash password if provided
+            password_hash = self.get_password_hash(password) if password else None
 
-            # Store password hash if provided
-            if password:
-                user_data["password_hash"] = self.get_password_hash(password)
-
-            # Create document in ChromaDB
-            document = DocumentModel(
-                id=user_id,
-                content=json.dumps(user_data),  # Use json.dumps instead of str()
-                metadata={
-                    "email": email,
-                    "name": user_data["name"],
-                    "user_type": "regular",
-                    "auth_provider": "local" if password else "google",
-                    "created_at": user_data["created_at"],
-                },
-                source="auth_service",
-                timestamp=datetime.now(),
+            # Create user in SQLite
+            user_data = self.user_db.create_user(
+                email=email,
+                name=name or email.split("@")[0],
+                password_hash=password_hash,
+                picture=picture,
+                auth_provider="local" if password else "google",
+                metadata={},
             )
 
-            success = self.chroma_manager.add_document("users", document)
-            if success:
-                # Convert created_at back to datetime for User object
-                user_data["created_at"] = datetime.fromisoformat(
-                    user_data["created_at"]
-                )
-                user = User(**user_data)
-                logger.info(f"Created new user: {email}")
-                return user
-            else:
-                raise RuntimeError("Failed to store user in database")
+            # Convert created_at to datetime
+            user_data["created_at"] = datetime.fromisoformat(user_data["created_at"])
+
+            # Remove password_hash before creating User object
+            user_data.pop("password_hash", None)
+            user_data.pop("metadata", None)
+            user_data.pop("auth_provider", None)
+
+            user = User(**user_data)
+            logger.info(f"Created new user: {email}")
+            return user
 
         except Exception as e:
             logger.error(f"Error creating user {email}: {e}")
@@ -293,40 +240,23 @@ class AuthService:
 
             if existing_user:
                 # Update existing user
-                user_data = existing_user.dict()
-                user_data["name"] = name or existing_user.name
-                user_data["picture"] = picture or existing_user.picture
-                user_data["last_login"] = datetime.now().isoformat()
-
-                # Update document in ChromaDB
-                document = DocumentModel(
-                    id=existing_user.id,
-                    content=json.dumps(user_data),  # Use json.dumps
-                    metadata={
-                        "email": email,
-                        "name": user_data["name"],
-                        "user_type": "regular",
-                        "auth_provider": "google",
-                        "updated_at": datetime.now().isoformat(),
-                    },
-                    source="auth_service",
-                    timestamp=datetime.now(),
-                )
-
-                # Delete old and add updated
-                self.chroma_manager.delete_document("users", existing_user.id)
-                self.chroma_manager.add_document("users", document)
-
-                # Convert datetime strings back to datetime objects
-                user_data["created_at"] = datetime.fromisoformat(
-                    user_data["created_at"]
-                )
-                user_data["last_login"] = datetime.fromisoformat(
-                    user_data["last_login"]
+                self.user_db.update_user(
+                    existing_user.id,
+                    name=name or existing_user.name,
+                    picture=picture or existing_user.picture,
+                    last_login=datetime.utcnow().isoformat(),
                 )
 
                 logger.info(f"Updated existing user: {email}")
-                return User(**user_data)
+                # Return updated user
+                updated_user = await self.get_user_by_id(existing_user.id)
+                if updated_user:
+                    return updated_user
+                else:
+                    # This shouldn't happen but handle it gracefully
+                    raise RuntimeError(
+                        f"Failed to retrieve updated user: {existing_user.id}"
+                    )
             else:
                 # Create new user
                 return await self.create_user(email, name, picture)
@@ -338,18 +268,12 @@ class AuthService:
     async def authenticate_user(self, email: str, password: str) -> User | None:
         """Authenticate a user with email and password."""
         try:
-            user = await self.get_user_by_email(email)
-            if not user:
+            # Get user data with password hash
+            user_data = self.user_db.get_user_by_email(email)
+            if not user_data:
                 return None
 
-            # Get the stored password hash from the document
-            document = self.chroma_manager.get_document("users", user.id)
-            if not document:
-                return None
-
-            user_data = json.loads(document.content)  # Use json.loads instead of eval
             stored_password_hash = user_data.get("password_hash")
-
             if not stored_password_hash:
                 logger.warning(f"User {email} has no password hash (may be OAuth only)")
                 return None
@@ -358,21 +282,16 @@ class AuthService:
                 return None
 
             # Update last login
-            user_data["last_login"] = datetime.now().isoformat()
-            updated_document = DocumentModel(
-                id=user.id,
-                content=json.dumps(user_data),  # Use json.dumps
-                metadata=document.metadata,
-                source="auth_service",
-                timestamp=datetime.now(),
-            )
+            self.user_db.update_last_login(user_data["id"])
 
-            self.chroma_manager.delete_document("users", user.id)
-            self.chroma_manager.add_document("users", updated_document)
-
-            # Convert datetime string back to datetime object
+            # Convert to User object
             user_data["created_at"] = datetime.fromisoformat(user_data["created_at"])
-            user_data["last_login"] = datetime.fromisoformat(user_data["last_login"])
+            user_data["last_login"] = datetime.utcnow()
+
+            # Remove password_hash before creating User object
+            user_data.pop("password_hash", None)
+            user_data.pop("metadata", None)
+            user_data.pop("auth_provider", None)
 
             return User(**user_data)
 
@@ -383,28 +302,7 @@ class AuthService:
     async def update_last_login(self, user_id: str) -> bool:
         """Update the user's last login timestamp."""
         try:
-            user = await self.get_user_by_id(user_id)
-            if not user:
-                return False
-
-            document = self.chroma_manager.get_document("users", user_id)
-            if not document:
-                return False
-
-            user_data = json.loads(document.content)  # Use json.loads instead of eval
-            user_data["last_login"] = datetime.now().isoformat()
-
-            updated_document = DocumentModel(
-                id=user_id,
-                content=json.dumps(user_data),  # Use json.dumps
-                metadata=document.metadata,
-                source="auth_service",
-                timestamp=datetime.now(),
-            )
-
-            self.chroma_manager.delete_document("users", user_id)
-            return self.chroma_manager.add_document("users", updated_document)
-
+            return self.user_db.update_last_login(user_id)
         except Exception as e:
             logger.error(f"Error updating last login for user {user_id}: {e}")
             return False
@@ -418,8 +316,8 @@ class AuthService:
                 logger.warning(f"Attempted to delete non-existent user: {user_id}")
                 return False
 
-            # Delete user document from ChromaDB
-            success = self.chroma_manager.delete_document("users", user_id)
+            # Delete user from SQLite
+            success = self.user_db.delete_user(user_id)
             if success:
                 logger.info(f"Deleted user: {user.email} (ID: {user_id})")
             else:
@@ -448,10 +346,9 @@ class AuthService:
     def get_user_stats(self) -> dict[str, Any]:
         """Get user statistics."""
         try:
-            stats = self.chroma_manager.get_collection_stats("users")
             return {
-                "total_users": stats.get("document_count", 0),
-                "collection_name": "users",
+                "total_users": self.user_db.get_user_count(),
+                "database_type": "SQLite",
                 "last_updated": datetime.now().isoformat(),
             }
         except Exception as e:

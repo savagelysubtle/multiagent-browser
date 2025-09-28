@@ -1,5 +1,3 @@
-import logging
-
 from browser_use.browser.browser import Browser
 from browser_use.browser.context import (
     BrowserContext,
@@ -7,7 +5,9 @@ from browser_use.browser.context import (
     BrowserContextState,
 )
 
-logger = logging.getLogger(__name__)
+from ..utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class CustomBrowserContext(BrowserContext):

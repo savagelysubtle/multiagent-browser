@@ -6,17 +6,17 @@ Provides endpoints for agent management, task submission, and status monitoring.
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from ...utils.logging_config import get_logger
 from ..auth.dependencies import get_current_user
 from ..dependencies import get_orchestrator
 from ..middleware.error_handler import AgentException, AppException
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 

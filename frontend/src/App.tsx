@@ -30,10 +30,15 @@ const queryClient = new QueryClient({
 function App() {
   const { user, setUser, loadStateFromBackend, theme } = useAppStore();
   const [loading, setLoading] = useState(true);
+  const [authChecking, setAuthChecking] = useState(false);
 
   useEffect(() => {
     // Check authentication on app load
     const initAuth = async () => {
+      // Prevent multiple auth checks
+      if (authChecking) return;
+
+      setAuthChecking(true);
       try {
         const token = localStorage.getItem('auth_token');
         if (token) {
@@ -48,11 +53,12 @@ function App() {
         localStorage.removeItem('auth_token');
       } finally {
         setLoading(false);
+        setAuthChecking(false);
       }
     };
 
     initAuth();
-  }, [setUser, loadStateFromBackend]);
+  }, [setUser, loadStateFromBackend]); // Remove authChecking from dependencies
 
   if (loading) {
     return <LoadingScreen />;

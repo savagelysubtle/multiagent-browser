@@ -6,13 +6,14 @@ user isolation, and comprehensive error handling.
 """
 
 import asyncio
-import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from ...utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass

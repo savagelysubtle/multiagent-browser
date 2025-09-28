@@ -1,15 +1,15 @@
 """MCP Configuration Manager for ChromaDB storage."""
 
 import json
-import logging
 from datetime import datetime
 from typing import Any
 
+from ..utils.logging_config import get_logger
 from .chroma_manager import ChromaManager
 from .document_pipeline import DocumentPipeline
 from .models import CollectionConfig, DocumentModel, QueryRequest
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class MCPConfigManager:

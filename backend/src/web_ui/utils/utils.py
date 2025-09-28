@@ -3,6 +3,10 @@ import os
 import time
 from pathlib import Path
 
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 def encode_image(img_path):
     if not img_path:
@@ -31,6 +35,6 @@ def get_latest_files(
                 if time.time() - latest.stat().st_mtime > 1.0:
                     latest_files[file_type] = str(latest)
         except Exception as e:
-            print(f"Error getting latest {file_type} file: {e}")
+            logger.error(f"Error getting latest {file_type} file: {e}")
 
     return latest_files

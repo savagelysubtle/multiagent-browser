@@ -4,12 +4,13 @@ Browser Use Agent Adapter.
 Adapts the existing BrowserUse agent to work with the SimpleAgentOrchestrator.
 """
 
-import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from ...utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class BrowserUseAdapter:

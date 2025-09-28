@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import os
 import threading
 import uuid
@@ -32,10 +31,11 @@ from pydantic import BaseModel, Field
 
 from ...browser.custom_browser import CustomBrowser
 from ...controller.custom_controller import CustomController
+from ...utils.logging_config import get_logger
 from ...utils.mcp_client import setup_mcp_client_and_tools
 from ..browser_use.browser_use_agent import BrowserUseAgent
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Constants
 REPORT_FILENAME = "report.md"

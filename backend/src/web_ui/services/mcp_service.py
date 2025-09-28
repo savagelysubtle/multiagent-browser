@@ -2,15 +2,15 @@
 
 import asyncio
 import json
-import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from ..database.mcp_config_manager import MCPConfigManager
+from ..utils.logging_config import get_logger
 from ..utils.mcp_client import setup_mcp_client_and_tools
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class MCPService:

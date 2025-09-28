@@ -7,7 +7,6 @@ global error middleware, and circuit breaker patterns for resilient operation.
 
 from __future__ import annotations
 
-import logging
 import os
 import traceback
 from datetime import datetime
@@ -17,7 +16,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-logger = logging.getLogger(__name__)
+from ...utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class AppException(Exception):

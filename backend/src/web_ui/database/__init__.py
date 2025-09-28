@@ -5,6 +5,7 @@ from .connection import get_chroma_client
 from .document_pipeline import DocumentPipeline
 from .mcp_config_manager import MCPConfigManager
 from .models import CollectionConfig, DocumentModel
+from .user_db import UserDatabase
 from .user_state_manager import UserStateManager
 from .utils import DatabaseUtils
 
@@ -17,4 +18,5 @@ __all__ = [
     "DatabaseUtils",
     "MCPConfigManager",
     "UserStateManager",
+    "UserDatabase",
 ]

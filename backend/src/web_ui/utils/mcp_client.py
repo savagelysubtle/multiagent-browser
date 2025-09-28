@@ -1,5 +1,4 @@
 import inspect
-import logging
 import uuid
 from datetime import date, datetime, time
 from enum import Enum
@@ -11,7 +10,9 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from pydantic import BaseModel, Field, create_model
 from pydantic.v1 import BaseModel, Field
 
-logger = logging.getLogger(__name__)
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 async def setup_mcp_client_and_tools(

@@ -5,12 +5,13 @@ Prepares the infrastructure for Google A2A integration while maintaining
 compatibility with the existing agent orchestrator.
 """
 
-import logging
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from ...utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class A2AMessageType(Enum):

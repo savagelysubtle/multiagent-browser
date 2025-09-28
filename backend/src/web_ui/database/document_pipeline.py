@@ -1,16 +1,16 @@
 """Document pipeline for integrating document editor with ChromaDB."""
 
 import hashlib
-import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ..utils.logging_config import get_logger
 from .chroma_manager import ChromaManager
 from .models import DocumentModel, QueryRequest, SearchResult
 from .utils import DatabaseUtils
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DocumentPipeline:

@@ -9,8 +9,9 @@ Follows the orchestrator pattern: keep entry point minimal (< 50 lines).
 import sys
 from pathlib import Path
 
-# Ensure we can import from src
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Ensure we can import from backend/src
+backend_src = Path(__file__).parent / "backend" / "src"
+sys.path.insert(0, str(backend_src))
 
 from dotenv import load_dotenv
 

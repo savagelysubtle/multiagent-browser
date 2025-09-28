@@ -56,7 +56,7 @@ try {
     Start-Sleep -Seconds 3
 
     Write-Host "`n✅ Both servers are starting up!" -ForegroundColor Green
-    Write-Host "📱 Frontend: http://localhost:3002/" -ForegroundColor Cyan
+    Write-Host "📱 Frontend: http://localhost:3000/" -ForegroundColor Cyan
     Write-Host "🔧 Backend:  http://localhost:8000/" -ForegroundColor Cyan
     Write-Host "`n💡 Press Ctrl+C to stop both servers" -ForegroundColor Yellow
     Write-Host "================================================" -ForegroundColor Cyan
@@ -71,9 +71,9 @@ try {
             break
         }
 
-        # Display job output
+        # Display job output (without -Keep to show only new output)
         foreach ($job in $runningJobs) {
-            $output = Receive-Job -Job $job -Keep
+            $output = Receive-Job -Job $job
             if ($output) {
                 Write-Host "[$($job.Name)] $output" -ForegroundColor Gray
             }

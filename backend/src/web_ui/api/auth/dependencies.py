@@ -6,14 +6,13 @@ Provides dependency injection for user authentication and authorization.
 
 from __future__ import annotations
 
-import logging
-
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from ...utils.logging_config import get_logger
 from .auth_service import User, auth_service
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Security configuration
 security = HTTPBearer(auto_error=False)  # Don't auto-error on missing tokens

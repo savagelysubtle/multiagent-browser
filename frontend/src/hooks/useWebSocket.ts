@@ -97,6 +97,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   }, [updateTask]);
 
   const connect = useCallback(() => {
+    // Temporarily disable WebSocket to debug the blank dashboard issue
+    console.warn('WebSocket connection temporarily disabled for debugging');
+    return;
+
     if (!user || wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
@@ -133,6 +137,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         setConnectionStatus('disconnected');
         cleanup();
 
+        // Don't reconnect if authentication failed
+        if (event.code === 4001) {
+          console.error('WebSocket authentication failed');
+          return;
+        }
+
         // Attempt to reconnect if not a normal closure and we haven't exceeded max attempts
         if (
           event.code !== 1000 &&
@@ -145,6 +155,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           reconnectTimerRef.current = setTimeout(() => {
             connect();
           }, reconnectInterval * Math.pow(2, reconnectAttemptsRef.current - 1)); // Exponential backoff
+        } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          console.error('Max reconnection attempts reached');
         }
       };
 

@@ -6,12 +6,13 @@ and automatic reconnection support for the React frontend.
 """
 
 import asyncio
-import logging
 from datetime import datetime
 
 from fastapi import WebSocket
 
-logger = logging.getLogger(__name__)
+from ...utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConnectionManager:

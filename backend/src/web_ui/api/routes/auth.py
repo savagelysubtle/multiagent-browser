@@ -7,7 +7,6 @@ user management, and Google OAuth integration.
 
 from __future__ import annotations
 
-import logging
 import os
 from typing import Any
 
@@ -15,11 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 
 from ...database.user_state_manager import UserStateManager
+from ...utils.logging_config import get_logger
 from ..auth.auth_service import User, auth_service
 from ..auth.dependencies import get_current_user
 from ..auth.google_auth import get_google_oauth_status, google_callback, google_login
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Create router
 router = APIRouter(tags=["authentication"])

@@ -6,7 +6,6 @@ to enable seamless integration with the React frontend.
 """
 
 import json
-import logging
 import os
 
 # Ensure we can import from src
@@ -24,13 +23,15 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from ..utils.logging_config import get_logger
+
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
 from ..agent.document_editor import DocumentEditingAgent
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Global agent instance
 document_agent: DocumentEditingAgent | None = None
@@ -709,12 +710,21 @@ def run_api_server(
     """Run the FastAPI server."""
     import uvicorn
 
+    from ..utils.logging_config import LoggingConfig
+
     logger.info(f"Starting API server on {host}:{port}")
+
+    # Get uvicorn-specific logging configuration to prevent duplicates
+    log_config = LoggingConfig.configure_uvicorn_logging(log_level.upper())
 
     uvicorn.run(
         "src.web_ui.api.server:app",
         host=host,
         port=port,
         reload=reload,
-        log_level=log_level,
+        log_config=log_config,  # Use our custom log config instead of log_level
     )
+
+
+if __name__ == "__main__":
+    run_api_server()

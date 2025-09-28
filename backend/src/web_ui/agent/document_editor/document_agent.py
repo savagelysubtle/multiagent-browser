@@ -7,7 +7,6 @@ and uses ChromaDB MCP tools for advanced document management.
 
 import asyncio
 import json
-import logging
 import os
 import uuid
 from collections.abc import AsyncGenerator
@@ -22,9 +21,10 @@ from ...database import (
     MCPConfigManager,
 )
 from ...utils import config, llm_provider
+from ...utils.logging_config import get_logger
 from ...utils.mcp_client import setup_mcp_client_and_tools
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DocumentEditingAgent:

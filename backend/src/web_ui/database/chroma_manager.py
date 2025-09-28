@@ -1,15 +1,15 @@
 """ChromaDB manager for document storage and retrieval."""
 
-import logging
 from typing import Any
 from uuid import uuid4
 
 from chromadb.api.models.Collection import Collection
 
+from ..utils.logging_config import get_logger
 from .connection import get_chroma_client, get_db_config
 from .models import CollectionConfig, DocumentModel, QueryRequest, SearchResult
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ChromaManager:

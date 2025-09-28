@@ -5,16 +5,16 @@ Provides Google SSO authentication routes and setup.
 Ready for future activation via environment variables.
 """
 
-import logging
 import os
 from typing import Any
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import FastAPI, HTTPException, Request, status
 
+from ...utils.logging_config import get_logger
 from .auth_service import auth_service
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # OAuth setup (ready but not active)
 oauth = OAuth()

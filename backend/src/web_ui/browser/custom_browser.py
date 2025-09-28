@@ -1,4 +1,3 @@
-import logging
 import socket
 
 from browser_use.browser.browser import IN_DOCKER, Browser
@@ -19,9 +18,10 @@ from playwright.async_api import (
     Playwright,
 )
 
+from ..utils.logging_config import get_logger
 from .custom_context import CustomBrowserContext
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CustomBrowser(Browser):

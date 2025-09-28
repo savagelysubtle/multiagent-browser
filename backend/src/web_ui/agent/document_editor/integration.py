@@ -5,15 +5,15 @@ This module provides seamless integration between the AI agent and the Gradio-ba
 document editor interface, enabling enhanced document management capabilities.
 """
 
-import logging
 from typing import Any
 
 import gradio as gr
 
+from ...utils.logging_config import get_logger
 from ...webui.webui_manager import WebuiManager
 from .document_agent import DocumentEditingAgent
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DocumentEditorIntegration:

@@ -1,15 +1,15 @@
 """Database utilities and helper functions."""
 
 import hashlib
-import logging
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+from ..utils.logging_config import get_logger
 from .chroma_manager import ChromaManager
 from .models import CollectionConfig, DocumentModel, SearchResult
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DatabaseUtils:
