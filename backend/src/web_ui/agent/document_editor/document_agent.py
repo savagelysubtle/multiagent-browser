@@ -10,9 +10,10 @@ import json
 import logging
 import os
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+from typing import Any
 
 from ...database import (
     ChromaManager,
@@ -40,14 +41,14 @@ class DocumentEditingAgent:
 
     def __init__(
         self,
-        llm: Optional[Any] = None,
+        llm: Any | None = None,
         mcp_config_path: str = "./data/mcp.json",
         working_directory: str = "./tmp/documents",
-        llm_provider_name: Optional[str] = None,
-        llm_model_name: Optional[str] = None,
+        llm_provider_name: str | None = None,
+        llm_model_name: str | None = None,
         llm_temperature: float = 0.3,
-        llm_api_key: Optional[str] = None,
-        llm_base_url: Optional[str] = None,
+        llm_api_key: str | None = None,
+        llm_base_url: str | None = None,
         **llm_kwargs,
     ):
         """Initialize the Document Editing Agent."""
@@ -74,7 +75,7 @@ class DocumentEditingAgent:
         self.mcp_tools = []
 
         # Agent state
-        self.current_document_id: Optional[str] = None
+        self.current_document_id: str | None = None
         self.session_id = str(uuid.uuid4())
 
         # Ensure working directory exists
@@ -119,11 +120,11 @@ class DocumentEditingAgent:
 
     async def setup_llm(
         self,
-        provider_name: Optional[str] = None,
-        model_name: Optional[str] = None,
-        temperature: Optional[float] = None,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        provider_name: str | None = None,
+        model_name: str | None = None,
+        temperature: float | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         **kwargs,
     ) -> bool:
         """Setup or reconfigure the LLM using the provider system."""
@@ -174,14 +175,14 @@ class DocumentEditingAgent:
             logger.error(f"Error setting up LLM: {e}")
             return False
 
-    def get_available_providers(self) -> Dict[str, Any]:
+    def get_available_providers(self) -> dict[str, Any]:
         """Get available LLM providers and their models."""
         return {
             "providers": list(config.PROVIDER_DISPLAY_NAMES.keys()),
             "models_by_provider": config.model_names,
         }
 
-    def get_current_llm_config(self) -> Dict[str, Any]:
+    def get_current_llm_config(self) -> dict[str, Any]:
         """Get current LLM configuration."""
         return {
             "provider": self.llm_provider_name,
@@ -192,7 +193,7 @@ class DocumentEditingAgent:
             "api_key_set": bool(self.llm_api_key),
         }
 
-    async def _load_mcp_config(self) -> Optional[Dict[str, Any]]:
+    async def _load_mcp_config(self) -> dict[str, Any] | None:
         """Load MCP configuration from file or database."""
         try:
             # First try to get active config from database
@@ -203,7 +204,7 @@ class DocumentEditingAgent:
 
             # Fallback to file-based config
             if os.path.exists(self.mcp_config_path):
-                with open(self.mcp_config_path, "r") as f:
+                with open(self.mcp_config_path) as f:
                     config_data = json.load(f)
                     logger.info(
                         f"Loaded MCP configuration from file: {self.mcp_config_path}"
@@ -221,8 +222,8 @@ class DocumentEditingAgent:
         filename: str,
         content: str = "",
         document_type: str = "document",
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[bool, str, Optional[str]]:
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[bool, str, str | None]:
         """Create a new document with database persistence."""
         try:
             file_path = os.path.join(self.working_directory, filename)
@@ -276,7 +277,7 @@ class DocumentEditingAgent:
 
     async def edit_document(
         self, document_id: str, instruction: str, use_llm: bool = True
-    ) -> Tuple[bool, str, Optional[str]]:
+    ) -> tuple[bool, str, str | None]:
         """Edit a document using AI assistance and MCP tools."""
         try:
             # Get document from database
@@ -356,8 +357,8 @@ class DocumentEditingAgent:
             return False, f"Error editing document: {str(e)}", None
 
     async def _llm_edit_document(
-        self, content: str, instruction: str, document_metadata: Dict[str, Any]
-    ) -> Optional[str]:
+        self, content: str, instruction: str, document_metadata: dict[str, Any]
+    ) -> str | None:
         """Use LLM to edit document content."""
         try:
             if not self.llm:
@@ -435,7 +436,7 @@ Provide the edited content:"""
         collection_type: str = "documents",
         limit: int = 10,
         use_mcp_tools: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search documents using database and MCP tools."""
         try:
             results = []
@@ -476,7 +477,7 @@ Provide the edited content:"""
 
     async def _search_with_mcp_tools(
         self, query: str, limit: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Use MCP tools for document search."""
         try:
             results = []
@@ -522,7 +523,7 @@ Provide the edited content:"""
 
     async def get_document_suggestions(
         self, content: str, document_type: str = "document"
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> dict[str, list[dict[str, Any]]]:
         """Get intelligent document suggestions."""
         try:
             # Get suggestions from database pipeline
@@ -565,7 +566,7 @@ Provide the edited content:"""
 
     async def _get_mcp_suggestions(
         self, content: str, document_type: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get suggestions using MCP tools."""
         try:
             suggestions = []
@@ -612,7 +613,7 @@ Provide the edited content:"""
         policy_title: str,
         policy_type: str = "manual",
         authority_level: str = "medium",
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Store document as a policy manual."""
         try:
             # Get document content
@@ -662,7 +663,7 @@ Provide the edited content:"""
             f"# {filename}\n\nCreated by DocumentEditingAgent on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n",
         )
 
-    async def get_database_stats(self) -> Dict[str, Any]:
+    async def get_database_stats(self) -> dict[str, Any]:
         """Get comprehensive database statistics."""
         try:
             # Get collection stats from document pipeline
@@ -690,7 +691,7 @@ Provide the edited content:"""
             return {"error": str(e)}
 
     async def chat_with_user(
-        self, message: str, context_document_id: Optional[str] = None
+        self, message: str, context_document_id: str | None = None
     ) -> str:
         """Chat with the user, optionally using a document as context."""
         try:
@@ -765,8 +766,8 @@ Always be helpful, concise, and focused on document-related tasks.{context}"""
             return f"I apologize, but I encountered an error: {str(e)}"
 
     async def chat_with_user_stream(
-        self, message: str, context_document_id: Optional[str] = None
-    ) -> AsyncGenerator[str, None]:
+        self, message: str, context_document_id: str | None = None
+    ) -> AsyncGenerator[str]:
         """Stream chat responses for real-time interaction."""
         try:
             if not self.llm:
@@ -834,8 +835,8 @@ Always be helpful, concise, and focused on document-related tasks.{context}"""
             yield f"I apologize, but I encountered an error: {str(e)}"
 
     async def process_batch_documents(
-        self, file_paths: List[str], document_type: str = "document"
-    ) -> Dict[str, Any]:
+        self, file_paths: list[str], document_type: str = "document"
+    ) -> dict[str, Any]:
         """Process multiple documents in batch."""
         try:
             results = {"processed": [], "failed": [], "total": len(file_paths)}
@@ -843,7 +844,7 @@ Always be helpful, concise, and focused on document-related tasks.{context}"""
             for file_path in file_paths:
                 try:
                     if os.path.exists(file_path):
-                        with open(file_path, "r", encoding="utf-8") as f:
+                        with open(file_path, encoding="utf-8") as f:
                             content = f.read()
 
                         success, message, doc_model = (

@@ -27,24 +27,30 @@ def create_message_content(text, image_path=None):
     image_format = "png" if image_path and image_path.endswith(".png") else "jpeg"
     if image_path:
         from src.utils import utils
+
         image_data = utils.encode_image(image_path)
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/{image_format};base64,{image_data}"}
-        })
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/{image_format};base64,{image_data}"},
+            }
+        )
     return content
 
 
 def get_env_value(key, provider):
     env_mappings = {
         "openai": {"api_key": "OPENAI_API_KEY", "base_url": "OPENAI_ENDPOINT"},
-        "azure_openai": {"api_key": "AZURE_OPENAI_API_KEY", "base_url": "AZURE_OPENAI_ENDPOINT"},
+        "azure_openai": {
+            "api_key": "AZURE_OPENAI_API_KEY",
+            "base_url": "AZURE_OPENAI_ENDPOINT",
+        },
         "google": {"api_key": "GOOGLE_API_KEY"},
         "deepseek": {"api_key": "DEEPSEEK_API_KEY", "base_url": "DEEPSEEK_ENDPOINT"},
         "mistral": {"api_key": "MISTRAL_API_KEY", "base_url": "MISTRAL_ENDPOINT"},
         "alibaba": {"api_key": "ALIBABA_API_KEY", "base_url": "ALIBABA_ENDPOINT"},
         "moonshot": {"api_key": "MOONSHOT_API_KEY", "base_url": "MOONSHOT_ENDPOINT"},
-        "ibm": {"api_key": "IBM_API_KEY", "base_url": "IBM_ENDPOINT"}
+        "ibm": {"api_key": "IBM_API_KEY", "base_url": "IBM_ENDPOINT"},
     }
 
     if provider in env_mappings and key in env_mappings[provider]:
@@ -53,12 +59,13 @@ def get_env_value(key, provider):
 
 
 def test_llm(config, query, image_path=None, system_message=None):
-    from src.utils import utils, llm_provider
+    from src.utils import llm_provider
 
     # Special handling for Ollama-based models
     if config.provider == "ollama":
         if "deepseek-r1" in config.model_name:
             from src.utils.llm_provider import DeepSeekR1ChatOllama
+
             llm = DeepSeekR1ChatOllama(model=config.model_name)
         else:
             llm = ChatOllama(model=config.model_name)
@@ -75,7 +82,7 @@ def test_llm(config, query, image_path=None, system_message=None):
         model_name=config.model_name,
         temperature=config.temperature,
         base_url=config.base_url or get_env_value("base_url", config.provider),
-        api_key=config.api_key or get_env_value("api_key", config.provider)
+        api_key=config.api_key or get_env_value("api_key", config.provider),
     )
 
     # Prepare messages for non-Ollama models
@@ -89,6 +96,7 @@ def test_llm(config, query, image_path=None, system_message=None):
     if hasattr(ai_msg, "reasoning_content"):
         print(ai_msg.reasoning_content)
     print(ai_msg.content)
+
 
 def test_openai_model():
     config = LLMConfig(provider="openai", model_name="gpt-4o")
@@ -113,7 +121,11 @@ def test_deepseek_model():
 
 def test_deepseek_r1_model():
     config = LLMConfig(provider="deepseek", model_name="deepseek-reasoner")
-    test_llm(config, "Which is greater, 9.11 or 9.8?", system_message="You are a helpful AI assistant.")
+    test_llm(
+        config,
+        "Which is greater, 9.11 or 9.8?",
+        system_message="You are a helpful AI assistant.",
+    )
 
 
 def test_ollama_model():
@@ -137,7 +149,9 @@ def test_moonshot_model():
 
 
 def test_ibm_model():
-    config = LLMConfig(provider="ibm", model_name="meta-llama/llama-4-maverick-17b-128e-instruct-fp8")
+    config = LLMConfig(
+        provider="ibm", model_name="meta-llama/llama-4-maverick-17b-128e-instruct-fp8"
+    )
     test_llm(config, "Describe this image", "assets/examples/test.png")
 
 

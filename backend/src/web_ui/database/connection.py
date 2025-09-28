@@ -1,10 +1,11 @@
 """ChromaDB connection management."""
 
-import os
+from __future__ import annotations
+
 import logging
+import os
 from pathlib import Path
-from typing import Optional
-import chromadb
+
 from chromadb import PersistentClient
 from chromadb.config import Settings
 
@@ -14,16 +15,16 @@ logger = logging.getLogger(__name__)
 class ChromaConnection:
     """Singleton class for managing ChromaDB connections."""
 
-    _instance: Optional['ChromaConnection'] = None
-    _client: Optional[PersistentClient] = None
+    _instance: ChromaConnection | None = None
+    _client: PersistentClient | None = None
 
-    def __new__(cls) -> 'ChromaConnection':
+    def __new__(cls) -> ChromaConnection:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
-        if not hasattr(self, '_initialized'):
+        if not hasattr(self, "_initialized"):
             self._initialized = True
             self._setup_client()
 
@@ -31,7 +32,7 @@ class ChromaConnection:
         """Initialize the ChromaDB client with proper configuration."""
         try:
             # Get database path from environment or use default
-            db_path = os.getenv('CHROMA_DB_PATH', './data/chroma_db')
+            db_path = os.getenv("CHROMA_DB_PATH", "./data/chroma_db")
             db_path = Path(db_path).resolve()
 
             # Ensure the directory exists
@@ -42,15 +43,14 @@ class ChromaConnection:
                 persist_directory=str(db_path),
                 anonymized_telemetry=False,  # Disable telemetry for privacy
                 allow_reset=True,  # Allow reset operations
-                is_persistent=True
+                is_persistent=True,
             )
 
-            self._client = PersistentClient(
-                path=str(db_path),
-                settings=settings
-            )
+            self._client = PersistentClient(path=str(db_path), settings=settings)
 
-            logger.info(f"ChromaDB client initialized with persistent storage at: {db_path}")
+            logger.info(
+                f"ChromaDB client initialized with persistent storage at: {db_path}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to initialize ChromaDB client: {e}")
@@ -94,9 +94,10 @@ def close_chroma_connection() -> None:
 def get_db_config() -> dict:
     """Get database configuration from environment variables."""
     return {
-        'db_path': os.getenv('CHROMA_DB_PATH', './data/chroma_db'),
-        'collection_prefix': os.getenv('CHROMA_COLLECTION_PREFIX', 'webui_'),
-        'default_embedding_function': os.getenv('CHROMA_EMBEDDING_FUNCTION', 'default'),
-        'max_connections': int(os.getenv('CHROMA_MAX_CONNECTIONS', '10')),
-        'enable_telemetry': os.getenv('CHROMA_ENABLE_TELEMETRY', 'false').lower() == 'true'
+        "db_path": os.getenv("CHROMA_DB_PATH", "./data/chroma_db"),
+        "collection_prefix": os.getenv("CHROMA_COLLECTION_PREFIX", "webui_"),
+        "default_embedding_function": os.getenv("CHROMA_EMBEDDING_FUNCTION", "default"),
+        "max_connections": int(os.getenv("CHROMA_MAX_CONNECTIONS", "10")),
+        "enable_telemetry": os.getenv("CHROMA_ENABLE_TELEMETRY", "false").lower()
+        == "true",
     }

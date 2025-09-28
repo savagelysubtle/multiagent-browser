@@ -1,4 +1,3 @@
-import pdb
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -6,6 +5,7 @@ load_dotenv()
 
 def test_connect_browser():
     import os
+
     from playwright.sync_api import sync_playwright
 
     chrome_exe = os.getenv("CHROME_PATH", "")
@@ -15,7 +15,7 @@ def test_connect_browser():
         browser = p.chromium.launch_persistent_context(
             user_data_dir=chrome_use_data,
             executable_path=chrome_exe,
-            headless=False  # Keep browser window visible
+            headless=False,  # Keep browser window visible
         )
 
         page = browser.new_page()
@@ -27,5 +27,5 @@ def test_connect_browser():
         browser.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_connect_browser()

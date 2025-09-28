@@ -5,9 +5,11 @@ Provides JWT-based authentication endpoints including login, logout,
 user management, and Google OAuth integration.
 """
 
+from __future__ import annotations
+
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
@@ -39,7 +41,7 @@ class RegisterRequest(BaseModel):
 
     email: EmailStr
     password: str
-    name: Optional[str] = None
+    name: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -47,7 +49,7 @@ class TokenResponse(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
-    user: Dict[str, Any]
+    user: dict[str, Any]
 
 
 class UserResponse(BaseModel):
@@ -55,11 +57,11 @@ class UserResponse(BaseModel):
 
     id: str
     email: str
-    name: Optional[str] = None
-    picture: Optional[str] = None
+    name: str | None = None
+    picture: str | None = None
     is_active: bool
     created_at: str
-    last_login: Optional[str] = None
+    last_login: str | None = None
 
 
 class MessageResponse(BaseModel):
@@ -71,7 +73,7 @@ class MessageResponse(BaseModel):
 class UserStateRequest(BaseModel):
     """Request model for user state updates."""
 
-    state: Dict[str, Any]
+    state: dict[str, Any]
 
 
 class PreferenceRequest(BaseModel):

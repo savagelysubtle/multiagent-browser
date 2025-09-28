@@ -3,13 +3,11 @@
 import asyncio
 import json
 import logging
-import os
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 from ..database.mcp_config_manager import MCPConfigManager
-from ..database.document_pipeline import DocumentPipeline
 from ..utils.mcp_client import setup_mcp_client_and_tools
 
 logger = logging.getLogger(__name__)
@@ -26,7 +24,7 @@ class MCPService:
             webui_manager: Reference to WebuiManager for UI integration
         """
         self.webui_manager = webui_manager
-        self.config_manager: Optional[MCPConfigManager] = None
+        self.config_manager: MCPConfigManager | None = None
         self.mcp_client = None
         self.is_running = False
         self.health_check_interval = 300  # 5 minutes
@@ -35,7 +33,7 @@ class MCPService:
         # File-based configuration
         self.mcp_file_path = Path("./data/mcp.json")
         self.file_check_interval = 30  # Check file every 30 seconds
-        self.last_file_mtime: Optional[float] = None
+        self.last_file_mtime: float | None = None
 
         # Initialize config manager when available
         self._initialize_config_manager()
@@ -44,8 +42,10 @@ class MCPService:
         """Initialize the MCP Configuration Manager."""
         try:
             # Try to get DocumentPipeline from webui_manager if available
-            if self.webui_manager and hasattr(self.webui_manager, 'document_pipeline'):
-                self.config_manager = MCPConfigManager(self.webui_manager.document_pipeline)
+            if self.webui_manager and hasattr(self.webui_manager, "document_pipeline"):
+                self.config_manager = MCPConfigManager(
+                    self.webui_manager.document_pipeline
+                )
             else:
                 # Fallback to standalone initialization
                 self.config_manager = MCPConfigManager()
@@ -85,7 +85,9 @@ class MCPService:
             success = await self.load_active_configuration()
 
             if success:
-                logger.info("MCP Service started successfully with active configuration")
+                logger.info(
+                    "MCP Service started successfully with active configuration"
+                )
             else:
                 logger.info("MCP Service started but no active configuration found")
 
@@ -149,17 +151,23 @@ class MCPService:
             success = await self._initialize_mcp_client(config_data)
 
             if success:
-                logger.info(f"Successfully loaded and applied MCP configuration: {config_name}")
+                logger.info(
+                    f"Successfully loaded and applied MCP configuration: {config_name}"
+                )
                 return True
             else:
-                logger.warning(f"Configuration loaded but MCP client initialization failed: {config_name}")
+                logger.warning(
+                    f"Configuration loaded but MCP client initialization failed: {config_name}"
+                )
                 return False
 
         except Exception as e:
             logger.error(f"Error loading active MCP configuration: {e}")
             return False
 
-    async def apply_configuration(self, config_data: Dict[str, Any], config_name: str = "runtime") -> bool:
+    async def apply_configuration(
+        self, config_data: dict[str, Any], config_name: str = "runtime"
+    ) -> bool:
         """
         Apply a new MCP configuration at runtime.
 
@@ -180,7 +188,7 @@ class MCPService:
                     config_name=config_name,
                     description=f"Runtime configuration applied at {datetime.now().isoformat()}",
                     config_type="runtime",
-                    set_as_active=True
+                    set_as_active=True,
                 )
 
                 if not success:
@@ -189,10 +197,9 @@ class MCPService:
 
             # Apply to UI
             if self.webui_manager:
-                await self._apply_config_to_ui({
-                    "config_name": config_name,
-                    "config_data": config_data
-                })
+                await self._apply_config_to_ui(
+                    {"config_name": config_name, "config_data": config_data}
+                )
 
             # Reinitialize MCP client
             success = await self._initialize_mcp_client(config_data)
@@ -201,14 +208,14 @@ class MCPService:
                 logger.info(f"Successfully applied MCP configuration: {config_name}")
                 return True
             else:
-                logger.error(f"Failed to initialize MCP client with new configuration")
+                logger.error("Failed to initialize MCP client with new configuration")
                 return False
 
         except Exception as e:
             logger.error(f"Error applying MCP configuration: {e}")
             return False
 
-    async def _apply_config_to_ui(self, config_info: Dict[str, Any]):
+    async def _apply_config_to_ui(self, config_info: dict[str, Any]):
         """Apply configuration to UI components."""
         try:
             if not self.webui_manager:
@@ -218,24 +225,26 @@ class MCPService:
             config_json = json.dumps(config_data, indent=2)
 
             # Apply to agent settings MCP component
-            if hasattr(self.webui_manager, 'id_to_component'):
+            if hasattr(self.webui_manager, "id_to_component"):
                 mcp_components = [
                     "agent_settings.mcp_server_config",
-                    "deep_research_agent.mcp_server_config"
+                    "deep_research_agent.mcp_server_config",
                 ]
 
                 for component_id in mcp_components:
                     if component_id in self.webui_manager.id_to_component:
                         component = self.webui_manager.id_to_component[component_id]
                         # Update component value (this would need actual Gradio update mechanism)
-                        logger.debug(f"Updated UI component {component_id} with new MCP config")
+                        logger.debug(
+                            f"Updated UI component {component_id} with new MCP config"
+                        )
 
             logger.info("Applied MCP configuration to UI components")
 
         except Exception as e:
             logger.error(f"Error applying config to UI: {e}")
 
-    async def _initialize_mcp_client(self, config_data: Dict[str, Any]) -> bool:
+    async def _initialize_mcp_client(self, config_data: dict[str, Any]) -> bool:
         """Initialize MCP client with configuration."""
         try:
             # Close existing client if any
@@ -251,7 +260,9 @@ class MCPService:
                     logger.info("MCP client initialized successfully")
 
                     # Apply to webui_manager if available
-                    if self.webui_manager and hasattr(self.webui_manager, 'setup_mcp_client'):
+                    if self.webui_manager and hasattr(
+                        self.webui_manager, "setup_mcp_client"
+                    ):
                         await self.webui_manager.setup_mcp_client(config_data)
 
                     return True
@@ -345,7 +356,9 @@ class MCPService:
 
             config_id = active_config.get("id")
             if config_id:
-                success, message, backup_id = await self.config_manager.backup_config(config_id)
+                success, message, backup_id = await self.config_manager.backup_config(
+                    config_id
+                )
 
                 if success:
                     logger.info(f"Auto-backup created: {message}")
@@ -369,12 +382,14 @@ class MCPService:
                 return True  # Not an error, just no file to sync
 
             # Read file content
-            with open(self.mcp_file_path, 'r', encoding='utf-8') as f:
+            with open(self.mcp_file_path, encoding="utf-8") as f:
                 file_config = json.load(f)
 
             # Extract configuration data (remove metadata if present)
-            config_data = {k: v for k, v in file_config.items() if not k.startswith('_')}
-            file_metadata = file_config.get('_metadata', {})
+            config_data = {
+                k: v for k, v in file_config.items() if not k.startswith("_")
+            }
+            file_metadata = file_config.get("_metadata", {})
 
             # Get file modification time
             file_mtime = self.mcp_file_path.stat().st_mtime
@@ -392,18 +407,26 @@ class MCPService:
                 sync_reason = "No active configuration in database"
             else:
                 # Compare configuration content
-                db_config_data = active_config.get('config_data', {})
+                db_config_data = active_config.get("config_data", {})
 
                 # Simple comparison - in production you might want more sophisticated diff
-                if json.dumps(config_data, sort_keys=True) != json.dumps(db_config_data, sort_keys=True):
+                if json.dumps(config_data, sort_keys=True) != json.dumps(
+                    db_config_data, sort_keys=True
+                ):
                     should_sync = True
                     sync_reason = "Configuration content differs from database"
 
                 # Check if file is newer (if timestamp is available)
-                db_last_modified = active_config.get('metadata', {}).get('created_at', '')
-                file_last_modified = file_metadata.get('last_modified', '')
+                db_last_modified = active_config.get("metadata", {}).get(
+                    "created_at", ""
+                )
+                file_last_modified = file_metadata.get("last_modified", "")
 
-                if file_last_modified and db_last_modified and file_last_modified > db_last_modified:
+                if (
+                    file_last_modified
+                    and db_last_modified
+                    and file_last_modified > db_last_modified
+                ):
                     should_sync = True
                     sync_reason = "File is newer than database version"
 
@@ -411,15 +434,17 @@ class MCPService:
                 logger.info(f"Syncing MCP file to database: {sync_reason}")
 
                 # Store file configuration in database
-                config_name = file_metadata.get('config_name', 'file_config')
-                description = file_metadata.get('description', f'Synced from {self.mcp_file_path}')
+                config_name = file_metadata.get("config_name", "file_config")
+                description = file_metadata.get(
+                    "description", f"Synced from {self.mcp_file_path}"
+                )
 
                 success, message = await self.config_manager.store_mcp_config(
                     config_data=config_data,
                     config_name=config_name,
                     description=description,
                     config_type="file_based",
-                    set_as_active=True
+                    set_as_active=True,
                 )
 
                 if success:
@@ -466,7 +491,9 @@ class MCPService:
 
             # Check if file has been modified since last check
             if self.last_file_mtime is None or current_mtime > self.last_file_mtime:
-                logger.info("MCP configuration file has been modified, syncing to database...")
+                logger.info(
+                    "MCP configuration file has been modified, syncing to database..."
+                )
 
                 # Sync file to database
                 success = await self._sync_file_to_database()
@@ -481,7 +508,7 @@ class MCPService:
         except Exception as e:
             logger.error(f"Error checking file changes: {e}")
 
-    async def update_file_from_database(self, config_id: Optional[str] = None) -> bool:
+    async def update_file_from_database(self, config_id: str | None = None) -> bool:
         """
         Update the mcp.json file with the current database configuration.
 
@@ -494,7 +521,9 @@ class MCPService:
         try:
             # Get configuration from database
             if config_id:
-                config = self.config_manager.get_document("mcp_configurations", config_id)
+                config = self.config_manager.get_document(
+                    "mcp_configurations", config_id
+                )
                 if not config:
                     return False
                 config_data = json.loads(config.content)
@@ -504,27 +533,31 @@ class MCPService:
                 if not active_config:
                     logger.warning("No active configuration to export to file")
                     return False
-                config_data = active_config.get('config_data', {})
-                metadata = active_config.get('metadata', {})
+                config_data = active_config.get("config_data", {})
+                metadata = active_config.get("metadata", {})
 
             # Create file content with metadata
             file_content = {
                 **config_data,
                 "_metadata": {
-                    "config_name": metadata.get("config_name", "Exported Configuration"),
-                    "description": metadata.get("description", "Exported from database"),
+                    "config_name": metadata.get(
+                        "config_name", "Exported Configuration"
+                    ),
+                    "description": metadata.get(
+                        "description", "Exported from database"
+                    ),
                     "version": metadata.get("version", "1.0.0"),
                     "last_modified": datetime.now().isoformat(),
                     "auto_sync": True,
-                    "exported_from_db": True
-                }
+                    "exported_from_db": True,
+                },
             }
 
             # Ensure directory exists
             self.mcp_file_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Write to file
-            with open(self.mcp_file_path, 'w', encoding='utf-8') as f:
+            with open(self.mcp_file_path, "w", encoding="utf-8") as f:
                 json.dump(file_content, f, indent=2)
 
             # Update file modification time tracking
@@ -537,7 +570,7 @@ class MCPService:
             logger.error(f"Error updating file from database: {e}")
             return False
 
-    async def get_service_status(self) -> Dict[str, Any]:
+    async def get_service_status(self) -> dict[str, Any]:
         """Get current service status and statistics."""
         try:
             status = {
@@ -545,7 +578,7 @@ class MCPService:
                 "has_config_manager": self.config_manager is not None,
                 "has_mcp_client": self.mcp_client is not None,
                 "service_uptime": "N/A",  # Could implement uptime tracking
-                "last_health_check": datetime.now().isoformat()
+                "last_health_check": datetime.now().isoformat(),
             }
 
             # Add file sync information
@@ -553,13 +586,15 @@ class MCPService:
                 "file_path": str(self.mcp_file_path),
                 "file_exists": self.mcp_file_path.exists(),
                 "last_file_check": self.last_file_mtime,
-                "auto_sync_enabled": True
+                "auto_sync_enabled": True,
             }
 
             if self.mcp_file_path.exists():
                 file_stat = self.mcp_file_path.stat()
                 status["file_sync"]["file_size"] = file_stat.st_size
-                status["file_sync"]["file_modified"] = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
+                status["file_sync"]["file_modified"] = datetime.fromtimestamp(
+                    file_stat.st_mtime
+                ).isoformat()
 
             # Add configuration information
             if self.config_manager:
@@ -567,8 +602,12 @@ class MCPService:
                 if active_config:
                     status["active_config"] = {
                         "name": active_config.get("config_name", "Unknown"),
-                        "server_count": len(active_config.get("config_data", {}).get("mcpServers", {})),
-                        "last_used": active_config.get("metadata", {}).get("last_used", "Unknown")
+                        "server_count": len(
+                            active_config.get("config_data", {}).get("mcpServers", {})
+                        ),
+                        "last_used": active_config.get("metadata", {}).get(
+                            "last_used", "Unknown"
+                        ),
                     }
 
                 # Get collection stats
@@ -581,7 +620,7 @@ class MCPService:
             logger.error(f"Error getting service status: {e}")
             return {"error": str(e), "is_running": self.is_running}
 
-    async def list_available_configs(self) -> List[Dict[str, Any]]:
+    async def list_available_configs(self) -> list[dict[str, Any]]:
         """Get list of all available configurations."""
         try:
             if not self.config_manager:
@@ -593,7 +632,7 @@ class MCPService:
             logger.error(f"Error listing configurations: {e}")
             return []
 
-    async def switch_configuration(self, config_id: str) -> Tuple[bool, str]:
+    async def switch_configuration(self, config_id: str) -> tuple[bool, str]:
         """
         Switch to a different stored configuration.
 

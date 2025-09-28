@@ -4,20 +4,22 @@ Enhanced test script for ChromaDB and DocumentPipeline integration.
 Run this to validate that the database and document editor integration is working correctly.
 """
 
-import sys
 import logging
+import sys
 from pathlib import Path
 
 # Add src to path so we can import our modules
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from web_ui.database import ChromaManager, DocumentModel, CollectionConfig
-from web_ui.database.utils import DatabaseUtils
+from web_ui.database import ChromaManager
 from web_ui.database.config import get_default_config
 from web_ui.database.document_pipeline import DocumentPipeline
+from web_ui.database.utils import DatabaseUtils
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -59,7 +61,7 @@ def test_database_integration():
         stats = pipeline.get_collection_stats()
         print(f"✅ Pipeline collections active: {len(stats)}")
         for collection, stat in stats.items():
-            doc_count = stat.get('document_count', 0)
+            doc_count = stat.get("document_count", 0)
             print(f"   📊 {collection}: {doc_count} documents")
 
         # Test 7: Document Processing from Editor
@@ -86,7 +88,7 @@ policy, procedure, documentation, compliance, review
             content=sample_content,
             file_path="./tmp/documents/sample_policy.md",
             document_type="markdown",
-            metadata={"test": True, "category": "policy", "priority": "high"}
+            metadata={"test": True, "category": "policy", "priority": "high"},
         )
 
         if success:
@@ -101,19 +103,23 @@ policy, procedure, documentation, compliance, review
             query="policy document formatting requirements",
             collection_type="documents",
             include_relations=True,
-            limit=5
+            limit=5,
         )
         print(f"✅ Search completed - Found {len(search_results)} results")
 
         if search_results:
             for i, result in enumerate(search_results[:2], 1):
-                print(f"   Result {i}: ID={result.id}, Score={result.relevance_score:.3f}")
+                print(
+                    f"   Result {i}: ID={result.id}, Score={result.relevance_score:.3f}"
+                )
 
         # Test 9: Document Suggestions
         print("\n9. Testing Document Suggestions...")
         suggestions = pipeline.get_document_suggestions(sample_content, "policy")
         total_suggestions = sum(len(v) for v in suggestions.values())
-        print(f"✅ Document suggestions generated: {total_suggestions} total suggestions")
+        print(
+            f"✅ Document suggestions generated: {total_suggestions} total suggestions"
+        )
 
         for category, results in suggestions.items():
             if results:
@@ -126,7 +132,7 @@ policy, procedure, documentation, compliance, review
             content=sample_content,
             policy_type="manual",
             authority_level="high",
-            metadata={"department": "IT", "version": "1.0"}
+            metadata={"department": "IT", "version": "1.0"},
         )
 
         if policy_success:
@@ -137,9 +143,7 @@ policy, procedure, documentation, compliance, review
         # Test 11: Vector Search
         print("\n11. Testing Vector Search...")
         vector_results = pipeline.search_documents(
-            query="document requirements compliance",
-            collection_type="vectors",
-            limit=3
+            query="document requirements compliance", collection_type="vectors", limit=3
         )
         print(f"✅ Vector search completed - Found {len(vector_results)} chunk results")
 
@@ -150,7 +154,7 @@ policy, procedure, documentation, compliance, review
                 source_doc_id=doc_model.id,
                 target_doc_id="policy_test_policy_manual",
                 relation_type="implements",
-                metadata={"strength": 0.8, "context": "policy_implementation"}
+                metadata={"strength": 0.8, "context": "policy_implementation"},
             )
             if relation_success:
                 print("✅ Document relation created successfully")
@@ -165,7 +169,7 @@ policy, procedure, documentation, compliance, review
         total_docs = 0
         for collection, stat in final_stats.items():
             if isinstance(stat, dict):
-                doc_count = stat.get('document_count', 0)
+                doc_count = stat.get("document_count", 0)
                 total_docs += doc_count
                 print(f"   📊 {collection}: {doc_count} documents")
 
@@ -192,7 +196,12 @@ def cleanup_test_data():
         manager = ChromaManager()
 
         # Delete test documents from various collections
-        collections_to_clean = ["documents", "policy_manuals", "document_vectors", "document_relations"]
+        collections_to_clean = [
+            "documents",
+            "policy_manuals",
+            "document_vectors",
+            "document_relations",
+        ]
 
         for collection in collections_to_clean:
             try:
@@ -208,7 +217,9 @@ def cleanup_test_data():
 
 if __name__ == "__main__":
     print("ChromaDB & Document Pipeline Integration Test")
-    print("This script tests the complete database integration for the web-ui application.")
+    print(
+        "This script tests the complete database integration for the web-ui application."
+    )
     print()
 
     # Run the test
@@ -216,8 +227,10 @@ if __name__ == "__main__":
 
     if success:
         # Ask if user wants to clean up
-        response = input("\nDo you want to clean up the test data? (y/N): ").strip().lower()
-        if response in ['y', 'yes']:
+        response = (
+            input("\nDo you want to clean up the test data? (y/N): ").strip().lower()
+        )
+        if response in ["y", "yes"]:
             cleanup_test_data()
 
     print("\nTest completed.")

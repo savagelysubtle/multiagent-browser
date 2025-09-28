@@ -53,11 +53,13 @@ target-version = "py313"
 
     [tool.ruff.lint]
     ignore = [  ]
-    select = [ "E", "F", "I", "N", "W" ]
+    select = [ "E", "F", "I", "N", "W", "UP" ] # Added UP for f-string formatting rules
 
     [tool.ruff.format]
     indent-style = "space"
     quote-style  = "double"
+
+    # F-string formatting is enabled by default in Ruff 0.9.0+
 
 [tool.pytest.ini_options]
 addopts = [

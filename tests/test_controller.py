@@ -11,7 +11,7 @@ load_dotenv()
 
 
 async def test_mcp_client():
-    from src.utils.mcp_client import setup_mcp_client_and_tools, create_tool_param_model
+    from src.utils.mcp_client import create_tool_param_model, setup_mcp_client_and_tools
 
     test_server_config = {
         "mcpServers": {
@@ -26,10 +26,7 @@ async def test_mcp_client():
             # },
             "desktop-commander": {
                 "command": "npx",
-                "args": [
-                    "-y",
-                    "@wonderwhy-er/desktop-commander"
-                ]
+                "args": ["-y", "@wonderwhy-er/desktop-commander"],
             },
             # "filesystem": {
             #     "command": "npx",
@@ -53,9 +50,7 @@ async def test_mcp_client():
 
 
 async def test_controller_with_mcp():
-    import os
     from src.controller.custom_controller import CustomController
-    from browser_use.controller.registry.views import ActionModel
 
     mcp_server_config = {
         "mcpServers": {
@@ -70,10 +65,7 @@ async def test_controller_with_mcp():
             # },
             "desktop-commander": {
                 "command": "npx",
-                "args": [
-                    "-y",
-                    "@wonderwhy-er/desktop-commander"
-                ]
+                "args": ["-y", "@wonderwhy-er/desktop-commander"],
             },
             # "filesystem": {
             #     "command": "npx",
@@ -92,8 +84,7 @@ async def test_controller_with_mcp():
     action_info = controller.registry.registry.actions[action_name]
     param_model = action_info.param_model
     print(param_model.model_json_schema())
-    params = {"command": f"python ./tmp/test.py"
-              }
+    params = {"command": "python ./tmp/test.py"}
     validated_params = param_model(**params)
     ActionModel_ = controller.registry.create_action_model()
     # Create ActionModel instance with the validated parameters
@@ -101,8 +92,11 @@ async def test_controller_with_mcp():
     result = await controller.act(action_model)
     result = result.extracted_content
     print(result)
-    if result and "Command is still running. Use read_output to get more output." in result and "PID" in \
-            result.split("\n")[0]:
+    if (
+        result
+        and "Command is still running. Use read_output to get more output." in result
+        and "PID" in result.split("\n")[0]
+    ):
         pid = int(result.split("\n")[0].split("PID")[-1].strip())
         action_name = "mcp.desktop-commander.read_output"
         action_info = controller.registry.registry.actions[action_name]
@@ -126,6 +120,6 @@ async def test_controller_with_mcp():
     pdb.set_trace()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # asyncio.run(test_mcp_client())
     asyncio.run(test_controller_with_mcp())

@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production builds
+dist/
+build/
+*.tsbuildinfo
+
+# Environment and config files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Generated files
+*.d.ts
+*.min.js
+*.min.css
+
+# Documentation
+*.md
+CHANGELOG.md
+
+# Logs
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Test coverage
+coverage/

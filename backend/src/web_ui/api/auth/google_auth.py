@@ -7,7 +7,7 @@ Ready for future activation via environment variables.
 
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import FastAPI, HTTPException, Request, status
@@ -77,7 +77,7 @@ def setup_google_oauth(app: FastAPI) -> bool:
 # OAuth route handlers (will be added to FastAPI app when Google SSO is enabled)
 
 
-async def google_login(request: Request) -> Dict[str, Any]:
+async def google_login(request: Request) -> dict[str, Any]:
     """
     Initiate Google OAuth login flow.
 
@@ -115,7 +115,7 @@ async def google_login(request: Request) -> Dict[str, Any]:
         )
 
 
-async def google_callback(request: Request) -> Dict[str, Any]:
+async def google_callback(request: Request) -> dict[str, Any]:
     """
     Handle Google OAuth callback.
 
@@ -193,7 +193,7 @@ async def google_callback(request: Request) -> Dict[str, Any]:
         )
 
 
-def get_google_oauth_status() -> Dict[str, Any]:
+def get_google_oauth_status() -> dict[str, Any]:
     """
     Get the current status of Google OAuth configuration.
 

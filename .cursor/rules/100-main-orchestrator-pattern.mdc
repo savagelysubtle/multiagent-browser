@@ -1,6 +1,6 @@
 ---
 description:
-globs: webui.py,**main.py,**.py
+globs: **.py,**/*.py
 alwaysApply: false
 ---
 <cursor-rule>

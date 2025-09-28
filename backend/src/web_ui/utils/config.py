@@ -13,17 +13,48 @@ PROVIDER_DISPLAY_NAMES = {
 
 # Predefined model names for common providers
 model_names = {
-    "anthropic": ["claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20240620", "claude-3-opus-20240229"],
+    "anthropic": [
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-sonnet-20240620",
+        "claude-3-opus-20240229",
+    ],
     "openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo", "o3-mini"],
     "deepseek": ["deepseek-chat", "deepseek-reasoner"],
-    "google": ["gemini-2.0-flash", "gemini-2.0-flash-thinking-exp", "gemini-1.5-flash-latest",
-               "gemini-1.5-flash-8b-latest", "gemini-2.0-flash-thinking-exp-01-21", "gemini-2.0-pro-exp-02-05",
-               "gemini-2.5-pro-preview-03-25", "gemini-2.5-flash-preview-04-17"],
-    "ollama": ["qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b", "qwen2.5-coder:14b", "qwen2.5-coder:32b", "llama2:7b",
-               "deepseek-r1:14b", "deepseek-r1:32b"],
+    "google": [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-thinking-exp",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-8b-latest",
+        "gemini-2.0-flash-thinking-exp-01-21",
+        "gemini-2.0-pro-exp-02-05",
+        "gemini-2.5-pro-preview-03-25",
+        "gemini-2.5-flash-preview-04-17",
+    ],
+    "ollama": [
+        "qwen2.5:7b",
+        "qwen2.5:14b",
+        "qwen2.5:32b",
+        "qwen2.5-coder:14b",
+        "qwen2.5-coder:32b",
+        "llama2:7b",
+        "deepseek-r1:14b",
+        "deepseek-r1:32b",
+    ],
     "azure_openai": ["gpt-4o", "gpt-4", "gpt-3.5-turbo"],
-    "mistral": ["pixtral-large-latest", "mistral-large-latest", "mistral-small-latest", "ministral-8b-latest"],
-    "alibaba": ["qwen-plus", "qwen-max", "qwen-vl-max", "qwen-vl-plus", "qwen-turbo", "qwen-long"],
+    "mistral": [
+        "pixtral-large-latest",
+        "mistral-large-latest",
+        "mistral-small-latest",
+        "ministral-8b-latest",
+    ],
+    "alibaba": [
+        "qwen-plus",
+        "qwen-max",
+        "qwen-vl-max",
+        "qwen-vl-plus",
+        "qwen-turbo",
+        "qwen-long",
+    ],
     "moonshot": ["moonshot-v1-32k-vision-preview", "moonshot-v1-8k-vision-preview"],
     "unbound": ["gemini-2.0-flash", "gpt-4o-mini", "gpt-4o", "gpt-4.5-preview"],
     "grok": [
@@ -68,9 +99,12 @@ model_names = {
         "Pro/THUDM/chatglm3-6b",
         "Pro/THUDM/glm-4-9b-chat",
     ],
-    "ibm": ["ibm/granite-vision-3.1-2b-preview", "meta-llama/llama-4-maverick-17b-128e-instruct-fp8",
-            "meta-llama/llama-3-2-90b-vision-instruct"],
-    "modelscope":[
+    "ibm": [
+        "ibm/granite-vision-3.1-2b-preview",
+        "meta-llama/llama-4-maverick-17b-128e-instruct-fp8",
+        "meta-llama/llama-3-2-90b-vision-instruct",
+    ],
+    "modelscope": [
         "Qwen/Qwen2.5-Coder-32B-Instruct",
         "Qwen/Qwen2.5-Coder-14B-Instruct",
         "Qwen/Qwen2.5-Coder-7B-Instruct",

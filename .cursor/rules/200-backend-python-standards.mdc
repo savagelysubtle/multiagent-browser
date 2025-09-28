@@ -1,0 +1,458 @@
+---
+description:
+globs: **/*.py,**.py,**backend/**/*,**backend/**
+alwaysApply: false
+---
+# Backend Python Coding Standards
+
+<cursor-rule>
+  <version>1.0.0</version>
+
+  <context>
+    This rule enforces Python coding standards specifically for the backend directory (./backend) of the web-ui project. It ensures consistent code quality through type hints, formatting with Ruff (replacing Black), comprehensive docstrings, and clean Python practices aligned with the project's Astral UV package manager and Ruff formatter configuration.
+  </context>
+
+  <scope>
+    <target>All Python files in ./backend directory and subdirectories</target>
+    <exclusions>Migration scripts, generated files, and third-party integrations may have relaxed requirements</exclusions>
+  </scope>
+
+  <coding-standards>
+    <type-hints>
+      <requirement>MANDATORY for all function signatures, class attributes, and return types</requirement>
+      <guidelines>
+        <guideline>Use specific types from typing module (List[str], Dict[str, Any], Optional[int])</guideline>
+        <guideline>Avoid Any type unless absolutely necessary - document why if used</guideline>
+        <guideline>Use Union types for multiple acceptable types</guideline>
+        <guideline>Include type hints for class attributes using dataclasses or explicit annotations</guideline>
+      </guidelines>
+      <examples>
+        <good>
+def process_documents(docs: List[Dict[str, Any]], batch_size: int = 10) -> Tuple[int, List[str]]:
+    """Process documents and return count and errors."""
+    pass
+
+class ChromaManager:
+    collection_name: str
+    client: Optional[chromadb.Client] = None
+        </good>
+        <bad>
+def process_documents(docs, batch_size=10):  # Missing all type hints
+    pass
+        </bad>
+      </examples>
+    </type-hints>
+
+    <formatting>
+      <tool>Ruff formatter (configured in [pyproject.toml](mdc:pyproject.toml))</tool>
+      <requirements>
+        <requirement>Line length: 88 characters (Black-compatible)</requirement>
+        <requirement>Use hanging commas for multi-line structures</requirement>
+        <requirement>F-string formatting preferred over .format() or % formatting</requirement>
+        <requirement>Consistent import ordering: standard library, third-party, local imports</requirement>
+        <requirement>Remove unused imports and variables</requirement>
+      </requirements>
+      <standards>
+        <standard>Use double quotes for strings consistently</standard>
+        <standard>Blank lines: 2 before top-level classes/functions, 1 between methods</standard>
+        <standard>Trailing commas in multi-line collections and function calls</standard>
+      </standards>
+    </formatting>
+
+    <docstrings>
+      <requirement>MANDATORY for all public classes, methods, and complex functions</requirement>
+      <style>Google style for classes and large functions, NumPy style for utilities</style>
+      <guidelines>
+        <guideline>Start with one-line summary, then detailed description if needed</guideline>
+        <guideline>Document all parameters with types and descriptions</guideline>
+        <guideline>Document return values and exceptions</guideline>
+        <guideline>Include usage examples for complex APIs</guideline>
+        <guideline>Keep concise - avoid overly verbose explanations</guideline>
+      </guidelines>
+      <examples>
+        <google-style>
+class ChromaManager:
+    """Manages ChromaDB operations for document storage and retrieval.
+
+    This class handles all interactions with the ChromaDB vector database,
+    including collection management, document embedding, and similarity search.
+
+    Args:
+        collection_name: Name of the ChromaDB collection to use.
+        persist_directory: Directory for database persistence.
+
+    Raises:
+        ConnectionError: When unable to connect to ChromaDB.
+        ValueError: When collection_name is invalid.
+    """
+        </google-style>
+        <numpy-style>
+def embed_documents(texts: List[str], model: str = "default") -> np.ndarray:
+    """Generate embeddings for input texts.
+
+    Parameters
+    ----------
+    texts : List[str]
+        List of text documents to embed
+    model : str, default "default"
+        Embedding model to use
+
+    Returns
+    -------
+    np.ndarray
+        Array of embeddings with shape (len(texts), embedding_dim)
+
+    Raises
+    ------
+    ModelError
+        When embedding model fails to load or process texts
+    """
+        </numpy-style>
+      </examples>
+    </docstrings>
+
+    <code-quality>
+      <principles>
+        <principle>Single Responsibility: Each function/class has one clear purpose</principle>
+        <principle>DRY: Don't repeat yourself - extract common functionality</principle>
+        <principle>Explicit over implicit: Clear variable and function names</principle>
+        <principle>Fail fast: Validate inputs early and provide clear error messages</principle>
+      </principles>
+
+      <naming-conventions>
+        <functions>Verbs describing what they do (get_documents, process_query, validate_input)</functions>
+        <classes>Nouns representing entities (ChromaManager, DocumentProcessor, APIClient)</classes>
+        <constants>UPPER_SNAKE_CASE (MAX_BATCH_SIZE, DEFAULT_TIMEOUT)</constants>
+        <variables>snake_case with descriptive names (user_documents, processing_queue)</variables>
+      </naming-conventions>
+
+      <error-handling>
+        <requirement>Catch specific exceptions, not bare except clauses</requirement>
+        <requirement>Provide meaningful error messages with context</requirement>
+        <requirement>Use logging module instead of print statements</requirement>
+        <requirement>Re-raise unexpected errors with additional context</requirement>
+        <examples>
+          <good>
+try:
+    result = await chroma_client.get_collection(collection_name)
+except CollectionNotFoundError as e:
+    logger.error(f"Collection '{collection_name}' not found: {e}")
+    raise ValueError(f"Invalid collection: {collection_name}") from e
+except Exception as e:
+    logger.error(f"Unexpected error accessing ChromaDB: {e}")
+    raise
+          </good>
+          <bad>
+try:
+    result = chroma_client.get_collection(collection_name)
+except:  # Too broad
+    print("Error occurred")  # Not informative
+    pass  # Silently ignoring errors
+          </bad>
+        </examples>
+      </error-handling>
+
+      <imports>
+        <organization>Group imports: standard library, third-party, local backend imports</organization>
+        <standards>
+          <standard>Use absolute imports for backend modules: from backend.src.web_ui.database import ChromaManager</standard>
+          <standard>Use relative imports within the same module: from ..utils import config</standard>
+          <standard>Import specific items rather than entire modules when possible</standard>
+          <standard>Organize imports alphabetically within each group</standard>
+        </standards>
+        <example>
+# Standard library
+import asyncio
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+# Third-party
+import chromadb
+import fastapi
+from pydantic import BaseModel
+
+# Local backend imports
+from backend.src.web_ui.database import ChromaManager
+from backend.src.web_ui.utils.config import get_settings
+from ..adapters import DocumentEditorAdapter
+        </example>
+      </imports>
+    </code-quality>
+
+    <backend-specific>
+      <async-patterns>
+        <requirement>Use async/await for I/O operations (database, API calls, file operations)</requirement>
+        <requirement>Properly handle async context managers with async with</requirement>
+        <requirement>Use asyncio.gather() for concurrent operations</requirement>
+      </async-patterns>
+
+      <fastapi-integration>
+        <requirement>Use Pydantic models for request/response validation</requirement>
+        <requirement>Include proper HTTP status codes and error responses</requirement>
+        <requirement>Add comprehensive API documentation with descriptions</requirement>
+      </fastapi-integration>
+
+      <database-operations>
+        <requirement>Use proper connection management and cleanup</requirement>
+        <requirement>Include transaction handling where appropriate</requirement>
+        <requirement>Validate all database inputs and sanitize queries</requirement>
+      </database-operations>
+
+      <logging>
+        <requirement>Use structured logging with meaningful context</requirement>
+        <requirement>Log to ./logs/ directory as configured in project structure</requirement>
+        <requirement>Include correlation IDs for request tracking</requirement>
+        <levels>
+          <level>DEBUG: Detailed debugging information</level>
+          <level>INFO: Normal operation events</level>
+          <level>WARNING: Potential issues that don't break functionality</level>
+          <level>ERROR: Error conditions that need attention</level>
+        </levels>
+      </logging>
+    </backend-specific>
+  </coding-standards>
+
+  <enforcement>
+    <tools>
+      <tool>Ruff: Formatting and linting (configured in pyproject.toml)</tool>
+      <tool>UV: Package management and dependency resolution</tool>
+      <tool>Ty: Type checking for enhanced type safety</tool>
+    </tools>
+
+    <pre-commit-checks>
+      <check>Type hints present on all function signatures</check>
+      <check>Docstrings present on public classes and methods</check>
+      <check>No print() statements in production code (use logging)</check>
+      <check>Proper exception handling with specific exception types</check>
+      <check>Import organization follows standards</check>
+    </pre-commit-checks>
+  </enforcement>
+
+  <examples>
+    <exemplary-backend-file>
+      <description>Complete backend module following all standards</description>
+      <example>
+# backend/src/web_ui/database/chroma_manager.py
+"""ChromaDB management for document storage and retrieval."""
+
+import asyncio
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import chromadb
+from chromadb.config import Settings
+from pydantic import BaseModel, Field
+
+from backend.src.web_ui.utils.config import get_settings
+from ..models import Document, SearchResult
+
+logger = logging.getLogger(__name__)
+
+
+class DocumentRequest(BaseModel):
+    """Request model for document operations."""
+
+    content: str = Field(..., description="Document content to process")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional metadata")
+    collection_name: Optional[str] = Field(default="documents", description="Target collection")
+
+
+class ChromaManager:
+    """Manages ChromaDB operations for document storage and retrieval.
+
+    This class provides a high-level interface for interacting with ChromaDB,
+    handling connection management, collection operations, and document processing.
+
+    Args:
+        persist_directory: Directory for database persistence.
+        collection_name: Default collection name for operations.
+
+    Raises:
+        ConnectionError: When unable to connect to ChromaDB instance.
+        ValueError: When configuration parameters are invalid.
+    """
+
+    def __init__(
+        self,
+        persist_directory: Optional[Path] = None,
+        collection_name: str = "documents"
+    ) -> None:
+        self.persist_directory = persist_directory or Path("data/chroma_db")
+        self.collection_name = collection_name
+        self.client: Optional[chromadb.Client] = None
+        self._collection: Optional[chromadb.Collection] = None
+
+    async def connect(self) -> None:
+        """Establish connection to ChromaDB instance."""
+        try:
+            settings = Settings(persist_directory=str(self.persist_directory))
+            self.client = chromadb.Client(settings=settings)
+            logger.info(f"Connected to ChromaDB at {self.persist_directory}")
+        except Exception as e:
+            logger.error(f"Failed to connect to ChromaDB: {e}")
+            raise ConnectionError(f"ChromaDB connection failed: {e}") from e
+
+    async def add_documents(
+        self,
+        documents: List[str],
+        metadatas: Optional[List[Dict[str, Any]]] = None,
+        ids: Optional[List[str]] = None
+    ) -> Tuple[int, List[str]]:
+        """Add documents to the collection.
+
+        Parameters
+        ----------
+        documents : List[str]
+            List of document texts to add
+        metadatas : List[Dict[str, Any]], optional
+            Metadata for each document
+        ids : List[str], optional
+            Custom IDs for documents, auto-generated if None
+
+        Returns
+        -------
+        Tuple[int, List[str]]
+            Count of added documents and list of their IDs
+
+        Raises
+        ------
+        ValueError
+            When input validation fails
+        DatabaseError
+            When ChromaDB operation fails
+        """
+        if not documents:
+            raise ValueError("Documents list cannot be empty")
+
+        try:
+            collection = await self._get_collection()
+
+            # Generate IDs if not provided
+            if ids is None:
+                ids = [f"doc_{i}_{hash(doc)}" for i, doc in enumerate(documents)]
+
+            await asyncio.to_thread(
+                collection.add,
+                documents=documents,
+                metadatas=metadatas or [{}] * len(documents),
+                ids=ids
+            )
+
+            logger.info(f"Added {len(documents)} documents to collection '{self.collection_name}'")
+            return len(documents), ids
+
+        except Exception as e:
+            logger.error(f"Failed to add documents: {e}")
+            raise DatabaseError(f"Document addition failed: {e}") from e
+
+    async def _get_collection(self) -> chromadb.Collection:
+        """Get or create the working collection."""
+        if self.client is None:
+            await self.connect()
+
+        try:
+            return self.client.get_or_create_collection(name=self.collection_name)
+        except Exception as e:
+            logger.error(f"Failed to access collection '{self.collection_name}': {e}")
+            raise
+      </example>
+    </exemplary-backend-file>
+
+    <common-violations>
+      <violation>
+        <issue>Missing type hints</issue>
+        <bad>def process_data(data, options):</bad>
+        <good>def process_data(data: List[Dict[str, Any]], options: ProcessingOptions) -> ProcessingResult:</good>
+      </violation>
+
+      <violation>
+        <issue>Using print instead of logging</issue>
+        <bad>print(f"Processing {len(documents)} documents")</bad>
+        <good>logger.info(f"Processing {len(documents)} documents")</good>
+      </violation>
+
+      <violation>
+        <issue>Bare except clauses</issue>
+        <bad>
+try:
+    result = risky_operation()
+except:
+    return None
+        </bad>
+        <good>
+try:
+    result = risky_operation()
+except SpecificError as e:
+    logger.warning(f"Operation failed: {e}")
+    return None
+except Exception as e:
+    logger.error(f"Unexpected error: {e}")
+    raise
+        </good>
+      </violation>
+
+      <violation>
+        <issue>Missing or inadequate docstrings</issue>
+        <bad>
+def complex_function(data, config):
+    # Does complex processing
+    pass
+        </bad>
+        <good>
+def complex_function(data: List[Document], config: ProcessingConfig) -> ProcessingResult:
+    """Process documents according to configuration settings.
+
+    Args:
+        data: List of documents to process.
+        config: Processing configuration including filters and options.
+
+    Returns:
+        ProcessingResult containing success count and any errors.
+
+    Raises:
+        ValidationError: When input data is invalid.
+        ProcessingError: When processing fails.
+    """
+    pass
+        </good>
+      </violation>
+    </common-violations>
+  </examples>
+
+  <integration-requirements>
+    <requirement name="configuration-compliance">
+      <description>Follow existing Ruff configuration in [pyproject.toml](mdc:pyproject.toml)</description>
+      <action>Use `uv run ruff format ./backend` and `uv run ruff check ./backend` for validation</action>
+    </requirement>
+
+    <requirement name="import-structure">
+      <description>Respect the backend import structure defined in project rules</description>
+      <pattern>from backend.src.web_ui.{module} import {component}</pattern>
+    </requirement>
+
+    <requirement name="logging-integration">
+      <description>Use the logging configuration that writes to ./logs/ directory</description>
+      <reference>[main.py logging setup](mdc:backend/src/web_ui/main.py)</reference>
+    </requirement>
+  </integration-requirements>
+
+  <enforcement-workflow>
+    <step>Before committing: Run `uv run ruff check ./backend` to verify linting</step>
+    <step>Before committing: Run `uv run ruff format ./backend` to ensure formatting</step>
+    <step>During code review: Verify all public functions have docstrings and type hints</step>
+    <step>During implementation: Use logging instead of print statements</step>
+    <step>During error handling: Catch specific exceptions with meaningful messages</step>
+  </enforcement-workflow>
+
+  <critical-instructions>
+    <instruction>REQUIRE type hints on all function signatures in ./backend</instruction>
+    <instruction>ENFORCE Ruff formatting standards as configured in pyproject.toml</instruction>
+    <instruction>MANDATE docstrings for all public classes and complex functions</instruction>
+    <instruction>PROHIBIT print() statements in production backend code - use logging</instruction>
+    <instruction>ENSURE proper exception handling with specific exception types</instruction>
+    <instruction>MAINTAIN clean import organization: stdlib, third-party, local backend</instruction>
+  </critical-instructions>
+</cursor-rule>
+

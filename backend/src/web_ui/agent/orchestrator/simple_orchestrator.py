@@ -10,7 +10,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +23,14 @@ class AgentTask:
     user_id: str
     agent_type: str
     action: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     status: str = "pending"  # pending, running, completed, failed, cancelled
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    created_at: Optional[datetime] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    progress: Optional[Dict[str, Any]] = None
+    result: Any | None = None
+    error: str | None = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    progress: dict[str, Any] | None = None
 
     def __post_init__(self):
         if self.created_at is None:
@@ -53,9 +53,9 @@ class SimpleAgentOrchestrator:
 
     def __init__(self, ws_manager=None):
         self.agents = {}  # agent_type -> agent_instance
-        self.user_tasks: Dict[str, List[str]] = {}  # user_id -> task_ids
-        self.task_store: Dict[str, AgentTask] = {}  # task_id -> task
-        self.running_tasks: Dict[str, asyncio.Task] = {}  # task_id -> asyncio.Task
+        self.user_tasks: dict[str, list[str]] = {}  # user_id -> task_ids
+        self.task_store: dict[str, AgentTask] = {}  # task_id -> task
+        self.running_tasks: dict[str, asyncio.Task] = {}  # task_id -> asyncio.Task
         self.ws_manager = ws_manager
         self.max_concurrent_tasks = 5
         self.task_timeout = 300  # 5 minutes default timeout
@@ -65,7 +65,7 @@ class SimpleAgentOrchestrator:
         self.agents[agent_type] = agent_instance
         logger.info(f"Registered agent: {agent_type}")
 
-    def get_available_agents(self) -> List[Dict[str, Any]]:
+    def get_available_agents(self) -> list[dict[str, Any]]:
         """Get list of available agents and their capabilities."""
         return [
             {
@@ -122,7 +122,7 @@ class SimpleAgentOrchestrator:
         ]
 
     async def submit_task(
-        self, user_id: str, agent_type: str, action: str, payload: Dict
+        self, user_id: str, agent_type: str, action: str, payload: dict
     ) -> str:
         """Submit a task for a specific user."""
         if agent_type not in self.agents:
@@ -227,7 +227,7 @@ class SimpleAgentOrchestrator:
 
             logger.info(f"Task {task.id} completed successfully")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Task {task.id} timed out after {self.task_timeout} seconds")
             task.status = "failed"
             task.error = f"Task timed out after {self.task_timeout} seconds"
@@ -259,7 +259,7 @@ class SimpleAgentOrchestrator:
             await self._notify_task_status(task)
 
     async def _notify_task_status(
-        self, task: AgentTask, custom_message: Optional[Dict] = None
+        self, task: AgentTask, custom_message: dict | None = None
     ):
         """Notify user of task status change via WebSocket."""
         if not self.ws_manager:
@@ -277,7 +277,7 @@ class SimpleAgentOrchestrator:
 
         await self.ws_manager.send_message(task.user_id, message)
 
-    def _get_user_running_tasks(self, user_id: str) -> List[str]:
+    def _get_user_running_tasks(self, user_id: str) -> list[str]:
         """Get list of running task IDs for a user."""
         user_task_ids = self.user_tasks.get(user_id, [])
         return [
@@ -288,8 +288,8 @@ class SimpleAgentOrchestrator:
         ]
 
     async def get_user_tasks(
-        self, user_id: str, limit: int = 50, status_filter: Optional[str] = None
-    ) -> List[AgentTask]:
+        self, user_id: str, limit: int = 50, status_filter: str | None = None
+    ) -> list[AgentTask]:
         """Get recent tasks for a user with optional status filtering."""
         task_ids = self.user_tasks.get(user_id, [])
         tasks = [self.task_store[tid] for tid in task_ids if tid in self.task_store]
@@ -328,14 +328,14 @@ class SimpleAgentOrchestrator:
 
         return False
 
-    async def get_task_by_id(self, user_id: str, task_id: str) -> Optional[AgentTask]:
+    async def get_task_by_id(self, user_id: str, task_id: str) -> AgentTask | None:
         """Get a specific task by ID if it belongs to the user."""
         task = self.task_store.get(task_id)
         if task and task.user_id == user_id:
             return task
         return None
 
-    def get_agent_stats(self) -> Dict[str, Any]:
+    def get_agent_stats(self) -> dict[str, Any]:
         """Get orchestrator statistics."""
         total_tasks = len(self.task_store)
         running_tasks = len(self.running_tasks)
@@ -355,7 +355,7 @@ class SimpleAgentOrchestrator:
 
 
 # Global orchestrator instance - will be initialized with WebSocket manager
-orchestrator: Optional[SimpleAgentOrchestrator] = None
+orchestrator: SimpleAgentOrchestrator | None = None
 
 
 def initialize_orchestrator(ws_manager):

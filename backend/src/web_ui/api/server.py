@@ -12,9 +12,10 @@ import os
 # Ensure we can import from src
 import sys
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
@@ -32,7 +33,7 @@ from ..agent.document_editor import DocumentEditingAgent
 logger = logging.getLogger(__name__)
 
 # Global agent instance
-document_agent: Optional[DocumentEditingAgent] = None
+document_agent: DocumentEditingAgent | None = None
 
 
 # Pydantic models for API requests/responses
@@ -40,7 +41,7 @@ class DocumentCreateRequest(BaseModel):
     filename: str
     content: str = ""
     document_type: str = "document"
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 class DocumentEditRequest(BaseModel):
@@ -68,7 +69,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    context_document_id: Optional[str] = None
+    context_document_id: str | None = None
     use_streaming: bool = True
 
 
@@ -81,9 +82,9 @@ class ChatResponse(BaseModel):
 class AgentStatusResponse(BaseModel):
     initialized: bool
     mcp_tools_available: int
-    session_id: Optional[str]
-    current_document: Optional[str]
-    database_stats: Optional[Dict[str, Any]]
+    session_id: str | None
+    current_document: str | None
+    database_stats: dict[str, Any] | None
     message: str
 
 
@@ -94,7 +95,24 @@ async def lifespan(app: FastAPI):
 
     # Startup
     logger.info("Starting API server...")
+
+    # Initialize WebSocket manager first
+    # Initialize agent orchestrator
+    from ..agent.orchestrator.simple_orchestrator import initialize_orchestrator
+    from .dependencies import set_orchestrator
+    from .websocket.websocket_manager import ws_manager
+
+    orchestrator = initialize_orchestrator(ws_manager)
+    set_orchestrator(orchestrator)  # Make it available to other routes
+    logger.info("Agent orchestrator initialized")
+
+    # Initialize document agent
     await initialize_document_agent()
+
+    # Register document agent with orchestrator if available
+    if document_agent and orchestrator:
+        orchestrator.register_agent("document_editor", document_agent)
+        logger.info("DocumentEditingAgent registered with orchestrator")
 
     yield
 
@@ -184,9 +202,11 @@ app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # Include document routes
+from .routes.agents import router as agents_router
 from .routes.documents import router as documents_router
 
 app.include_router(documents_router)
+app.include_router(agents_router)  # agents_router already has /api/agents prefix
 
 
 # WebSocket endpoint for real-time communication
@@ -402,7 +422,7 @@ async def get_document_suggestions(request: DocumentSuggestionsRequest):
 
 @app.post("/documents/batch")
 async def process_batch_documents(
-    file_paths: List[str], document_type: str = "document"
+    file_paths: list[str], document_type: str = "document"
 ):
     """Process multiple documents in batch using DocumentEditingAgent."""
     if not document_agent:
@@ -552,7 +572,7 @@ async def stream_chat_message(request: ChatRequest):
                     detail="LLM not available. Please configure LLM settings.",
                 )
 
-        async def generate_response() -> AsyncGenerator[str, None]:
+        async def generate_response() -> AsyncGenerator[str]:
             """Generate streaming response."""
             async for chunk in document_agent.chat_with_user_stream(
                 message=request.message, context_document_id=request.context_document_id

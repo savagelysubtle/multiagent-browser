@@ -5,8 +5,9 @@ Adapts the existing DeepResearch agent to work with the SimpleAgentOrchestrator.
 """
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +34,10 @@ class DeepResearchAdapter:
         self,
         topic: str,
         depth: str = "standard",
-        sources: Optional[List[str]] = None,
-        progress_callback: Optional[Callable[[int, str], Awaitable[None]]] = None,
+        sources: list[str] | None = None,
+        progress_callback: Callable[[int, str], Awaitable[None]] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Conduct comprehensive research on a topic.
 
@@ -121,7 +122,7 @@ class DeepResearchAdapter:
             logger.error(f"Failed to research topic '{topic}': {e}")
             raise
 
-    def _get_research_steps(self, depth: str) -> List[str]:
+    def _get_research_steps(self, depth: str) -> list[str]:
         """Get the research steps based on depth level."""
         base_steps = [
             "Initial topic analysis",
@@ -148,10 +149,10 @@ class DeepResearchAdapter:
         self,
         topic: str,
         depth: str,
-        sources: List[str],
-        research_steps: List[str],
-        progress_callback: Optional[Callable[[int, str], Awaitable[None]]] = None,
-    ) -> Dict[str, Any]:
+        sources: list[str],
+        research_steps: list[str],
+        progress_callback: Callable[[int, str], Awaitable[None]] | None = None,
+    ) -> dict[str, Any]:
         """Simulate research process for fallback implementation."""
 
         findings = []
@@ -230,10 +231,10 @@ class DeepResearchAdapter:
 
     async def analyze_sources(
         self,
-        sources: List[str],
-        progress_callback: Optional[Callable[[int, str], Awaitable[None]]] = None,
+        sources: list[str],
+        progress_callback: Callable[[int, str], Awaitable[None]] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Analyze the credibility and relevance of research sources.
 
@@ -309,7 +310,7 @@ class DeepResearchAdapter:
             logger.error(f"Failed to analyze sources: {e}")
             raise
 
-    def get_capabilities(self) -> Dict[str, Any]:
+    def get_capabilities(self) -> dict[str, Any]:
         """Get the capabilities of this adapter."""
         return {
             "agent_type": self.agent_type,

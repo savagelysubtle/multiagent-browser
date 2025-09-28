@@ -7,7 +7,7 @@ and DocumentEditingAgent support.
 
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -33,15 +33,15 @@ class DocumentCreateRequest(BaseModel):
     title: str
     content: str = ""
     document_type: str = "document"
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 class DocumentUpdateRequest(BaseModel):
     """Request model for document updates."""
 
-    title: Optional[str] = None
-    content: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    title: str | None = None
+    content: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class DocumentResponse(BaseModel):
@@ -51,7 +51,7 @@ class DocumentResponse(BaseModel):
     title: str
     content: str
     document_type: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     created_at: str
     updated_at: str
     owner_id: str
@@ -60,7 +60,7 @@ class DocumentResponse(BaseModel):
 class DocumentListResponse(BaseModel):
     """Response model for document lists."""
 
-    documents: List[DocumentResponse]
+    documents: list[DocumentResponse]
     total: int
     page: int
     page_size: int
@@ -136,7 +136,7 @@ async def create_document(
 async def list_documents(
     page: int = 1,
     page_size: int = 20,
-    document_type: Optional[str] = None,
+    document_type: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
     """

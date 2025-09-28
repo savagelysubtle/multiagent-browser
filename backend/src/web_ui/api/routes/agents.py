@@ -1,17 +1,19 @@
 """
-Agent API Routes.
+Agents API routes for the React frontend.
 
-Provides REST endpoints for agent discovery, task submission, and task management.
+Provides endpoints for agent management, task submission, and status monitoring.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ...agent.orchestrator.simple_orchestrator import orchestrator
 from ..auth.dependencies import get_current_user
+from ..dependencies import get_orchestrator
 from ..middleware.error_handler import AgentException, AppException
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,7 @@ class TaskSubmissionRequest(BaseModel):
 
     agent_type: str = Field(..., description="Type of agent to use")
     action: str = Field(..., description="Action to perform")
-    payload: Dict[str, Any] = Field(..., description="Task parameters")
+    payload: dict[str, Any] = Field(..., description="Task parameters")
 
 
 class TaskSubmissionResponse(BaseModel):
@@ -45,17 +47,17 @@ class TaskResponse(BaseModel):
     action: str
     status: str
     created_at: str
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    progress: Optional[Dict[str, Any]] = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    result: Any | None = None
+    error: str | None = None
+    progress: dict[str, Any] | None = None
 
 
 class TaskListResponse(BaseModel):
     """Response model for task list."""
 
-    tasks: List[TaskResponse]
+    tasks: list[TaskResponse]
     total_count: int
     page: int
     limit: int
@@ -66,7 +68,7 @@ class AgentCapability(BaseModel):
 
     name: str
     description: str
-    parameters: List[str]
+    parameters: list[str]
 
 
 class AgentInfo(BaseModel):
@@ -75,13 +77,13 @@ class AgentInfo(BaseModel):
     type: str
     name: str
     description: str
-    actions: List[AgentCapability]
+    actions: list[AgentCapability]
 
 
 class AvailableAgentsResponse(BaseModel):
     """Response model for available agents."""
 
-    agents: List[AgentInfo]
+    agents: list[AgentInfo]
     total_agents: int
 
 
@@ -97,10 +99,14 @@ async def get_available_agents(user=Depends(get_current_user)):
     - Required parameters for each action
     """
     try:
-        if not orchestrator:
-            raise AppException(
-                "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
+        try:
+            orchestrator = get_orchestrator()
+        except RuntimeError:
+            # Return empty list if orchestrator not ready yet
+            logger.warning(
+                "Orchestrator not initialized yet, returning empty agent list"
             )
+            return AvailableAgentsResponse(agents=[], total_agents=0)
 
         # Get available agents from orchestrator
         agents_info = orchestrator.get_available_agents()
@@ -144,6 +150,7 @@ async def execute_agent_task(
     will be sent via WebSocket to the authenticated user.
     """
     try:
+        orchestrator = get_orchestrator()
         if not orchestrator:
             raise AppException(
                 "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
@@ -179,9 +186,12 @@ async def execute_agent_task(
             task_id=task_id,
             status="submitted",
             message=f"Task submitted to {request.agent_type}",
-            submitted_at=orchestrator.task_store[task_id].created_at.isoformat()
-            if orchestrator.task_store[task_id].created_at
-            else "",
+            submitted_at=(
+                orchestrator.task_store[task_id].created_at.isoformat()
+                if task_id in orchestrator.task_store
+                and orchestrator.task_store[task_id].created_at
+                else ""
+            ),
         )
 
     except ValueError as e:
@@ -197,7 +207,7 @@ async def get_user_tasks(
         50, ge=1, le=100, description="Maximum number of tasks to return"
     ),
     page: int = Query(1, ge=1, description="Page number (1-based)"),
-    status: Optional[str] = Query(None, description="Filter by task status"),
+    status: str | None = Query(None, description="Filter by task status"),
     user=Depends(get_current_user),
 ):
     """
@@ -207,6 +217,7 @@ async def get_user_tasks(
     Tasks are ordered by creation date (newest first).
     """
     try:
+        orchestrator = get_orchestrator()
         if not orchestrator:
             raise AppException(
                 "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
@@ -264,6 +275,7 @@ async def get_task_details(task_id: str, user=Depends(get_current_user)):
     results (if completed), and progress information.
     """
     try:
+        orchestrator = get_orchestrator()
         if not orchestrator:
             raise AppException(
                 "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
@@ -304,6 +316,7 @@ async def cancel_task(task_id: str, user=Depends(get_current_user)):
     Completed or failed tasks cannot be cancelled.
     """
     try:
+        orchestrator = get_orchestrator()
         if not orchestrator:
             raise AppException(
                 "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
@@ -341,6 +354,7 @@ async def get_agent_stats(user=Depends(get_current_user)):
     This endpoint provides insights into system health and usage patterns.
     """
     try:
+        orchestrator = get_orchestrator()
         if not orchestrator:
             raise AppException(
                 "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
@@ -384,6 +398,7 @@ async def health_check():
     and registered agents.
     """
     try:
+        orchestrator = get_orchestrator()
         health_status = {
             "orchestrator_initialized": orchestrator is not None,
             "registered_agents": list(orchestrator.agents.keys())

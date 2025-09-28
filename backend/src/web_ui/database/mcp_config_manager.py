@@ -3,12 +3,11 @@
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
-from uuid import uuid4
+from typing import Any
 
-from .document_pipeline import DocumentPipeline
-from .models import DocumentModel, CollectionConfig, QueryRequest
 from .chroma_manager import ChromaManager
+from .document_pipeline import DocumentPipeline
+from .models import CollectionConfig, DocumentModel, QueryRequest
 
 logger = logging.getLogger(__name__)
 
@@ -40,20 +39,24 @@ class MCPConfigManager:
                         "type": "mcp_configs",
                         "auto_startup": True,
                         "max_versions": 10,
-                        "created_at": datetime.now().isoformat()
-                    }
+                        "created_at": datetime.now().isoformat(),
+                    },
                 )
                 self.manager.create_collection(config)
-                logger.info(f"Created MCP configurations collection: {self.collection_name}")
+                logger.info(
+                    f"Created MCP configurations collection: {self.collection_name}"
+                )
         except Exception as e:
             logger.error(f"Failed to ensure MCP collection exists: {e}")
 
-    async def store_mcp_config(self,
-                              config_data: Dict[str, Any],
-                              config_name: str = "primary",
-                              description: str = "",
-                              config_type: str = "custom",
-                              set_as_active: bool = True) -> Tuple[bool, str]:
+    async def store_mcp_config(
+        self,
+        config_data: dict[str, Any],
+        config_name: str = "primary",
+        description: str = "",
+        config_type: str = "custom",
+        set_as_active: bool = True,
+    ) -> tuple[bool, str]:
         """
         Store MCP configuration in ChromaDB.
 
@@ -80,7 +83,9 @@ class MCPConfigManager:
                 server_count = len(servers)
 
             # Generate unique ID
-            config_id = f"mcp_config_{config_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            config_id = (
+                f"mcp_config_{config_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
 
             # Prepare metadata
             metadata = {
@@ -90,10 +95,14 @@ class MCPConfigManager:
                 "created_at": datetime.now().isoformat(),
                 "last_used": datetime.now().isoformat(),
                 "server_count": str(server_count),  # Convert to string for ChromaDB
-                "servers": ", ".join(servers),  # Store as string for ChromaDB compatibility
-                "is_active": "true" if set_as_active else "false",  # Store as string for ChromaDB
+                "servers": ", ".join(
+                    servers
+                ),  # Store as string for ChromaDB compatibility
+                "is_active": "true"
+                if set_as_active
+                else "false",  # Store as string for ChromaDB
                 "description": description,
-                "upload_source": "api_storage"
+                "upload_source": "api_storage",
             }
 
             # Create document model
@@ -102,7 +111,7 @@ class MCPConfigManager:
                 content=json.dumps(config_data, indent=2),
                 metadata=metadata,
                 source="mcp_config_manager",
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             # Store in database
@@ -122,7 +131,7 @@ class MCPConfigManager:
             logger.error(f"Error storing MCP configuration: {e}")
             return False, f"Error storing configuration: {str(e)}"
 
-    async def get_active_config(self) -> Optional[Dict[str, Any]]:
+    async def get_active_config(self) -> dict[str, Any] | None:
         """
         Retrieve the currently active MCP configuration.
 
@@ -136,7 +145,7 @@ class MCPConfigManager:
                 query="MCP server configuration",
                 collection_name=self.collection_name,
                 limit=50,
-                include_metadata=True
+                include_metadata=True,
             )
 
             results = self.manager.search(query_request)
@@ -162,10 +171,12 @@ class MCPConfigManager:
 
                     return {
                         "id": active_config.id,
-                        "config_name": active_config.metadata.get("config_name", "Unknown"),
+                        "config_name": active_config.metadata.get(
+                            "config_name", "Unknown"
+                        ),
                         "description": active_config.metadata.get("description", ""),
                         "config_data": config_data,
-                        "metadata": active_config.metadata
+                        "metadata": active_config.metadata,
                     }
 
             logger.info("No active MCP configuration found")
@@ -175,7 +186,7 @@ class MCPConfigManager:
             logger.error(f"Error retrieving active MCP configuration: {e}")
             return None
 
-    async def list_configs(self) -> List[Dict[str, Any]]:
+    async def list_configs(self) -> list[dict[str, Any]]:
         """
         List all stored MCP configurations.
 
@@ -188,7 +199,7 @@ class MCPConfigManager:
                 query="MCP server configuration",
                 collection_name=self.collection_name,
                 limit=50,
-                include_metadata=True
+                include_metadata=True,
             )
 
             results = self.manager.search(query_request)
@@ -200,12 +211,14 @@ class MCPConfigManager:
                     "config_name": result.metadata.get("config_name", "Unknown"),
                     "config_type": result.metadata.get("config_type", "custom"),
                     "description": result.metadata.get("description", ""),
-                    "server_count": int(result.metadata.get("server_count", "0")),  # Convert back to int
+                    "server_count": int(
+                        result.metadata.get("server_count", "0")
+                    ),  # Convert back to int
                     "servers": result.metadata.get("servers", ""),
                     "is_active": result.metadata.get("is_active") == "true",
                     "created_at": result.metadata.get("created_at", ""),
                     "last_used": result.metadata.get("last_used", ""),
-                    "version": result.metadata.get("version", "1.0.0")
+                    "version": result.metadata.get("version", "1.0.0"),
                 }
                 configs.append(config_summary)
 
@@ -218,7 +231,7 @@ class MCPConfigManager:
             logger.error(f"Error listing MCP configurations: {e}")
             return []
 
-    async def set_active_config(self, config_id: str) -> Tuple[bool, str]:
+    async def set_active_config(self, config_id: str) -> tuple[bool, str]:
         """
         Set a specific configuration as active.
 
@@ -248,7 +261,7 @@ class MCPConfigManager:
                 content=config.content,
                 metadata=updated_metadata,
                 source=config.source,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             # Delete old and add updated
@@ -266,7 +279,7 @@ class MCPConfigManager:
             logger.error(f"Error setting active MCP configuration: {e}")
             return False, f"Error activating configuration: {str(e)}"
 
-    async def delete_config(self, config_id: str) -> Tuple[bool, str]:
+    async def delete_config(self, config_id: str) -> tuple[bool, str]:
         """
         Delete a stored MCP configuration.
 
@@ -304,7 +317,7 @@ class MCPConfigManager:
             logger.error(f"Error deleting MCP configuration: {e}")
             return False, f"Error deleting configuration: {str(e)}"
 
-    async def backup_config(self, config_id: str) -> Tuple[bool, str, Optional[str]]:
+    async def backup_config(self, config_id: str) -> tuple[bool, str, str | None]:
         """
         Create a backup of an existing configuration.
 
@@ -325,14 +338,16 @@ class MCPConfigManager:
 
             # Create backup with new name
             original_name = config.metadata.get("config_name", "Unknown")
-            backup_name = f"{original_name}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            backup_name = (
+                f"{original_name}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
 
             success, message = await self.store_mcp_config(
                 config_data=config_data,
                 config_name=backup_name,
                 description=f"Backup of {original_name}",
                 config_type="backup",
-                set_as_active=False
+                set_as_active=False,
             )
 
             if success:
@@ -346,7 +361,7 @@ class MCPConfigManager:
             logger.error(f"Error creating backup for MCP configuration: {e}")
             return False, f"Error creating backup: {str(e)}", None
 
-    def _validate_mcp_config(self, config_data: Dict[str, Any]) -> bool:
+    def _validate_mcp_config(self, config_data: dict[str, Any]) -> bool:
         """
         Validate MCP configuration structure.
 
@@ -374,12 +389,16 @@ class MCPConfigManager:
             # Validate each server configuration
             for server_name, server_config in mcp_servers.items():
                 if not isinstance(server_config, dict):
-                    logger.warning(f"Server config for '{server_name}' must be a dictionary")
+                    logger.warning(
+                        f"Server config for '{server_name}' must be a dictionary"
+                    )
                     return False
 
                 # Check for required fields (command is typically required)
                 if "command" not in server_config:
-                    logger.warning(f"Server '{server_name}' missing required 'command' field")
+                    logger.warning(
+                        f"Server '{server_name}' missing required 'command' field"
+                    )
                     return False
 
             return True
@@ -410,12 +429,14 @@ class MCPConfigManager:
                             content=doc.content,
                             metadata=updated_metadata,
                             source=doc.source,
-                            timestamp=datetime.now()
+                            timestamp=datetime.now(),
                         )
 
                         # Replace document
                         self.manager.delete_document(self.collection_name, config["id"])
-                        self.manager.add_document(self.collection_name, updated_document)
+                        self.manager.add_document(
+                            self.collection_name, updated_document
+                        )
 
         except Exception as e:
             logger.error(f"Error deactivating other configurations: {e}")
@@ -433,7 +454,7 @@ class MCPConfigManager:
                     content=config.content,
                     metadata=updated_metadata,
                     source=config.source,
-                    timestamp=datetime.now()
+                    timestamp=datetime.now(),
                 )
 
                 self.manager.delete_document(self.collection_name, config_id)
@@ -442,7 +463,7 @@ class MCPConfigManager:
         except Exception as e:
             logger.error(f"Error updating last_used timestamp: {e}")
 
-    async def get_config_by_name(self, config_name: str) -> Optional[Dict[str, Any]]:
+    async def get_config_by_name(self, config_name: str) -> dict[str, Any] | None:
         """
         Retrieve a configuration by its name.
 
@@ -458,7 +479,7 @@ class MCPConfigManager:
                 collection_name=self.collection_name,
                 limit=10,
                 include_metadata=True,
-                metadata_filters={"config_name": config_name}
+                metadata_filters={"config_name": config_name},
             )
 
             results = self.manager.search(query_request)
@@ -471,7 +492,7 @@ class MCPConfigManager:
                         "config_name": config_name,
                         "description": result.metadata.get("description", ""),
                         "config_data": config_data,
-                        "metadata": result.metadata
+                        "metadata": result.metadata,
                     }
 
             return None
@@ -480,7 +501,7 @@ class MCPConfigManager:
             logger.error(f"Error retrieving configuration by name '{config_name}': {e}")
             return None
 
-    def get_collection_stats(self) -> Dict[str, Any]:
+    def get_collection_stats(self) -> dict[str, Any]:
         """Get statistics about the MCP configurations collection."""
         try:
             stats = self.manager.get_collection_stats(self.collection_name)

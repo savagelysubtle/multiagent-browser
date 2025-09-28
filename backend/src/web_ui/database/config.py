@@ -1,17 +1,24 @@
 """Database configuration and settings."""
 
 import os
-from pathlib import Path
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+def get_project_root() -> Path:
+    """Get the project root directory."""
+    current_file = Path(__file__)
+    # Navigate up from backend/src/web_ui/database/config.py to project root
+    return current_file.parent.parent.parent.parent.parent
 
 
 @dataclass
 class DatabaseConfig:
     """Configuration class for the database settings."""
 
-    # Database path settings
-    db_path: str = "./data/chroma_db"
+    # Database path settings - use absolute path relative to project root
+    db_path: str = str(get_project_root() / "data" / "chroma_db")
     collection_prefix: str = "webui_"
 
     # Connection settings
@@ -33,38 +40,50 @@ class DatabaseConfig:
     backup_interval_hours: int = 24
 
     @classmethod
-    def from_env(cls) -> 'DatabaseConfig':
+    def from_env(cls) -> "DatabaseConfig":
         """Create configuration from environment variables."""
+        default_db_path = str(get_project_root() / "data" / "chroma_db")
         return cls(
-            db_path=os.getenv('CHROMA_DB_PATH', cls.db_path),
-            collection_prefix=os.getenv('CHROMA_COLLECTION_PREFIX', cls.collection_prefix),
-            max_connections=int(os.getenv('CHROMA_MAX_CONNECTIONS', str(cls.max_connections))),
-            connection_timeout=int(os.getenv('CHROMA_CONNECTION_TIMEOUT', str(cls.connection_timeout))),
-            enable_telemetry=os.getenv('CHROMA_ENABLE_TELEMETRY', 'false').lower() == 'true',
-            enable_logging=os.getenv('CHROMA_ENABLE_LOGGING', 'true').lower() == 'true',
-            log_level=os.getenv('CHROMA_LOG_LEVEL', cls.log_level),
-            batch_size=int(os.getenv('CHROMA_BATCH_SIZE', str(cls.batch_size))),
-            cache_size=int(os.getenv('CHROMA_CACHE_SIZE', str(cls.cache_size))),
-            allow_reset=os.getenv('CHROMA_ALLOW_RESET', 'true').lower() == 'true',
-            auto_backup=os.getenv('CHROMA_AUTO_BACKUP', 'false').lower() == 'true',
-            backup_interval_hours=int(os.getenv('CHROMA_BACKUP_INTERVAL_HOURS', str(cls.backup_interval_hours)))
+            db_path=os.getenv("CHROMA_DB_PATH", default_db_path),
+            collection_prefix=os.getenv(
+                "CHROMA_COLLECTION_PREFIX", cls.collection_prefix
+            ),
+            max_connections=int(
+                os.getenv("CHROMA_MAX_CONNECTIONS", str(cls.max_connections))
+            ),
+            connection_timeout=int(
+                os.getenv("CHROMA_CONNECTION_TIMEOUT", str(cls.connection_timeout))
+            ),
+            enable_telemetry=os.getenv("CHROMA_ENABLE_TELEMETRY", "false").lower()
+            == "true",
+            enable_logging=os.getenv("CHROMA_ENABLE_LOGGING", "true").lower() == "true",
+            log_level=os.getenv("CHROMA_LOG_LEVEL", cls.log_level),
+            batch_size=int(os.getenv("CHROMA_BATCH_SIZE", str(cls.batch_size))),
+            cache_size=int(os.getenv("CHROMA_CACHE_SIZE", str(cls.cache_size))),
+            allow_reset=os.getenv("CHROMA_ALLOW_RESET", "true").lower() == "true",
+            auto_backup=os.getenv("CHROMA_AUTO_BACKUP", "false").lower() == "true",
+            backup_interval_hours=int(
+                os.getenv(
+                    "CHROMA_BACKUP_INTERVAL_HOURS", str(cls.backup_interval_hours)
+                )
+            ),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary."""
         return {
-            'db_path': self.db_path,
-            'collection_prefix': self.collection_prefix,
-            'max_connections': self.max_connections,
-            'connection_timeout': self.connection_timeout,
-            'enable_telemetry': self.enable_telemetry,
-            'enable_logging': self.enable_logging,
-            'log_level': self.log_level,
-            'batch_size': self.batch_size,
-            'cache_size': self.cache_size,
-            'allow_reset': self.allow_reset,
-            'auto_backup': self.auto_backup,
-            'backup_interval_hours': self.backup_interval_hours
+            "db_path": self.db_path,
+            "collection_prefix": self.collection_prefix,
+            "max_connections": self.max_connections,
+            "connection_timeout": self.connection_timeout,
+            "enable_telemetry": self.enable_telemetry,
+            "enable_logging": self.enable_logging,
+            "log_level": self.log_level,
+            "batch_size": self.batch_size,
+            "cache_size": self.cache_size,
+            "allow_reset": self.allow_reset,
+            "auto_backup": self.auto_backup,
+            "backup_interval_hours": self.backup_interval_hours,
         }
 
     def validate(self) -> None:
@@ -93,25 +112,25 @@ class DatabaseConfig:
             raise ValueError("backup_interval_hours must be at least 1")
 
         # Validate log level
-        valid_log_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+        valid_log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if self.log_level.upper() not in valid_log_levels:
             raise ValueError(f"log_level must be one of {valid_log_levels}")
 
 
 # Environment variable documentation
 ENV_VARS_DOCS = {
-    'CHROMA_DB_PATH': 'Path to the ChromaDB database directory (default: ./data/chroma_db)',
-    'CHROMA_COLLECTION_PREFIX': 'Prefix for collection names (default: webui_)',
-    'CHROMA_MAX_CONNECTIONS': 'Maximum number of connections (default: 10)',
-    'CHROMA_CONNECTION_TIMEOUT': 'Connection timeout in seconds (default: 30)',
-    'CHROMA_ENABLE_TELEMETRY': 'Enable ChromaDB telemetry (default: false)',
-    'CHROMA_ENABLE_LOGGING': 'Enable database logging (default: true)',
-    'CHROMA_LOG_LEVEL': 'Logging level (default: INFO)',
-    'CHROMA_BATCH_SIZE': 'Batch size for bulk operations (default: 100)',
-    'CHROMA_CACHE_SIZE': 'Cache size for collections (default: 1000)',
-    'CHROMA_ALLOW_RESET': 'Allow database reset operations (default: true)',
-    'CHROMA_AUTO_BACKUP': 'Enable automatic backups (default: false)',
-    'CHROMA_BACKUP_INTERVAL_HOURS': 'Backup interval in hours (default: 24)'
+    "CHROMA_DB_PATH": f"Path to the ChromaDB database directory (default: {get_project_root() / 'data' / 'chroma_db'})",
+    "CHROMA_COLLECTION_PREFIX": "Prefix for collection names (default: webui_)",
+    "CHROMA_MAX_CONNECTIONS": "Maximum number of connections (default: 10)",
+    "CHROMA_CONNECTION_TIMEOUT": "Connection timeout in seconds (default: 30)",
+    "CHROMA_ENABLE_TELEMETRY": "Enable ChromaDB telemetry (default: false)",
+    "CHROMA_ENABLE_LOGGING": "Enable database logging (default: true)",
+    "CHROMA_LOG_LEVEL": "Logging level (default: INFO)",
+    "CHROMA_BATCH_SIZE": "Batch size for bulk operations (default: 100)",
+    "CHROMA_CACHE_SIZE": "Cache size for collections (default: 1000)",
+    "CHROMA_ALLOW_RESET": "Allow database reset operations (default: true)",
+    "CHROMA_AUTO_BACKUP": "Enable automatic backups (default: false)",
+    "CHROMA_BACKUP_INTERVAL_HOURS": "Backup interval in hours (default: 24)",
 }
 
 
@@ -120,12 +139,12 @@ def get_default_config() -> DatabaseConfig:
     return DatabaseConfig.from_env()
 
 
-def create_env_file_template(output_path: Optional[str] = None) -> str:
+def create_env_file_template(output_path: str | None = None) -> str:
     """Create a template .env file with database configuration options."""
     template_lines = [
         "# ChromaDB Configuration",
         "# Uncomment and modify the values below as needed",
-        ""
+        "",
     ]
 
     for env_var, description in ENV_VARS_DOCS.items():
@@ -136,7 +155,7 @@ def create_env_file_template(output_path: Optional[str] = None) -> str:
     template_content = "\n".join(template_lines)
 
     if output_path:
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             f.write(template_content)
 
     return template_content

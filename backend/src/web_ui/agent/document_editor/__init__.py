@@ -2,4 +2,4 @@
 
 from .document_agent import DocumentEditingAgent
 
-__all__ = ['DocumentEditingAgent']
+__all__ = ["DocumentEditingAgent"]

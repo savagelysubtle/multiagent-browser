@@ -5,8 +5,9 @@ Adapts the existing BrowserUse agent to work with the SimpleAgentOrchestrator.
 """
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +34,9 @@ class BrowserUseAdapter:
         self,
         url: str,
         instruction: str,
-        progress_callback: Optional[Callable[[int, str], Awaitable[None]]] = None,
+        progress_callback: Callable[[int, str], Awaitable[None]] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Navigate to a URL and interact with it based on instructions.
 
@@ -112,10 +113,10 @@ class BrowserUseAdapter:
     async def extract(
         self,
         url: str,
-        selectors: List[str],
-        progress_callback: Optional[Callable[[int, str], Awaitable[None]]] = None,
+        selectors: list[str],
+        progress_callback: Callable[[int, str], Awaitable[None]] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Extract specific information from a webpage using CSS selectors.
 
@@ -197,9 +198,9 @@ class BrowserUseAdapter:
     async def screenshot(
         self,
         url: str,
-        progress_callback: Optional[Callable[[int, str], Awaitable[None]]] = None,
+        progress_callback: Callable[[int, str], Awaitable[None]] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Take a screenshot of a webpage.
 
@@ -258,7 +259,7 @@ class BrowserUseAdapter:
             logger.error(f"Failed to take screenshot of {url}: {e}")
             raise
 
-    def get_capabilities(self) -> Dict[str, Any]:
+    def get_capabilities(self) -> dict[str, Any]:
         """Get the capabilities of this adapter."""
         return {
             "agent_type": self.agent_type,

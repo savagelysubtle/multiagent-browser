@@ -1,14 +1,13 @@
 """Document pipeline for integrating document editor with ChromaDB."""
 
-import logging
 import hashlib
-from typing import Dict, List, Optional, Any, Tuple
+import logging
 from datetime import datetime
 from pathlib import Path
-import json
+from typing import Any
 
-from .models import DocumentModel, SearchResult, QueryRequest
 from .chroma_manager import ChromaManager
+from .models import DocumentModel, QueryRequest, SearchResult
 from .utils import DatabaseUtils
 
 logger = logging.getLogger(__name__)
@@ -36,8 +35,8 @@ class DocumentPipeline:
                 metadata={
                     "description": "Main document storage with full content",
                     "type": "documents",
-                    "searchable": True
-                }
+                    "searchable": True,
+                },
             ),
             # Vector search optimized for semantic search
             CollectionConfig(
@@ -46,16 +45,16 @@ class DocumentPipeline:
                     "description": "Document chunks optimized for vector search",
                     "type": "vectors",
                     "chunk_size": 512,
-                    "overlap": 50
-                }
+                    "overlap": 50,
+                },
             ),
             # Document relationships and references
             CollectionConfig(
                 name="document_relations",
                 metadata={
                     "description": "Relationships between documents, policies, and references",
-                    "type": "relations"
-                }
+                    "type": "relations",
+                },
             ),
             # Policy manuals and templates
             CollectionConfig(
@@ -63,17 +62,17 @@ class DocumentPipeline:
                 metadata={
                     "description": "Policy documents, templates, and guidelines",
                     "type": "policies",
-                    "authority_level": "high"
-                }
+                    "authority_level": "high",
+                },
             ),
             # Document versions and history
             CollectionConfig(
                 name="document_versions",
                 metadata={
                     "description": "Document version history and changes",
-                    "type": "versions"
-                }
-            )
+                    "type": "versions",
+                },
+            ),
         ]
 
         for config in collections:
@@ -88,8 +87,8 @@ class DocumentPipeline:
         content: str,
         file_path: str,
         document_type: str = "document",
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> Tuple[bool, str, Optional[DocumentModel]]:
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[bool, str, DocumentModel | None]:
         """Process a document from the editor and store in database."""
         try:
             # Extract document information
@@ -97,7 +96,7 @@ class DocumentPipeline:
             file_extension = Path(file_path).suffix.lower()
 
             # Generate document ID based on content hash
-            content_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
+            content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
             doc_id = f"{filename}_{content_hash}"
 
             # Prepare metadata
@@ -111,7 +110,7 @@ class DocumentPipeline:
                 "character_count": len(content),
                 "language": self._detect_language_from_extension(file_extension),
                 "processed_at": datetime.now().isoformat(),
-                **(metadata or {})
+                **(metadata or {}),
             }
 
             # Create document model
@@ -120,7 +119,7 @@ class DocumentPipeline:
                 content=content,
                 metadata=doc_metadata,
                 source=f"document_editor:{file_path}",
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             # Store in main documents collection
@@ -145,23 +144,23 @@ class DocumentPipeline:
     def _detect_language_from_extension(self, extension: str) -> str:
         """Detect programming/markup language from file extension."""
         language_map = {
-            '.py': 'python',
-            '.js': 'javascript',
-            '.ts': 'typescript',
-            '.html': 'html',
-            '.css': 'css',
-            '.md': 'markdown',
-            '.json': 'json',
-            '.xml': 'xml',
-            '.yaml': 'yaml',
-            '.yml': 'yaml',
-            '.sql': 'sql',
-            '.sh': 'shell',
-            '.bat': 'batch',
-            '.ps1': 'powershell',
-            '.txt': 'text'
+            ".py": "python",
+            ".js": "javascript",
+            ".ts": "typescript",
+            ".html": "html",
+            ".css": "css",
+            ".md": "markdown",
+            ".json": "json",
+            ".xml": "xml",
+            ".yaml": "yaml",
+            ".yml": "yaml",
+            ".sql": "sql",
+            ".sh": "shell",
+            ".bat": "batch",
+            ".ps1": "powershell",
+            ".txt": "text",
         }
-        return language_map.get(extension, 'text')
+        return language_map.get(extension, "text")
 
     def _process_for_vector_search(self, document: DocumentModel):
         """Process document for optimized vector search."""
@@ -176,7 +175,7 @@ class DocumentPipeline:
                     "parent_document_id": document.id,
                     "chunk_index": i,
                     "chunk_type": "content",
-                    "total_chunks": len(chunks)
+                    "total_chunks": len(chunks),
                 }
 
                 chunk_doc = DocumentModel(
@@ -184,7 +183,7 @@ class DocumentPipeline:
                     content=chunk,
                     metadata=chunk_metadata,
                     source=document.source,
-                    timestamp=document.timestamp
+                    timestamp=document.timestamp,
                 )
 
                 self.manager.add_document("document_vectors", chunk_doc)
@@ -194,7 +193,9 @@ class DocumentPipeline:
         except Exception as e:
             logger.error(f"Error processing document for vector search: {e}")
 
-    def _chunk_content(self, content: str, chunk_size: int = 512, overlap: int = 50) -> List[str]:
+    def _chunk_content(
+        self, content: str, chunk_size: int = 512, overlap: int = 50
+    ) -> list[str]:
         """Chunk content into overlapping segments for better search."""
         if len(content) <= chunk_size:
             return [content]
@@ -203,8 +204,8 @@ class DocumentPipeline:
         words = content.split()
 
         for i in range(0, len(words), chunk_size - overlap):
-            chunk_words = words[i:i + chunk_size]
-            chunk = ' '.join(chunk_words)
+            chunk_words = words[i : i + chunk_size]
+            chunk = " ".join(chunk_words)
             chunks.append(chunk)
 
             # Break if we've processed all words
@@ -221,7 +222,7 @@ class DocumentPipeline:
                 **document.metadata,
                 "parent_document_id": document.id,
                 "version_type": "save",
-                "is_latest": True
+                "is_latest": True,
             }
 
             version_doc = DocumentModel(
@@ -229,7 +230,7 @@ class DocumentPipeline:
                 content=document.content,
                 metadata=version_metadata,
                 source=f"version:{document.source}",
-                timestamp=document.timestamp
+                timestamp=document.timestamp,
             )
 
             self.manager.add_document("document_versions", version_doc)
@@ -243,8 +244,8 @@ class DocumentPipeline:
         content: str,
         policy_type: str = "manual",
         authority_level: str = "medium",
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> Tuple[bool, str]:
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[bool, str]:
         """Store a policy manual or template."""
         try:
             # Generate policy ID
@@ -256,7 +257,7 @@ class DocumentPipeline:
                 "authority_level": authority_level,
                 "word_count": len(content.split()),
                 "tags": self._extract_policy_tags(content),
-                **(metadata or {})
+                **(metadata or {}),
             }
 
             policy_doc = DocumentModel(
@@ -264,7 +265,7 @@ class DocumentPipeline:
                 content=content,
                 metadata=policy_metadata,
                 source="policy_system",
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             success = self.manager.add_document("policy_manuals", policy_doc)
@@ -283,9 +284,18 @@ class DocumentPipeline:
         """Extract relevant tags from policy content as a comma-separated string."""
         # Simple keyword-based tag extraction
         policy_keywords = [
-            "procedure", "guideline", "standard", "requirement",
-            "compliance", "security", "privacy", "approval",
-            "workflow", "template", "format", "style"
+            "procedure",
+            "guideline",
+            "standard",
+            "requirement",
+            "compliance",
+            "security",
+            "privacy",
+            "approval",
+            "workflow",
+            "template",
+            "format",
+            "style",
         ]
 
         content_lower = content.lower()
@@ -297,19 +307,23 @@ class DocumentPipeline:
         source_doc_id: str,
         target_doc_id: str,
         relation_type: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Create a relationship between two documents."""
         try:
             relation_id = f"rel_{source_doc_id}_{target_doc_id}_{relation_type}"
 
-            relation_content = f"Relationship: {source_doc_id} --{relation_type}--> {target_doc_id}"
+            relation_content = (
+                f"Relationship: {source_doc_id} --{relation_type}--> {target_doc_id}"
+            )
             relation_metadata = {
                 "source_document": source_doc_id,
                 "target_document": target_doc_id,
                 "relation_type": relation_type,
-                "relationship_strength": metadata.get("strength", 0.5) if metadata else 0.5,
-                **(metadata or {})
+                "relationship_strength": metadata.get("strength", 0.5)
+                if metadata
+                else 0.5,
+                **(metadata or {}),
             }
 
             relation_doc = DocumentModel(
@@ -317,7 +331,7 @@ class DocumentPipeline:
                 content=relation_content,
                 metadata=relation_metadata,
                 source="relation_system",
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             return self.manager.add_document("document_relations", relation_doc)
@@ -331,8 +345,8 @@ class DocumentPipeline:
         query: str,
         collection_type: str = "documents",
         include_relations: bool = False,
-        limit: int = 10
-    ) -> List[SearchResult]:
+        limit: int = 10,
+    ) -> list[SearchResult]:
         """Search documents with optional relation inclusion."""
         try:
             # Map collection types
@@ -340,7 +354,7 @@ class DocumentPipeline:
                 "documents": "documents",
                 "vectors": "document_vectors",
                 "policies": "policy_manuals",
-                "relations": "document_relations"
+                "relations": "document_relations",
             }
 
             collection_name = collection_map.get(collection_type, "documents")
@@ -349,7 +363,7 @@ class DocumentPipeline:
                 query=query,
                 collection_name=collection_name,
                 limit=limit,
-                include_metadata=True
+                include_metadata=True,
             )
 
             results = self.manager.search(query_request)
@@ -364,7 +378,9 @@ class DocumentPipeline:
             logger.error(f"Error searching documents: {e}")
             return []
 
-    def _enhance_with_relations(self, results: List[SearchResult]) -> List[SearchResult]:
+    def _enhance_with_relations(
+        self, results: list[SearchResult]
+    ) -> list[SearchResult]:
         """Enhance search results with related documents."""
         try:
             enhanced_results = []
@@ -375,7 +391,7 @@ class DocumentPipeline:
                     query=result.id,
                     collection_name="document_relations",
                     limit=5,
-                    metadata_filters={"source_document": result.id}
+                    metadata_filters={"source_document": result.id},
                 )
 
                 relations = self.manager.search(relations_query)
@@ -386,7 +402,7 @@ class DocumentPipeline:
                         {
                             "target_id": rel.metadata.get("target_document"),
                             "relation_type": rel.metadata.get("relation_type"),
-                            "strength": rel.metadata.get("relationship_strength", 0.5)
+                            "strength": rel.metadata.get("relationship_strength", 0.5),
                         }
                         for rel in relations
                     ]
@@ -400,10 +416,8 @@ class DocumentPipeline:
             return results
 
     def get_document_suggestions(
-        self,
-        content: str,
-        document_type: str = "document"
-    ) -> Dict[str, List[SearchResult]]:
+        self, content: str, document_type: str = "document"
+    ) -> dict[str, list[SearchResult]]:
         """Get suggestions for related policies and documents based on content."""
         try:
             suggestions = {}
@@ -412,24 +426,20 @@ class DocumentPipeline:
             policy_results = self.search_documents(
                 query=content[:500],  # Use first 500 chars for search
                 collection_type="policies",
-                limit=5
+                limit=5,
             )
             suggestions["related_policies"] = policy_results
 
             # Search for similar documents
             similar_docs = self.search_documents(
-                query=content[:500],
-                collection_type="vectors",
-                limit=5
+                query=content[:500], collection_type="vectors", limit=5
             )
             suggestions["similar_documents"] = similar_docs
 
             # Search for relevant templates
             template_query = f"template {document_type}"
             template_results = self.search_documents(
-                query=template_query,
-                collection_type="policies",
-                limit=3
+                query=template_query, collection_type="policies", limit=3
             )
             suggestions["templates"] = template_results
 
@@ -439,12 +449,15 @@ class DocumentPipeline:
             logger.error(f"Error getting document suggestions: {e}")
             return {}
 
-    def get_collection_stats(self) -> Dict[str, Any]:
+    def get_collection_stats(self) -> dict[str, Any]:
         """Get statistics about all document collections."""
         try:
             collections = [
-                "documents", "document_vectors", "document_relations",
-                "policy_manuals", "document_versions"
+                "documents",
+                "document_vectors",
+                "document_relations",
+                "policy_manuals",
+                "document_versions",
             ]
 
             stats = {}
@@ -454,9 +467,13 @@ class DocumentPipeline:
 
             # Calculate summary stats
             stats["summary"] = {
-                "total_documents": sum(s.get("document_count", 0) for s in stats.values()),
-                "collections_active": len([s for s in stats.values() if s.get("document_count", 0) > 0]),
-                "last_updated": datetime.now().isoformat()
+                "total_documents": sum(
+                    s.get("document_count", 0) for s in stats.values()
+                ),
+                "collections_active": len(
+                    [s for s in stats.values() if s.get("document_count", 0) > 0]
+                ),
+                "last_updated": datetime.now().isoformat(),
             }
 
             return stats

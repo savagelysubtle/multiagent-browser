@@ -13,15 +13,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from dotenv import load_dotenv
+
 load_dotenv()
+
 
 def main():
     """Route all commands to the application orchestrator."""
     # Import the orchestrator
     from web_ui.main import main as orchestrator_main
-    
+
     # Let the orchestrator handle everything
     orchestrator_main()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """Test script for MCP file synchronization functionality."""
 
-import sys
-import json
 import asyncio
-import os
-from pathlib import Path
+import json
+import sys
 from datetime import datetime
+from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from web_ui.services.mcp_service import MCPService
-from web_ui.database.mcp_config_manager import MCPConfigManager
+
 
 async def test_file_sync():
     """Test MCP file synchronization between file and database."""
@@ -27,10 +26,10 @@ async def test_file_sync():
     file_path = Path("./data/mcp.json")
 
     if file_path.exists():
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             file_config = json.load(f)
 
-        servers = file_config.get('mcpServers', {})
+        servers = file_config.get("mcpServers", {})
         print(f"✅ Found mcp.json with {len(servers)} servers: {list(servers.keys())}")
     else:
         print("❌ mcp.json file not found")
@@ -52,11 +51,11 @@ async def test_file_sync():
 
     print(f"✅ Service running: {status.get('is_running', False)}")
 
-    file_sync_info = status.get('file_sync', {})
+    file_sync_info = status.get("file_sync", {})
     print(f"✅ File exists: {file_sync_info.get('file_exists', False)}")
     print(f"✅ File path: {file_sync_info.get('file_path', 'Unknown')}")
 
-    if file_sync_info.get('file_exists'):
+    if file_sync_info.get("file_exists"):
         print(f"   File size: {file_sync_info.get('file_size', 0)} bytes")
         print(f"   File modified: {file_sync_info.get('file_modified', 'Unknown')}")
 
@@ -67,11 +66,11 @@ async def test_file_sync():
 
         if active_config:
             print(f"✅ Active config in database: {active_config.get('config_name')}")
-            db_servers = active_config.get('config_data', {}).get('mcpServers', {})
+            db_servers = active_config.get("config_data", {}).get("mcpServers", {})
             print(f"   Database servers: {list(db_servers.keys())}")
 
             # Compare with file
-            file_servers = file_config.get('mcpServers', {})
+            file_servers = file_config.get("mcpServers", {})
             if set(file_servers.keys()) == set(db_servers.keys()):
                 print("✅ File and database servers match")
             else:
@@ -89,15 +88,15 @@ async def test_file_sync():
 
     # Modify the file
     modified_config = file_config.copy()
-    modified_config['mcpServers']['test-server'] = {
+    modified_config["mcpServers"]["test-server"] = {
         "command": "echo",
-        "args": ["test-modification"]
+        "args": ["test-modification"],
     }
-    modified_config['_metadata']['last_modified'] = datetime.now().isoformat()
-    modified_config['_metadata']['description'] = "Modified for testing auto-sync"
+    modified_config["_metadata"]["last_modified"] = datetime.now().isoformat()
+    modified_config["_metadata"]["description"] = "Modified for testing auto-sync"
 
     # Write modified config
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         json.dump(modified_config, f, indent=2)
 
     print("✅ Modified mcp.json file (added test-server)")
@@ -111,9 +110,11 @@ async def test_file_sync():
         updated_config = await service.config_manager.get_active_config()
 
         if updated_config:
-            updated_servers = updated_config.get('config_data', {}).get('mcpServers', {})
+            updated_servers = updated_config.get("config_data", {}).get(
+                "mcpServers", {}
+            )
 
-            if 'test-server' in updated_servers:
+            if "test-server" in updated_servers:
                 print("✅ Auto-sync successful - database updated with file changes")
             else:
                 print("⚠️ Auto-sync may not have completed yet")
@@ -130,7 +131,7 @@ async def test_file_sync():
 
     # Test 7: Restore original file
     print("\n7. Restoring original configuration...")
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         json.dump(backup_config, f, indent=2)
 
     print("✅ Restored original mcp.json file")
@@ -147,6 +148,7 @@ async def test_file_sync():
     print("📁 MCP configuration file: ./data/mcp.json")
 
     return True
+
 
 if __name__ == "__main__":
     asyncio.run(test_file_sync())

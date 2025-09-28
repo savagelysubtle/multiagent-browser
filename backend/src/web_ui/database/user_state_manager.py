@@ -8,7 +8,7 @@ with ChromaDB backend storage.
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .chroma_manager import ChromaManager
 from .models import CollectionConfig, DocumentModel
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class UserStateManager:
     """Manages per-user state persistence in ChromaDB."""
 
-    def __init__(self, chroma_manager: Optional[ChromaManager] = None):
+    def __init__(self, chroma_manager: ChromaManager | None = None):
         """
         Initialize the User State Manager.
 
@@ -48,7 +48,7 @@ class UserStateManager:
         except Exception as e:
             logger.error(f"Failed to ensure user state collection: {e}")
 
-    async def save_user_state(self, user_id: str, state: Dict[str, Any]) -> bool:
+    async def save_user_state(self, user_id: str, state: dict[str, Any]) -> bool:
         """
         Save user's application state.
 
@@ -73,7 +73,7 @@ class UserStateManager:
                     "state_type": "application_state",
                     "last_updated": datetime.now().isoformat(),
                     "version": "1.0",
-                    "state_keys": list(validated_state.keys()),
+                    "state_keys": ", ".join(validated_state.keys()),
                 },
                 source="user_state_manager",
                 timestamp=datetime.now(),
@@ -97,7 +97,7 @@ class UserStateManager:
             logger.error(f"Error saving user state for {user_id}: {e}")
             return False
 
-    async def get_user_state(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user_state(self, user_id: str) -> dict[str, Any] | None:
         """
         Retrieve user's application state.
 
@@ -154,7 +154,7 @@ class UserStateManager:
             return False
 
     async def update_workspace_state(
-        self, user_id: str, workspace_data: Dict[str, Any]
+        self, user_id: str, workspace_data: dict[str, Any]
     ) -> bool:
         """
         Update user's workspace state.
@@ -181,7 +181,7 @@ class UserStateManager:
             return False
 
     async def update_agent_settings(
-        self, user_id: str, agent_settings: Dict[str, Any]
+        self, user_id: str, agent_settings: dict[str, Any]
     ) -> bool:
         """
         Update user's agent settings.
@@ -256,7 +256,7 @@ class UserStateManager:
             logger.error(f"Error clearing user state for {user_id}: {e}")
             return False
 
-    def _validate_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_state(self, state: dict[str, Any]) -> dict[str, Any]:
         """
         Validate and sanitize user state data.
 
@@ -291,7 +291,7 @@ class UserStateManager:
 
         return validated_state
 
-    def get_collection_stats(self) -> Dict[str, Any]:
+    def get_collection_stats(self) -> dict[str, Any]:
         """
         Get statistics about the user states collection.
 
@@ -309,7 +309,7 @@ class UserStateManager:
             logger.error(f"Error getting collection stats: {e}")
             return {"error": str(e)}
 
-    async def backup_user_state(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def backup_user_state(self, user_id: str) -> dict[str, Any] | None:
         """
         Create a backup of user state.
 
@@ -336,7 +336,7 @@ class UserStateManager:
             return None
 
     async def restore_user_state(
-        self, user_id: str, backup_data: Dict[str, Any]
+        self, user_id: str, backup_data: dict[str, Any]
     ) -> bool:
         """
         Restore user state from backup.

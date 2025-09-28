@@ -4,21 +4,23 @@ Comprehensive test script for MCP-Chroma integration.
 Tests the MCPConfigManager, MCPService, and database persistence.
 """
 
-import sys
-import logging
 import asyncio
-import json
+import logging
+import sys
 from pathlib import Path
 
 # Add src to path so we can import our modules
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from web_ui.database import MCPConfigManager, DocumentPipeline
-from web_ui.services import MCPService
 from web_ui.webui.webui_manager import WebuiManager
 
+from web_ui.database import DocumentPipeline, MCPConfigManager
+from web_ui.services import MCPService
+
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -40,16 +42,13 @@ async def test_mcp_integration():
             "mcpServers": {
                 "filesystem": {
                     "command": "uvx",
-                    "args": ["mcp-server-filesystem", "--base-path", "/workspace"]
+                    "args": ["mcp-server-filesystem", "--base-path", "/workspace"],
                 },
                 "brave-search": {
                     "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-brave-search"]
+                    "args": ["-y", "@modelcontextprotocol/server-brave-search"],
                 },
-                "test-server": {
-                    "command": "python",
-                    "args": ["-m", "test_mcp_server"]
-                }
+                "test-server": {"command": "python", "args": ["-m", "test_mcp_server"]},
             }
         }
 
@@ -58,7 +57,7 @@ async def test_mcp_integration():
             config_name="test_integration_config",
             description="Integration test configuration with multiple servers",
             config_type="test",
-            set_as_active=True
+            set_as_active=True,
         )
 
         if success:
@@ -73,10 +72,14 @@ async def test_mcp_integration():
 
         if active_config:
             config_name = active_config.get("config_name")
-            server_count = len(active_config.get("config_data", {}).get("mcpServers", {}))
+            server_count = len(
+                active_config.get("config_data", {}).get("mcpServers", {})
+            )
             print(f"✅ Retrieved active config: {config_name}")
             print(f"   Server count: {server_count}")
-            print(f"   Servers: {list(active_config.get('config_data', {}).get('mcpServers', {}).keys())}")
+            print(
+                f"   Servers: {list(active_config.get('config_data', {}).get('mcpServers', {}).keys())}"
+            )
         else:
             print("❌ No active configuration found")
             return False
@@ -87,7 +90,9 @@ async def test_mcp_integration():
         print(f"✅ Found {len(configs)} configurations:")
 
         for i, config in enumerate(configs, 1):
-            print(f"   {i}. {config['config_name']} ({config['config_type']}) - {config['server_count']} servers")
+            print(
+                f"   {i}. {config['config_name']} ({config['config_type']}) - {config['server_count']} servers"
+            )
 
         # Test 5: MCP Service Integration
         print("\n5. Testing MCP Service...")
@@ -103,8 +108,8 @@ async def test_mcp_integration():
         # Test service status
         status = await mcp_service.get_service_status()
         print(f"✅ Service status: {status.get('is_running', False)}")
-        if status.get('active_config'):
-            active_name = status['active_config'].get('name', 'Unknown')
+        if status.get("active_config"):
+            active_name = status["active_config"].get("name", "Unknown")
             print(f"   Active config: {active_name}")
 
         # Test 6: Configuration Switching
@@ -112,12 +117,7 @@ async def test_mcp_integration():
 
         # Create a second configuration
         backup_config = {
-            "mcpServers": {
-                "simple-server": {
-                    "command": "echo",
-                    "args": ["test"]
-                }
-            }
+            "mcpServers": {"simple-server": {"command": "echo", "args": ["test"]}}
         }
 
         success, message = await mcp_manager.store_mcp_config(
@@ -125,7 +125,7 @@ async def test_mcp_integration():
             config_name="backup_config",
             description="Simple backup configuration",
             config_type="backup",
-            set_as_active=False
+            set_as_active=False,
         )
 
         if success:
@@ -136,13 +136,15 @@ async def test_mcp_integration():
             backup_config_id = None
 
             for config in configs:
-                if config['config_name'] == 'backup_config':
-                    backup_config_id = config['id']
+                if config["config_name"] == "backup_config":
+                    backup_config_id = config["id"]
                     break
 
             if backup_config_id:
                 # Switch to backup configuration
-                switch_success, switch_message = await mcp_service.switch_configuration(backup_config_id)
+                switch_success, switch_message = await mcp_service.switch_configuration(
+                    backup_config_id
+                )
                 if switch_success:
                     print(f"✅ Successfully switched configuration: {switch_message}")
                 else:
@@ -153,7 +155,9 @@ async def test_mcp_integration():
         # Test 7: Configuration Backup
         print("\n7. Testing Configuration Backup...")
         if active_config:
-            backup_success, backup_message, backup_id = await mcp_manager.backup_config(active_config['id'])
+            backup_success, backup_message, backup_id = await mcp_manager.backup_config(
+                active_config["id"]
+            )
             if backup_success:
                 print(f"✅ Backup created: {backup_message}")
                 print(f"   Backup ID: {backup_id}")
@@ -178,7 +182,9 @@ async def test_mcp_integration():
 
                 # Test service status through WebUI Manager
                 webui_status = await webui_manager.get_mcp_service_status()
-                print(f"✅ WebUI MCP service status: {webui_status.get('is_running', False)}")
+                print(
+                    f"✅ WebUI MCP service status: {webui_status.get('is_running', False)}"
+                )
 
             else:
                 print("❌ WebUI Manager missing MCP service")
@@ -191,7 +197,7 @@ async def test_mcp_integration():
         collection_stats = mcp_manager.get_collection_stats()
 
         if collection_stats:
-            doc_count = collection_stats.get('document_count', 0)
+            doc_count = collection_stats.get("document_count", 0)
             print(f"✅ MCP configurations collection: {doc_count} documents")
         else:
             print("⚠️ Could not retrieve collection statistics")
@@ -245,15 +251,16 @@ async def cleanup_test_data():
         configs = await mcp_manager.list_configs()
 
         test_configs = [
-            config for config in configs
-            if config['config_name'] in ['test_integration_config', 'backup_config']
-            or config['config_type'] == 'test'
-            or 'backup' in config['config_name']
+            config
+            for config in configs
+            if config["config_name"] in ["test_integration_config", "backup_config"]
+            or config["config_type"] == "test"
+            or "backup" in config["config_name"]
         ]
 
         deleted_count = 0
         for config in test_configs:
-            success, message = await mcp_manager.delete_config(config['id'])
+            success, message = await mcp_manager.delete_config(config["id"])
             if success:
                 deleted_count += 1
                 print(f"✅ Deleted: {config['config_name']}")
@@ -269,7 +276,9 @@ async def cleanup_test_data():
 def main():
     """Main test function."""
     print("MCP-Chroma Integration Comprehensive Test")
-    print("This script tests the complete integration between MCP configuration management and ChromaDB.")
+    print(
+        "This script tests the complete integration between MCP configuration management and ChromaDB."
+    )
     print()
 
     # Run the test
@@ -277,8 +286,10 @@ def main():
 
     if success:
         # Ask if user wants to clean up
-        response = input("\nDo you want to clean up the test data? (y/N): ").strip().lower()
-        if response in ['y', 'yes']:
+        response = (
+            input("\nDo you want to clean up the test data? (y/N): ").strip().lower()
+        )
+        if response in ["y", "yes"]:
             asyncio.run(cleanup_test_data())
 
     print("\nTest completed.")

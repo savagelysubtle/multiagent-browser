@@ -5,8 +5,9 @@ Adapts the existing DocumentEditor agent to work with the SimpleAgentOrchestrato
 """
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,9 @@ class DocumentEditorAdapter:
         filename: str,
         content: str,
         document_type: str = "markdown",
-        progress_callback: Optional[Callable[[int, str], Awaitable[None]]] = None,
+        progress_callback: Callable[[int, str], Awaitable[None]] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create a new document.
 
@@ -121,9 +122,9 @@ class DocumentEditorAdapter:
         self,
         document_id: str,
         instruction: str,
-        progress_callback: Optional[Callable[[int, str], Awaitable[None]]] = None,
+        progress_callback: Callable[[int, str], Awaitable[None]] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Edit an existing document using AI assistance.
 
@@ -206,9 +207,9 @@ class DocumentEditorAdapter:
         self,
         query: str,
         limit: int = 10,
-        progress_callback: Optional[Callable[[int, str], Awaitable[None]]] = None,
+        progress_callback: Callable[[int, str], Awaitable[None]] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Search through documents.
 
@@ -274,7 +275,7 @@ class DocumentEditorAdapter:
             logger.error(f"Failed to search documents: {e}")
             raise
 
-    def get_capabilities(self) -> Dict[str, Any]:
+    def get_capabilities(self) -> dict[str, Any]:
         """Get the capabilities of this adapter."""
         return {
             "agent_type": self.agent_type,

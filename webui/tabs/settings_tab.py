@@ -1,13 +1,11 @@
 import json
-import os
-import gradio as gr
 import logging
-from gradio.components import Component
-from typing import Any, Dict, Optional
-from functools import partial
+import os
 
-from ..webui_manager import WebuiManager
+import gradio as gr
+
 from ...utils import config
+from ..webui_manager import WebuiManager
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +13,9 @@ logger = logging.getLogger(__name__)
 def strtobool(val):
     """Convert a string representation of truth to True or False."""
     val = val.lower()
-    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+    if val in ("y", "yes", "t", "true", "on", "1"):
         return True
-    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+    elif val in ("n", "no", "f", "false", "off", "0"):
         return False
     else:
         raise ValueError(f"invalid truth value {val!r}")
@@ -29,10 +27,12 @@ def update_model_dropdown(llm_provider):
         return gr.Dropdown(
             choices=config.model_names[llm_provider],
             value=config.model_names[llm_provider][0],
-            interactive=True
+            interactive=True,
         )
     else:
-        return gr.Dropdown(choices=[], value="", interactive=True, allow_custom_value=True)
+        return gr.Dropdown(
+            choices=[], value="", interactive=True, allow_custom_value=True
+        )
 
 
 def load_default_mcp_config():
@@ -40,7 +40,7 @@ def load_default_mcp_config():
     default_mcp_file = "./data/mcp.json"
     try:
         if os.path.exists(default_mcp_file):
-            with open(default_mcp_file, 'r') as f:
+            with open(default_mcp_file) as f:
                 mcp_server = json.load(f)
             logger.info(f"Loaded default MCP configuration from {default_mcp_file}")
             return json.dumps(mcp_server, indent=2), default_mcp_file
@@ -76,11 +76,11 @@ async def update_mcp_server(mcp_file: str, webui_manager: WebuiManager):
         await webui_manager.bu_controller.close_mcp_client()
         webui_manager.bu_controller = None
 
-    if not mcp_file or not os.path.exists(mcp_file) or not mcp_file.endswith('.json'):
+    if not mcp_file or not os.path.exists(mcp_file) or not mcp_file.endswith(".json"):
         logger.warning(f"{mcp_file} is not a valid MCP file.")
         return None, gr.update(visible=False)
 
-    with open(mcp_file, 'r') as f:
+    with open(mcp_file) as f:
         mcp_server = json.load(f)
 
     return json.dumps(mcp_server, indent=2), gr.update(visible=True)
@@ -101,30 +101,24 @@ def create_settings_tab(webui_manager: WebuiManager):
                 config_file = gr.File(
                     label="Load UI Settings from JSON",
                     file_types=[".json"],
-                    interactive=True
+                    interactive=True,
                 )
                 with gr.Row():
                     load_config_button = gr.Button("Load Config", variant="primary")
-                    save_config_button = gr.Button("Save UI Settings", variant="primary")
+                    save_config_button = gr.Button(
+                        "Save UI Settings", variant="primary"
+                    )
 
-                config_status = gr.Textbox(
-                    label="Status",
-                    lines=2,
-                    interactive=False
-                )
+                config_status = gr.Textbox(label="Status", lines=2, interactive=False)
 
             # System Prompts
             with gr.Group():
                 gr.Markdown("## 📝 System Prompts")
                 override_system_prompt = gr.Textbox(
-                    label="Override System Prompt",
-                    lines=6,
-                    interactive=True
+                    label="Override System Prompt", lines=6, interactive=True
                 )
                 extend_system_prompt = gr.Textbox(
-                    label="Extend System Prompt",
-                    lines=6,
-                    interactive=True
+                    label="Extend System Prompt", lines=6, interactive=True
                 )
 
             # Agent Parameters
@@ -138,7 +132,7 @@ def create_settings_tab(webui_manager: WebuiManager):
                         step=1,
                         label="Max Run Steps",
                         info="Maximum number of steps the agent will take",
-                        interactive=True
+                        interactive=True,
                     )
                     max_actions = gr.Slider(
                         minimum=1,
@@ -147,20 +141,27 @@ def create_settings_tab(webui_manager: WebuiManager):
                         step=1,
                         label="Max Actions per Step",
                         info="Maximum number of actions per step",
-                        interactive=True
+                        interactive=True,
                     )
                     max_input_tokens = gr.Number(
                         label="Max Input Tokens",
                         value=128000,
                         precision=0,
-                        interactive=True
+                        interactive=True,
                     )
                     tool_calling_method = gr.Dropdown(
                         label="Tool Calling Method",
                         value="auto",
                         interactive=True,
                         allow_custom_value=True,
-                        choices=['function_calling', 'json_mode', 'raw', 'auto', 'tools', "None"],
+                        choices=[
+                            "function_calling",
+                            "json_mode",
+                            "raw",
+                            "auto",
+                            "tools",
+                            "None",
+                        ],
                     )
 
         # ==================== COLUMN 2: BROWSER SETTINGS ====================
@@ -174,7 +175,7 @@ def create_settings_tab(webui_manager: WebuiManager):
                     label="Browser Binary Path",
                     lines=1,
                     interactive=True,
-                    placeholder="e.g. '/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome'"
+                    placeholder="e.g. '/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome'",
                 )
                 browser_user_data_dir = gr.Textbox(
                     label="Browser User Data Dir",
@@ -190,25 +191,25 @@ def create_settings_tab(webui_manager: WebuiManager):
                         label="Use Own Browser",
                         value=bool(strtobool(os.getenv("USE_OWN_BROWSER", "false"))),
                         info="Use your existing browser instance",
-                        interactive=True
+                        interactive=True,
                     )
                     keep_browser_open = gr.Checkbox(
                         label="Keep Browser Open",
                         value=bool(strtobool(os.getenv("KEEP_BROWSER_OPEN", "true"))),
                         info="Keep browser open between tasks",
-                        interactive=True
+                        interactive=True,
                     )
                     headless = gr.Checkbox(
                         label="Headless Mode",
                         value=False,
                         info="Run browser without GUI",
-                        interactive=True
+                        interactive=True,
                     )
                     disable_security = gr.Checkbox(
                         label="Disable Security",
                         value=False,
                         info="Disable browser security",
-                        interactive=True
+                        interactive=True,
                     )
 
                 # Window & Connection Settings
@@ -218,13 +219,13 @@ def create_settings_tab(webui_manager: WebuiManager):
                         label="Window Width",
                         value=1280,
                         info="Browser window width",
-                        interactive=True
+                        interactive=True,
                     )
                     window_h = gr.Number(
                         label="Window Height",
                         value=1100,
                         info="Browser window height",
-                        interactive=True
+                        interactive=True,
                     )
                 cdp_url = gr.Textbox(
                     label="CDP URL",
@@ -270,13 +271,15 @@ def create_settings_tab(webui_manager: WebuiManager):
             # MCP Server Configuration
             with gr.Group():
                 gr.Markdown("## 🔧 MCP Server Configuration")
-                gr.Markdown(f"**Default MCP File**: `{default_mcp_file_path or 'Not found'}`")
+                gr.Markdown(
+                    f"**Default MCP File**: `{default_mcp_file_path or 'Not found'}`"
+                )
 
                 mcp_json_file = gr.File(
                     label="MCP Server JSON",
                     interactive=True,
                     file_types=[".json"],
-                    value=default_mcp_file_path if default_mcp_file_path else None
+                    value=default_mcp_file_path if default_mcp_file_path else None,
                 )
                 mcp_server_config = gr.Textbox(
                     label="MCP Server Configuration",
@@ -284,18 +287,20 @@ def create_settings_tab(webui_manager: WebuiManager):
                     interactive=True,
                     visible=True,
                     value=default_mcp_content,
-                    info="Current MCP server configuration"
+                    info="Current MCP server configuration",
                 )
 
             # Primary LLM Settings
             with gr.Group():
                 gr.Markdown("## 🤖 Primary LLM Settings")
                 llm_provider = gr.Dropdown(
-                    choices=[provider for provider, model in config.model_names.items()],
+                    choices=[
+                        provider for provider, model in config.model_names.items()
+                    ],
                     label="LLM Provider",
                     value=os.getenv("DEFAULT_LLM", "openai"),
                     info="Select LLM provider",
-                    interactive=True
+                    interactive=True,
                 )
                 llm_model_name = gr.Dropdown(
                     label="LLM Model Name",
@@ -303,7 +308,7 @@ def create_settings_tab(webui_manager: WebuiManager):
                     value=config.model_names[os.getenv("DEFAULT_LLM", "openai")][0],
                     interactive=True,
                     allow_custom_value=True,
-                    info="Select model or type custom model name"
+                    info="Select model or type custom model name",
                 )
                 with gr.Row():
                     llm_temperature = gr.Slider(
@@ -313,52 +318,52 @@ def create_settings_tab(webui_manager: WebuiManager):
                         step=0.1,
                         label="Temperature",
                         info="Controls randomness",
-                        interactive=True
+                        interactive=True,
                     )
                     use_vision = gr.Checkbox(
                         label="Use Vision",
                         value=True,
                         info="Enable vision capabilities",
-                        interactive=True
+                        interactive=True,
                     )
                 llm_base_url = gr.Textbox(
-                    label="Base URL",
-                    value="",
-                    info="API endpoint URL (if required)"
+                    label="Base URL", value="", info="API endpoint URL (if required)"
                 )
                 llm_api_key = gr.Textbox(
                     label="API Key",
                     type="password",
                     value="",
-                    info="Your API key (leave blank to use .env)"
+                    info="Your API key (leave blank to use .env)",
                 )
 
                 ollama_num_ctx = gr.Slider(
-                    minimum=2 ** 8,
-                    maximum=2 ** 16,
+                    minimum=2**8,
+                    maximum=2**16,
                     value=16000,
                     step=1,
                     label="Ollama Context Length",
                     info="Controls max context length",
                     visible=False,
-                    interactive=True
+                    interactive=True,
                 )
 
             # Planner LLM Settings
             with gr.Group():
                 gr.Markdown("## 🧠 Planner LLM Settings")
                 planner_llm_provider = gr.Dropdown(
-                    choices=[provider for provider, model in config.model_names.items()],
+                    choices=[
+                        provider for provider, model in config.model_names.items()
+                    ],
                     label="Planner LLM Provider",
                     info="Select LLM provider for planner",
                     value=None,
-                    interactive=True
+                    interactive=True,
                 )
                 planner_llm_model_name = gr.Dropdown(
                     label="Planner LLM Model Name",
                     interactive=True,
                     allow_custom_value=True,
-                    info="Select model or type custom model name"
+                    info="Select model or type custom model name",
                 )
                 with gr.Row():
                     planner_llm_temperature = gr.Slider(
@@ -368,85 +373,83 @@ def create_settings_tab(webui_manager: WebuiManager):
                         step=0.1,
                         label="Temperature",
                         info="Controls randomness",
-                        interactive=True
+                        interactive=True,
                     )
                     planner_use_vision = gr.Checkbox(
                         label="Use Vision",
                         value=False,
                         info="Enable vision for planner",
-                        interactive=True
+                        interactive=True,
                     )
                 planner_llm_base_url = gr.Textbox(
-                    label="Base URL",
-                    value="",
-                    info="API endpoint URL (if required)"
+                    label="Base URL", value="", info="API endpoint URL (if required)"
                 )
                 planner_llm_api_key = gr.Textbox(
                     label="API Key",
                     type="password",
                     value="",
-                    info="Your API key (leave blank to use .env)"
+                    info="Your API key (leave blank to use .env)",
                 )
 
                 planner_ollama_num_ctx = gr.Slider(
-                    minimum=2 ** 8,
-                    maximum=2 ** 16,
+                    minimum=2**8,
+                    maximum=2**16,
                     value=16000,
                     step=1,
                     label="Ollama Context Length",
                     info="Controls max context length",
                     visible=False,
-                    interactive=True
+                    interactive=True,
                 )
 
     # Register all components
-    tab_components.update({
-        # Configuration Management
-        'load_config_button': load_config_button,
-        'save_config_button': save_config_button,
-        'config_status': config_status,
-        'config_file': config_file,
-
-        # Browser Settings
-        'browser_binary_path': browser_binary_path,
-        'browser_user_data_dir': browser_user_data_dir,
-        'use_own_browser': use_own_browser,
-        'keep_browser_open': keep_browser_open,
-        'headless': headless,
-        'disable_security': disable_security,
-        'save_recording_path': save_recording_path,
-        'save_trace_path': save_trace_path,
-        'save_agent_history_path': save_agent_history_path,
-        'save_download_path': save_download_path,
-        'cdp_url': cdp_url,
-        'wss_url': wss_url,
-        'window_h': window_h,
-        'window_w': window_w,
-
-        # Agent Settings
-        'override_system_prompt': override_system_prompt,
-        'extend_system_prompt': extend_system_prompt,
-        'llm_provider': llm_provider,
-        'llm_model_name': llm_model_name,
-        'llm_temperature': llm_temperature,
-        'use_vision': use_vision,
-        'ollama_num_ctx': ollama_num_ctx,
-        'llm_base_url': llm_base_url,
-        'llm_api_key': llm_api_key,
-        'planner_llm_provider': planner_llm_provider,
-        'planner_llm_model_name': planner_llm_model_name,
-        'planner_llm_temperature': planner_llm_temperature,
-        'planner_use_vision': planner_use_vision,
-        'planner_ollama_num_ctx': planner_ollama_num_ctx,
-        'planner_llm_base_url': planner_llm_base_url,
-        'planner_llm_api_key': planner_llm_api_key,
-        'max_steps': max_steps,
-        'max_actions': max_actions,
-        'max_input_tokens': max_input_tokens,
-        'tool_calling_method': tool_calling_method,
-        'mcp_json_file': mcp_json_file,
-        'mcp_server_config': mcp_server_config,
-    })
+    tab_components.update(
+        {
+            # Configuration Management
+            "load_config_button": load_config_button,
+            "save_config_button": save_config_button,
+            "config_status": config_status,
+            "config_file": config_file,
+            # Browser Settings
+            "browser_binary_path": browser_binary_path,
+            "browser_user_data_dir": browser_user_data_dir,
+            "use_own_browser": use_own_browser,
+            "keep_browser_open": keep_browser_open,
+            "headless": headless,
+            "disable_security": disable_security,
+            "save_recording_path": save_recording_path,
+            "save_trace_path": save_trace_path,
+            "save_agent_history_path": save_agent_history_path,
+            "save_download_path": save_download_path,
+            "cdp_url": cdp_url,
+            "wss_url": wss_url,
+            "window_h": window_h,
+            "window_w": window_w,
+            # Agent Settings
+            "override_system_prompt": override_system_prompt,
+            "extend_system_prompt": extend_system_prompt,
+            "llm_provider": llm_provider,
+            "llm_model_name": llm_model_name,
+            "llm_temperature": llm_temperature,
+            "use_vision": use_vision,
+            "ollama_num_ctx": ollama_num_ctx,
+            "llm_base_url": llm_base_url,
+            "llm_api_key": llm_api_key,
+            "planner_llm_provider": planner_llm_provider,
+            "planner_llm_model_name": planner_llm_model_name,
+            "planner_llm_temperature": planner_llm_temperature,
+            "planner_use_vision": planner_use_vision,
+            "planner_ollama_num_ctx": planner_ollama_num_ctx,
+            "planner_llm_base_url": planner_llm_base_url,
+            "planner_llm_api_key": planner_llm_api_key,
+            "max_steps": max_steps,
+            "max_actions": max_actions,
+            "max_input_tokens": max_input_tokens,
+            "tool_calling_method": tool_calling_method,
+            "mcp_json_file": mcp_json_file,
+            "mcp_server_config": mcp_server_config,
+        }
+    )
 
     webui_manager.add_components("unified_settings", tab_components)
 
@@ -456,7 +459,7 @@ def create_settings_tab(webui_manager: WebuiManager):
     save_config_button.click(
         fn=webui_manager.save_config,
         inputs=set(webui_manager.get_components()),
-        outputs=[config_status]
+        outputs=[config_status],
     )
 
     load_config_button.click(
@@ -479,24 +482,24 @@ def create_settings_tab(webui_manager: WebuiManager):
     llm_provider.change(
         fn=lambda x: gr.update(visible=x == "ollama"),
         inputs=llm_provider,
-        outputs=ollama_num_ctx
+        outputs=ollama_num_ctx,
     )
     llm_provider.change(
         lambda provider: update_model_dropdown(provider),
         inputs=[llm_provider],
-        outputs=[llm_model_name]
+        outputs=[llm_model_name],
     )
 
     # Planner LLM Provider Events
     planner_llm_provider.change(
         fn=lambda x: gr.update(visible=x == "ollama"),
         inputs=[planner_llm_provider],
-        outputs=[planner_ollama_num_ctx]
+        outputs=[planner_ollama_num_ctx],
     )
     planner_llm_provider.change(
         lambda provider: update_model_dropdown(provider),
         inputs=[planner_llm_provider],
-        outputs=[planner_llm_model_name]
+        outputs=[planner_llm_model_name],
     )
 
     # MCP Server Events
@@ -508,5 +511,5 @@ def create_settings_tab(webui_manager: WebuiManager):
     mcp_json_file.change(
         update_wrapper,
         inputs=[mcp_json_file],
-        outputs=[mcp_server_config, mcp_server_config]
+        outputs=[mcp_server_config, mcp_server_config],
     )

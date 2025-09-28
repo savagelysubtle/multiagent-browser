@@ -1,0 +1,331 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+<cursor-rule>
+  <version>1.0.0</version>
+
+  <context>
+    This rule defines the standardized project structure for the web-ui application, which is a unified AI research platform with Python backend, React frontend, ChromaDB integration, and MCP tool servers. The architecture follows a clear separation of concerns with dedicated directories for each component.
+  </context>
+
+  <project-architecture>
+    <name>Web-UI - Unified AI Research Platform</name>
+    <structure>Full-stack application with Python backend and React frontend</structure>
+    <integration>ChromaDB, MCP servers, Agent orchestration, WebSocket communication</integration>
+  </project-architecture>
+
+  <directory-structure>
+    <backend>
+      <location>./backend</location>
+      <description>Python-based backend with FastAPI, agent orchestration, and database integration</description>
+      <structure>
+        <source>backend/src/web_ui/</source>
+        <components>
+          <component>agent/ - Agent orchestration and adapters</component>
+          <component>api/ - FastAPI REST endpoints and WebSocket handling</component>
+          <component>browser/ - Custom browser automation components</component>
+          <component>controller/ - Browser controller and MCP integration</component>
+          <component>database/ - ChromaDB management and models</component>
+          <component>services/ - Background services and MCP configuration</component>
+          <component>utils/ - Utilities and configuration</component>
+          <component>webui/ - Gradio web interface components</component>
+        </components>
+      </structure>
+    </backend>
+
+    <frontend>
+      <location>frontend/</location>
+      <description>React-based frontend with TypeScript, authentication, and real-time communication</description>
+      <structure>
+        <source>frontend/src/</source>
+        <components>
+          <component>components/ - Reusable React components</component>
+          <component>pages/ - Main page components</component>
+          <component>views/ - Feature-specific view components</component>
+          <component>services/ - API services and data fetching</component>
+          <component>stores/ - Zustand state management</component>
+          <component>hooks/ - Custom React hooks</component>
+          <component>utils/ - Frontend utilities</component>
+          <component>types/ - TypeScript type definitions</component>
+          <component>styles/ - Global CSS and styling</component>
+        </components>
+      </structure>
+    </frontend>
+
+    <data>
+      <location>data/</location>
+      <description>Application data storage and configuration</description>
+      <structure>
+        <component>chroma_db/ - ChromaDB persistent storage</component>
+        <component>documents/ - User documents and uploads</component>
+        <component>mcp.json - MCP server configuration</component>
+      </structure>
+    </data>
+
+    <logs>
+      <location>logs/</location>
+      <description>Application logs and debug information</description>
+      <structure>
+        <component>web-ui.log - Main application log file</component>
+        <component>Agent logs, error logs, and debug traces</component>
+      </structure>
+    </logs>
+
+    <mcp>
+      <location>mcp/</location>
+      <description>Model Context Protocol tool servers and configurations</description>
+      <structure>
+        <component>server/ - MCP server implementations</component>
+        <component>ToolRack/ - Organized MCP tools by language</component>
+        <component>Plans/ - Development and implementation plans</component>
+        <component>Compendium/ - Documentation and guides</component>
+      </structure>
+    </mcp>
+
+    <supporting>
+      <location>Root level</location>
+      <structure>
+        <component>plans/ - Project planning and feature documentation</component>
+        <component>scripts/ - Development and deployment scripts</component>
+        <component>tests/ - Python test suite</component>
+        <component>tmp/ - Temporary files and working directories</component>
+        <component>webui/ - Legacy Gradio interface components</component>
+      </structure>
+    </supporting>
+  </directory-structure>
+
+  <path-conventions>
+    <backend-imports>
+      <pattern>from backend.src.web_ui.{module} import {component}</pattern>
+      <example>from backend.src.web_ui.database import ChromaManager</example>
+    </backend-imports>
+
+    <frontend-imports>
+      <pattern>import {component} from '../{category}/{module}'</pattern>
+      <example>import { useAppStore } from '../stores/useAppStore'</example>
+    </frontend-imports>
+
+    <data-references>
+      <pattern>./data/{category}/{file}</pattern>
+      <examples>
+        <example>./data/chroma_db/ - Database storage</example>
+        <example>./data/documents/ - Document storage</example>
+        <example>./data/mcp.json - MCP configuration</example>
+      </examples>
+    </data-references>
+
+    <log-references>
+      <pattern>./logs/{component}.log</pattern>
+      <examples>
+        <example>./logs/web-ui.log - Main application log</example>
+        <example>./logs/agent.log - Agent operation logs</example>
+        <example>./logs/error.log - Error tracking</example>
+      </examples>
+    </log-references>
+
+    <mcp-references>
+      <pattern>./mcp/server/{category}/{implementation}</pattern>
+      <examples>
+        <example>./mcp/server/ToolRack/Python/ - Python MCP tools</example>
+        <example>./mcp/server/ToolRack/TypeScript/ - TypeScript MCP tools</example>
+        <example>./mcp/server/Plans/ - MCP development plans</example>
+      </examples>
+    </mcp-references>
+  </path-conventions>
+
+  <technology-stack>
+    <backend>
+      <runtime>Python 3.13+</runtime>
+      <framework>FastAPI with async support</framework>
+      <database>ChromaDB for vector storage</database>
+      <agents>Browser-use, Deep Research, Document Editor</agents>
+      <communication>WebSocket real-time updates</communication>
+      <package-manager>UV for dependency management</package-manager>
+      <testing>pytest with async support</testing>
+    </backend>
+
+    <frontend>
+      <runtime>Node.js 18+</runtime>
+      <framework>React 18 with TypeScript</framework>
+      <state-management>Zustand for application state</state-management>
+      <routing>React Router for navigation</routing>
+      <styling>Tailwind CSS with dark/light themes</styling>
+      <api-client>Axios with interceptors</api-client>
+      <build-tool>Vite for development and bundling</build-tool>
+    </frontend>
+
+    <mcp-integration>
+      <transport>Stdio transport for local communication</transport>
+      <servers>Python, TypeScript, Rust implementations</servers>
+      <configuration>JSON-based server configuration</configuration>
+    </mcp-integration>
+  </technology-stack>
+
+  <development-workflow>
+    <backend-development>
+      <working-directory>backend/</working-directory>
+      <entry-point>backend/src/web_ui/main.py</entry-point>
+      <package-management>UV commands (uv add, uv sync, uv run)</package-management>
+      <testing>pytest tests/ from project root</testing>
+      <logging>Configure to write to logs/ directory</logging>
+    </backend-development>
+
+    <frontend-development>
+      <working-directory>frontend/</working-directory>
+      <entry-point>frontend/src/main.tsx</entry-point>
+      <package-management>npm/pnpm commands</package-management>
+      <development-server>npm run dev (port 3000)</development-server>
+      <build>npm run build → dist/</build>
+    </frontend-development>
+
+    <mcp-development>
+      <working-directory>mcp/server/</working-directory>
+      <python-tools>mcp/server/ToolRack/Python/</python-tools>
+      <typescript-tools>mcp/server/ToolRack/TypeScript/</typescript-tools>
+      <configuration>data/mcp.json for server setup</configuration>
+    </mcp-development>
+  </development-workflow>
+
+  <requirements>
+    <requirement>
+      <type>DirectoryStructure</type>
+      <guideline>ALWAYS place Python backend code in backend/src/web_ui/ directory structure</guideline>
+    </requirement>
+    <requirement>
+      <type>FrontendOrganization</type>
+      <guideline>ALWAYS place React frontend code in frontend/src/ with proper component organization</guideline>
+    </requirement>
+    <requirement>
+      <type>DataManagement</type>
+      <guideline>ALWAYS store application data (database, documents, configs) in data/ directory</guideline>
+    </requirement>
+    <requirement>
+      <type>LoggingPath</type>
+      <guideline>ALWAYS configure logging to write to logs/ directory with structured file naming</guideline>
+    </requirement>
+    <requirement>
+      <type>MCPIntegration</type>
+      <guideline>ALWAYS place MCP server implementations in mcp/server/ with proper language separation</guideline>
+    </requirement>
+    <requirement>
+      <type>ImportPaths</type>
+      <guideline>USE relative imports within each major directory section, absolute imports for cross-section communication</guideline>
+    </requirement>
+    <requirement>
+      <type>ConfigurationFiles</type>
+      <guideline>PLACE configuration files at appropriate levels: pyproject.toml for backend, package.json for frontend, mcp.json in data/</guideline>
+    </requirement>
+  </requirements>
+
+  <examples>
+    <good-practice>
+      <description>Correct backend file organization and imports</description>
+      <example>
+# File: backend/src/web_ui/agent/orchestrator/simple_orchestrator.py
+from typing import Any
+from ...database import ChromaManager
+from ...api.websocket import ws_manager
+from ..adapters import DocumentEditorAdapter
+
+class SimpleAgentOrchestrator:
+    def __init__(self, ws_manager=None):
+        self.ws_manager = ws_manager
+        # Implementation follows project structure
+      </example>
+    </good-practice>
+
+    <good-practice>
+      <description>Correct frontend file organization and imports</description>
+      <example>
+// File: frontend/src/pages/DashboardPage.tsx
+import React from 'react';
+import { useWebSocket } from '../hooks/useWebSocket';
+import Sidebar from '../components/layout/Sidebar';
+import Header from '../components/layout/Header';
+import EditorView from '../views/EditorView';
+
+export default function DashboardPage() {
+  // Component follows frontend structure conventions
+}
+      </example>
+    </good-practice>
+
+    <good-practice>
+      <description>Correct logging configuration pointing to logs directory</description>
+      <example>
+# File: backend/src/web_ui/main.py
+import logging
+from pathlib import Path
+
+def setup_logging(level: str = "INFO"):
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+
+    logging.basicConfig(
+        level=getattr(logging, level.upper()),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_dir / "web-ui.log")
+        ],
+    )
+      </example>
+    </good-practice>
+
+    <good-practice>
+      <description>Correct MCP server configuration in data directory</description>
+      <example>
+# File: data/mcp.json
+{
+  "mcpServers": {
+    "Python": {
+      "command": "./ToolRack/Python/start_mcp_server.bat",
+      "type": "stdio",
+      "cwd": "./mcp/server/ToolRack/Python",
+      "env": {
+        "LOG_LEVEL": "INFO"
+      }
+    },
+    "chroma": {
+      "command": "uvx",
+      "args": ["chroma-mcp", "--data-dir", "./data/chroma_db"]
+    }
+  }
+}
+      </example>
+    </good-practice>
+
+    <bad-practice>
+      <description>Incorrect directory structure and imports</description>
+      <example>
+# BAD: Backend code in wrong location
+# File: src/agent.py (should be backend/src/web_ui/agent/)
+
+# BAD: Frontend code mixed with backend
+# File: backend/components/Dashboard.tsx (should be frontend/src/components/)
+
+# BAD: Logs written to random locations
+logging.FileHandler("app.log")  # Should be logs/web-ui.log
+
+# BAD: Data stored in root or random directories
+db_path = "./database/"  # Should be data/chroma_db/
+
+# BAD: MCP configuration in wrong location
+# File: mcp.json (should be data/mcp.json)
+      </example>
+    </bad-practice>
+  </examples>
+
+  <critical-instructions>
+    <instruction>MAINTAIN strict separation between backend/ and frontend/ codebases</instruction>
+    <instruction>ALWAYS use data/ directory for persistent storage (database, documents, configs)</instruction>
+    <instruction>CONFIGURE all logging to write to logs/ directory with proper file naming</instruction>
+    <instruction>ORGANIZE MCP servers by language in mcp/server/ToolRack/{Language}/</instruction>
+    <instruction>FOLLOW the orchestrator pattern with webui.py as entry point and backend/src/web_ui/main.py as orchestrator</instruction>
+    <instruction>USE proper import paths that respect the directory structure boundaries</instruction>
+    <instruction>PLACE temporary files in tmp/ directory, tests in tests/ directory</instruction>
+  </critical-instructions>
+</cursor-rule>
+

@@ -1,27 +1,23 @@
+import asyncio
 import json
 import logging
-from collections.abc import Generator
-from typing import TYPE_CHECKING
 import os
-import gradio as gr
-from datetime import datetime
-from typing import Optional, Dict, List, Tuple
-import uuid
-import asyncio
 import time
+from datetime import datetime
+
+import gradio as gr
 
 logger = logging.getLogger(__name__)
 
-from gradio.components import Component
-from browser_use.browser.browser import Browser
-from browser_use.browser.context import BrowserContext
 from browser_use.agent.service import Agent
+from gradio.components import Component
+
+from ..agent.deep_research.deep_research_agent import DeepResearchAgent
 from ..browser.custom_browser import CustomBrowser
 from ..browser.custom_context import CustomBrowserContext
 from ..controller.custom_controller import CustomController
-from ..agent.deep_research.deep_research_agent import DeepResearchAgent
-from ..services.mcp_service import MCPService
 from ..database.document_pipeline import DocumentPipeline
+from ..services.mcp_service import MCPService
 
 
 class WebuiManager:
@@ -33,43 +29,46 @@ class WebuiManager:
         os.makedirs(self.settings_save_dir, exist_ok=True)
 
         # Initialize database and MCP service
-        self.document_pipeline: Optional[DocumentPipeline] = None
-        self.mcp_service: Optional[MCPService] = None
+        self.document_pipeline: DocumentPipeline | None = None
+        self.mcp_service: MCPService | None = None
         self._initialize_database_and_services()
 
     def init_browser_use_agent(self) -> None:
         """
         init browser use agent
         """
-        self.bu_agent: Optional[Agent] = None
-        self.bu_browser: Optional[CustomBrowser] = None
-        self.bu_browser_context: Optional[CustomBrowserContext] = None
-        self.bu_controller: Optional[CustomController] = None
-        self.bu_chat_history: List[Dict[str, Optional[str]]] = []
-        self.bu_response_event: Optional[asyncio.Event] = None
-        self.bu_user_help_response: Optional[str] = None
-        self.bu_current_task: Optional[asyncio.Task] = None
-        self.bu_agent_task_id: Optional[str] = None
+        self.bu_agent: Agent | None = None
+        self.bu_browser: CustomBrowser | None = None
+        self.bu_browser_context: CustomBrowserContext | None = None
+        self.bu_controller: CustomController | None = None
+        self.bu_chat_history: list[dict[str, str | None]] = []
+        self.bu_response_event: asyncio.Event | None = None
+        self.bu_user_help_response: str | None = None
+        self.bu_current_task: asyncio.Task | None = None
+        self.bu_agent_task_id: str | None = None
 
     def init_deep_research_agent(self) -> None:
         """
         init deep research agent
         """
-        self.dr_agent: Optional[DeepResearchAgent] = None
+        self.dr_agent: DeepResearchAgent | None = None
         self.dr_current_task = None
-        self.dr_agent_task_id: Optional[str] = None
-        self.dr_save_dir: Optional[str] = None
+        self.dr_agent_task_id: str | None = None
+        self.dr_save_dir: str | None = None
 
     def init_document_editor(self) -> None:
         """
         init document editor
         """
         from .tabs.document_editor_tab import DocumentEditorManager
-        self.de_manager: Optional[DocumentEditorManager] = DocumentEditorManager()
-        self.de_current_file: Optional[str] = None
-        self.de_recent_files: List[str] = []
 
-    def add_components(self, tab_name: str, components_dict: dict[str, "Component"]) -> None:
+        self.de_manager: DocumentEditorManager | None = DocumentEditorManager()
+        self.de_current_file: str | None = None
+        self.de_recent_files: list[str] = []
+
+    def add_components(
+        self, tab_name: str, components_dict: dict[str, "Component"]
+    ) -> None:
         """
         Add tab components
         """
@@ -96,19 +95,24 @@ class WebuiManager:
         """
         return self.component_to_id[comp]
 
-    def save_config(self, components: Dict["Component", str]) -> None:
+    def save_config(self, components: dict["Component", str]) -> None:
         """
         Save config
         """
         cur_settings = {}
         for comp in components:
-            if not isinstance(comp, gr.Button) and not isinstance(comp, gr.File) and str(
-                    getattr(comp, "interactive", True)).lower() != "false":
+            if (
+                not isinstance(comp, gr.Button)
+                and not isinstance(comp, gr.File)
+                and str(getattr(comp, "interactive", True)).lower() != "false"
+            ):
                 comp_id = self.get_id_by_component(comp)
                 cur_settings[comp_id] = components[comp]
 
         config_name = datetime.now().strftime("%Y%m%d-%H%M%S")
-        with open(os.path.join(self.settings_save_dir, f"{config_name}.json"), "w") as fw:
+        with open(
+            os.path.join(self.settings_save_dir, f"{config_name}.json"), "w"
+        ) as fw:
             json.dump(cur_settings, fw, indent=4)
 
         return os.path.join(self.settings_save_dir, f"{config_name}.json")
@@ -117,7 +121,7 @@ class WebuiManager:
         """
         Load config
         """
-        with open(config_path, "r") as fr:
+        with open(config_path) as fr:
             ui_settings = json.load(fr)
 
         update_components = {}
@@ -125,7 +129,9 @@ class WebuiManager:
             if comp_id in self.id_to_component:
                 comp = self.id_to_component[comp_id]
                 if comp.__class__.__name__ == "Chatbot":
-                    update_components[comp] = comp.__class__(value=comp_val, type="messages")
+                    update_components[comp] = comp.__class__(
+                        value=comp_val, type="messages"
+                    )
                 else:
                     update_components[comp] = comp.__class__(value=comp_val)
                     if comp_id == "agent_settings.planner_llm_provider":
@@ -135,7 +141,9 @@ class WebuiManager:
         config_status = self.id_to_component["load_save_config.config_status"]
         update_components.update(
             {
-                config_status: config_status.__class__(value=f"Successfully loaded config: {config_path}")
+                config_status: config_status.__class__(
+                    value=f"Successfully loaded config: {config_path}"
+                )
             }
         )
         yield update_components
@@ -180,7 +188,7 @@ class WebuiManager:
             logger.error(f"Failed to load MCP config from database: {e}")
             return False
 
-    async def setup_mcp_client(self, mcp_server_config: Optional[Dict] = None) -> bool:
+    async def setup_mcp_client(self, mcp_server_config: dict | None = None) -> bool:
         """
         Setup MCP client with provided configuration or load from database.
 
@@ -198,8 +206,7 @@ class WebuiManager:
             if mcp_server_config:
                 # Apply provided configuration
                 success = await self.mcp_service.apply_configuration(
-                    config_data=mcp_server_config,
-                    config_name="ui_provided_config"
+                    config_data=mcp_server_config, config_name="ui_provided_config"
                 )
             else:
                 # Load from database
@@ -216,7 +223,7 @@ class WebuiManager:
             logger.error(f"Error setting up MCP client: {e}")
             return False
 
-    async def get_mcp_service_status(self) -> Dict:
+    async def get_mcp_service_status(self) -> dict:
         """Get current MCP service status."""
         try:
             if not self.mcp_service:
@@ -228,7 +235,7 @@ class WebuiManager:
             logger.error(f"Error getting MCP service status: {e}")
             return {"error": str(e), "is_running": False}
 
-    async def list_mcp_configurations(self) -> List[Dict]:
+    async def list_mcp_configurations(self) -> list[dict]:
         """List all available MCP configurations."""
         try:
             if not self.mcp_service:
@@ -240,7 +247,7 @@ class WebuiManager:
             logger.error(f"Error listing MCP configurations: {e}")
             return []
 
-    async def switch_mcp_configuration(self, config_id: str) -> Tuple[bool, str]:
+    async def switch_mcp_configuration(self, config_id: str) -> tuple[bool, str]:
         """Switch to a different MCP configuration."""
         try:
             if not self.mcp_service:
@@ -251,5 +258,3 @@ class WebuiManager:
         except Exception as e:
             logger.error(f"Error switching MCP configuration: {e}")
             return False, f"Error switching configuration: {str(e)}"
-
-

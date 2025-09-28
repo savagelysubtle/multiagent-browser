@@ -8,7 +8,6 @@ and automatic reconnection support for the React frontend.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from fastapi import WebSocket
 
@@ -20,13 +19,13 @@ class ConnectionManager:
 
     def __init__(self):
         # Map user_id to WebSocket connection
-        self.active_connections: Dict[str, WebSocket] = {}
+        self.active_connections: dict[str, WebSocket] = {}
         # Track connection health
-        self.connection_health: Dict[str, Dict] = {}
+        self.connection_health: dict[str, dict] = {}
         # Message queue for offline users
-        self.message_queue: Dict[str, List[Dict]] = {}
+        self.message_queue: dict[str, list[dict]] = {}
         # Background tasks for heartbeat monitoring
-        self.heartbeat_tasks: Dict[str, asyncio.Task] = {}
+        self.heartbeat_tasks: dict[str, asyncio.Task] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str):
         """Connect a user with automatic reconnection support."""
@@ -86,7 +85,7 @@ class ConnectionManager:
 
         logger.info(f"User {user_id} disconnected from WebSocket")
 
-    async def send_message(self, user_id: str, message: Dict) -> bool:
+    async def send_message(self, user_id: str, message: dict) -> bool:
         """
         Send message to specific user with queueing for offline users.
 
@@ -108,7 +107,7 @@ class ConnectionManager:
         return False
 
     async def broadcast_message(
-        self, message: Dict, exclude_users: Optional[List[str]] = None
+        self, message: dict, exclude_users: list[str] | None = None
     ):
         """Broadcast message to all connected users."""
         exclude_users = exclude_users or []
@@ -145,7 +144,7 @@ class ConnectionManager:
         }
         await self.send_message(user_id, message)
 
-    async def handle_user_message(self, user_id: str, message: Dict):
+    async def handle_user_message(self, user_id: str, message: dict):
         """Handle incoming message from user."""
         message_type = message.get("type", "unknown")
 
@@ -162,7 +161,7 @@ class ConnectionManager:
             # Handle other message types
             logger.info(f"Received message from {user_id}: {message_type}")
 
-    async def _queue_message(self, user_id: str, message: Dict):
+    async def _queue_message(self, user_id: str, message: dict):
         """Queue message for offline user."""
         if user_id not in self.message_queue:
             self.message_queue[user_id] = []
@@ -256,7 +255,7 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Heartbeat monitor error for {user_id}: {e}")
 
-    def get_connection_stats(self) -> Dict:
+    def get_connection_stats(self) -> dict:
         """Get connection statistics for monitoring."""
         active_count = len(self.active_connections)
         queued_messages = sum(len(queue) for queue in self.message_queue.values())

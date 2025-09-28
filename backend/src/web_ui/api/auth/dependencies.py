@@ -4,8 +4,9 @@ Authentication dependencies for FastAPI routes.
 Provides dependency injection for user authentication and authorization.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -15,17 +16,24 @@ from .auth_service import User, auth_service
 logger = logging.getLogger(__name__)
 
 # Security configuration
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)  # Don't auto-error on missing tokens
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> User:
     """
     Get the current authenticated user from JWT token.
 
     This dependency can be used in FastAPI routes to require authentication.
     """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
         token = credentials.credentials
         user_id = auth_service.verify_token(token)
@@ -79,8 +87,8 @@ async def get_current_active_user(
 
 
 async def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-) -> Optional[User]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> User | None:
     """
     Get the current user if authenticated, otherwise return None.
 

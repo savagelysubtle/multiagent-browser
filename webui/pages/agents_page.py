@@ -1,7 +1,8 @@
 import gradio as gr
-from ..webui_manager import WebuiManager
+
 from ..tabs.browser_use_agent_tab import create_browser_use_agent_tab
 from ..tabs.deep_research_agent_tab import create_deep_research_agent_tab
+from ..webui_manager import WebuiManager
 
 
 def create_agents_page(webui_manager: WebuiManager):

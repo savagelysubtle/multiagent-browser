@@ -5,11 +5,13 @@ This service provides JWT-based authentication with user management
 and ChromaDB integration for persistent user state.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any
 from uuid import uuid4
 
 from fastapi.security import HTTPBearer
@@ -21,8 +23,9 @@ from ...database import ChromaManager, DocumentModel
 
 logger = logging.getLogger(__name__)
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing - use pbkdf2_sha256 for compatibility
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+logger.info("Using pbkdf2_sha256 for password hashing (bcrypt compatibility issues)")
 
 # Security configuration
 security = HTTPBearer()
@@ -33,11 +36,11 @@ class User(BaseModel):
 
     id: str
     email: str
-    name: Optional[str] = None
-    picture: Optional[str] = None
+    name: str | None = None
+    picture: str | None = None
     is_active: bool = True
     created_at: datetime
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat()}
@@ -112,10 +115,14 @@ class AuthService:
 
     def get_password_hash(self, password: str) -> str:
         """Hash a password for storage."""
+        # Ensure password is not too long for bcrypt (72 byte limit)
+        if len(password.encode("utf-8")) > 72:
+            logger.warning("Password truncated to 72 bytes for bcrypt compatibility")
+            password = password[:72]
         return pwd_context.hash(password)
 
     def create_access_token(
-        self, user_id: str, expires_delta: Optional[timedelta] = None
+        self, user_id: str, expires_delta: timedelta | None = None
     ) -> str:
         """Create a JWT access token for a user."""
         if expires_delta:
@@ -134,7 +141,7 @@ class AuthService:
 
         return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
 
-    def verify_token(self, token: str) -> Optional[str]:
+    def verify_token(self, token: str) -> str | None:
         """Verify a JWT token and return the user ID."""
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
@@ -149,7 +156,7 @@ class AuthService:
             logger.warning(f"JWT verification failed: {e}")
             return None
 
-    async def get_user_by_id(self, user_id: str) -> Optional[User]:
+    async def get_user_by_id(self, user_id: str) -> User | None:
         """Get a user by their ID from ChromaDB."""
         try:
             document = self.chroma_manager.get_document("users", user_id)
@@ -178,7 +185,7 @@ class AuthService:
             logger.error(f"Error getting user by ID {user_id}: {e}")
             return None
 
-    async def get_user_by_email(self, email: str) -> Optional[User]:
+    async def get_user_by_email(self, email: str) -> User | None:
         """Get a user by their email from ChromaDB."""
         try:
             from ...database.models import QueryRequest
@@ -220,9 +227,9 @@ class AuthService:
     async def create_user(
         self,
         email: str,
-        name: Optional[str] = None,
-        picture: Optional[str] = None,
-        password: Optional[str] = None,
+        name: str | None = None,
+        picture: str | None = None,
+        password: str | None = None,
     ) -> User:
         """Create a new user in ChromaDB."""
         try:
@@ -278,7 +285,7 @@ class AuthService:
             raise
 
     async def create_or_update_user(
-        self, email: str, name: Optional[str] = None, picture: Optional[str] = None
+        self, email: str, name: str | None = None, picture: str | None = None
     ) -> User:
         """Create or update a user (used for Google SSO)."""
         try:
@@ -328,7 +335,7 @@ class AuthService:
             logger.error(f"Error creating/updating user {email}: {e}")
             raise
 
-    async def authenticate_user(self, email: str, password: str) -> Optional[User]:
+    async def authenticate_user(self, email: str, password: str) -> User | None:
         """Authenticate a user with email and password."""
         try:
             user = await self.get_user_by_email(email)
@@ -402,7 +409,43 @@ class AuthService:
             logger.error(f"Error updating last login for user {user_id}: {e}")
             return False
 
-    def get_user_stats(self) -> Dict[str, Any]:
+    async def delete_user(self, user_id: str) -> bool:
+        """Delete a user from the database."""
+        try:
+            # First check if user exists
+            user = await self.get_user_by_id(user_id)
+            if not user:
+                logger.warning(f"Attempted to delete non-existent user: {user_id}")
+                return False
+
+            # Delete user document from ChromaDB
+            success = self.chroma_manager.delete_document("users", user_id)
+            if success:
+                logger.info(f"Deleted user: {user.email} (ID: {user_id})")
+            else:
+                logger.error(f"Failed to delete user: {user_id}")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Error deleting user {user_id}: {e}")
+            return False
+
+    async def delete_user_by_email(self, email: str) -> bool:
+        """Delete a user by their email address."""
+        try:
+            user = await self.get_user_by_email(email)
+            if not user:
+                logger.warning(f"Attempted to delete non-existent user: {email}")
+                return False
+
+            return await self.delete_user(user.id)
+
+        except Exception as e:
+            logger.error(f"Error deleting user by email {email}: {e}")
+            return False
+
+    def get_user_stats(self) -> dict[str, Any]:
         """Get user statistics."""
         try:
             stats = self.chroma_manager.get_collection_stats("users")

@@ -8,7 +8,7 @@ compatibility with the existing agent orchestrator.
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +37,9 @@ class A2AMessage:
         message_type: A2AMessageType,
         sender_id: str,
         receiver_id: str,
-        payload: Dict[str, Any],
-        conversation_id: Optional[str] = None,
-        message_id: Optional[str] = None,
+        payload: dict[str, Any],
+        conversation_id: str | None = None,
+        message_id: str | None = None,
     ):
         self.message_type = message_type
         self.sender_id = sender_id
@@ -49,7 +49,7 @@ class A2AMessage:
         self.message_id = message_id or f"msg_{datetime.utcnow().timestamp()}"
         self.timestamp = datetime.utcnow()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert message to dictionary format."""
         return {
             "message_id": self.message_id,
@@ -62,7 +62,7 @@ class A2AMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "A2AMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "A2AMessage":
         """Create message from dictionary."""
         message = cls(
             message_type=A2AMessageType(data["message_type"]),
@@ -95,11 +95,11 @@ class GoogleA2AInterface:
         """
         self.orchestrator = orchestrator
         self.agent_id = "web-ui-orchestrator"
-        self.registered_agents: Dict[str, Dict[str, Any]] = {}
-        self.conversation_history: Dict[str, List[A2AMessage]] = {}
+        self.registered_agents: dict[str, dict[str, Any]] = {}
+        self.conversation_history: dict[str, list[A2AMessage]] = {}
         self.enabled = False  # Disabled by default until Google A2A is available
 
-    def register_local_agent(self, agent_id: str, capabilities: Dict[str, Any]):
+    def register_local_agent(self, agent_id: str, capabilities: dict[str, Any]):
         """
         Register a local agent for A2A communication.
 
@@ -145,9 +145,7 @@ class GoogleA2AInterface:
             logger.error(f"Failed to send A2A message: {e}")
             return False
 
-    async def receive_message(
-        self, message_data: Dict[str, Any]
-    ) -> Optional[A2AMessage]:
+    async def receive_message(self, message_data: dict[str, Any]) -> A2AMessage | None:
         """
         Receive and process an A2A message.
 
@@ -310,7 +308,7 @@ class GoogleA2AInterface:
         )
         return True
 
-    def get_conversation_history(self, conversation_id: str) -> List[A2AMessage]:
+    def get_conversation_history(self, conversation_id: str) -> list[A2AMessage]:
         """
         Get conversation history for a specific conversation.
 
@@ -322,7 +320,7 @@ class GoogleA2AInterface:
         """
         return self.conversation_history.get(conversation_id, [])
 
-    def get_agent_capabilities(self) -> Dict[str, Any]:
+    def get_agent_capabilities(self) -> dict[str, Any]:
         """
         Get capabilities of this A2A interface.
 
@@ -355,7 +353,7 @@ class GoogleA2AInterface:
 
 
 # Global A2A interface instance
-a2a_interface: Optional[GoogleA2AInterface] = None
+a2a_interface: GoogleA2AInterface | None = None
 
 
 def initialize_a2a_interface(orchestrator):

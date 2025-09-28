@@ -2,11 +2,6 @@ import base64
 import os
 import time
 from pathlib import Path
-from typing import Dict, Optional
-import requests
-import json
-import gradio as gr
-import uuid
 
 
 def encode_image(img_path):
@@ -17,9 +12,11 @@ def encode_image(img_path):
     return image_data
 
 
-def get_latest_files(directory: str, file_types: list = ['.webm', '.zip']) -> Dict[str, Optional[str]]:
+def get_latest_files(
+    directory: str, file_types: list = [".webm", ".zip"]
+) -> dict[str, str | None]:
     """Get the latest recording and trace files"""
-    latest_files: Dict[str, Optional[str]] = {ext: None for ext in file_types}
+    latest_files: dict[str, str | None] = {ext: None for ext in file_types}
 
     if not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)

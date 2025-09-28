@@ -5,11 +5,12 @@ Provides comprehensive error handling with custom exception classes,
 global error middleware, and circuit breaker patterns for resilient operation.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import traceback
 from datetime import datetime
-from typing import Optional
 
 from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
@@ -27,7 +28,7 @@ class AppException(Exception):
         message: str,
         code: str = "APP_ERROR",
         status_code: int = 500,
-        details: Optional[dict] = None,
+        details: dict | None = None,
     ):
         self.message = message
         self.code = code
@@ -43,7 +44,7 @@ class AgentException(AppException):
         self,
         message: str,
         agent_name: str,
-        action: Optional[str] = None,
+        action: str | None = None,
         code: str = "AGENT_ERROR",
     ):
         self.agent_name = agent_name
@@ -58,7 +59,7 @@ class ValidationException(AppException):
     """Input validation exceptions with field-level detail."""
 
     def __init__(
-        self, message: str, field: Optional[str] = None, value: Optional[str] = None
+        self, message: str, field: str | None = None, value: str | None = None
     ):
         self.field = field
         self.value = value
@@ -93,7 +94,7 @@ class WebSocketException(AppException):
     """WebSocket-specific exceptions."""
 
     def __init__(
-        self, message: str, user_id: Optional[str] = None, code: str = "WEBSOCKET_ERROR"
+        self, message: str, user_id: str | None = None, code: str = "WEBSOCKET_ERROR"
     ):
         details = {}
         if user_id:
@@ -312,7 +313,7 @@ def with_circuit_breaker(circuit_breaker: CircuitBreaker):
 
 # Utility functions for error reporting
 def create_error_response(
-    code: str, message: str, status_code: int = 500, details: Optional[dict] = None
+    code: str, message: str, status_code: int = 500, details: dict | None = None
 ) -> JSONResponse:
     """Create a standardized error response."""
     return JSONResponse(

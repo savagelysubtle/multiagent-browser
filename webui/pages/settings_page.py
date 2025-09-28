@@ -1,6 +1,7 @@
 import gradio as gr
-from ..webui_manager import WebuiManager
+
 from ..tabs.settings_tab import create_settings_tab
+from ..webui_manager import WebuiManager
 
 
 def create_settings_page(webui_manager: WebuiManager):

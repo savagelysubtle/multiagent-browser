@@ -1,49 +1,47 @@
-import asyncio
-import json
 import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, Optional, List
-import mimetypes
+from typing import Any
 
 import gradio as gr
 from gradio.components import Component
 
-from ..webui_manager import WebuiManager
+from ...database import DatabaseUtils, DocumentPipeline
 from ...utils import llm_provider
-from ...database import DocumentPipeline, DatabaseUtils
+from ..webui_manager import WebuiManager
 
 logger = logging.getLogger(__name__)
 
 # Supported file formats
 SUPPORTED_FORMATS = {
-    '.txt': 'text',
-    '.md': 'markdown',
-    '.py': 'python',
-    '.js': 'javascript',
-    '.html': 'html',
-    '.css': 'css',
-    '.json': 'json',
-    '.xml': 'xml',
-    '.yaml': 'yaml',
-    '.yml': 'yaml',
-    '.sql': 'sql',
-    '.sh': 'shell',
-    '.bat': 'batch',
-    '.ps1': 'powershell'
+    ".txt": "text",
+    ".md": "markdown",
+    ".py": "python",
+    ".js": "javascript",
+    ".html": "html",
+    ".css": "css",
+    ".json": "json",
+    ".xml": "xml",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".sql": "sql",
+    ".sh": "shell",
+    ".bat": "batch",
+    ".ps1": "powershell",
 }
+
 
 class DocumentEditorManager:
     """Manages document editing operations and state."""
 
     def __init__(self):
-        self.current_file_path: Optional[str] = None
+        self.current_file_path: str | None = None
         self.current_content: str = ""
         self.working_directory: str = "./tmp/documents"
         self.auto_save_enabled: bool = True
         self.backup_directory: str = "./tmp/document_backups"
-        self.recent_files: List[str] = []
+        self.recent_files: list[str] = []
         self.max_recent_files: int = 10
 
         # Database integration
@@ -52,11 +50,11 @@ class DocumentEditorManager:
         self.auto_store_to_db: bool = True
 
         # Chat integration
-        self.chat_history: List[Dict[str, str]] = []
+        self.chat_history: list[dict[str, str]] = []
         self.chat_enabled: bool = True
         self.max_chat_history: int = 50
 
-                # Create directories
+        # Create directories
         os.makedirs(self.working_directory, exist_ok=True)
         os.makedirs(self.backup_directory, exist_ok=True)
 
@@ -137,14 +135,14 @@ if __name__ == "__main__":
         examples = [
             ("sample.md", sample_md),
             ("sample.py", sample_py),
-            ("sample.json", sample_json)
+            ("sample.json", sample_json),
         ]
 
         for filename, content in examples:
             file_path = os.path.join(examples_dir, filename)
             if not os.path.exists(file_path):
                 try:
-                    with open(file_path, 'w', encoding='utf-8') as f:
+                    with open(file_path, "w", encoding="utf-8") as f:
                         f.write(content)
                     logger.info(f"Created example file: {file_path}")
                 except Exception as e:
@@ -153,7 +151,7 @@ if __name__ == "__main__":
     def get_file_language(self, file_path: str) -> str:
         """Get language for syntax highlighting based on file extension."""
         ext = Path(file_path).suffix.lower()
-        return SUPPORTED_FORMATS.get(ext, 'text')
+        return SUPPORTED_FORMATS.get(ext, "text")
 
     def is_supported_format(self, file_path: str) -> bool:
         """Check if file format is supported."""
@@ -175,12 +173,12 @@ if __name__ == "__main__":
                     os.path.abspath("./"),
                     os.path.abspath("./src"),
                     os.path.abspath("./docs"),
-                    os.path.abspath("./examples")
+                    os.path.abspath("./examples"),
                 ]
                 if not any(abs_file_path.startswith(d) for d in allowed_dirs):
                     raise PermissionError(f"Access denied: {file_path}")
 
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             language = self.get_file_language(file_path)
@@ -194,14 +192,18 @@ if __name__ == "__main__":
             logger.error(f"Error reading file {file_path}: {e}")
             raise e
 
-    def save_file(self, file_path: str, content: str, create_backup: bool = True) -> bool:
+    def save_file(
+        self, file_path: str, content: str, create_backup: bool = True
+    ) -> bool:
         """Save content to file with optional backup and database storage."""
         try:
             # Security check
             abs_file_path = os.path.abspath(file_path)
             abs_working_dir = os.path.abspath(self.working_directory)
             if not abs_file_path.startswith(abs_working_dir):
-                raise PermissionError(f"Can only save to working directory: {file_path}")
+                raise PermissionError(
+                    f"Can only save to working directory: {file_path}"
+                )
 
             # Create backup if file exists and backup is enabled
             if create_backup and os.path.exists(file_path):
@@ -210,7 +212,7 @@ if __name__ == "__main__":
             # Ensure directory exists
             os.makedirs(os.path.dirname(abs_file_path), exist_ok=True)
 
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
             self.current_file_path = file_path
@@ -220,14 +222,16 @@ if __name__ == "__main__":
             # Store in database if enabled
             if self.auto_store_to_db:
                 try:
-                    success, message, doc_model = self.document_pipeline.process_document_from_editor(
-                        content=content,
-                        file_path=file_path,
-                        document_type=self.get_file_language(file_path),
-                        metadata={
-                            "saved_from_editor": True,
-                            "working_directory": self.working_directory
-                        }
+                    success, message, doc_model = (
+                        self.document_pipeline.process_document_from_editor(
+                            content=content,
+                            file_path=file_path,
+                            document_type=self.get_file_language(file_path),
+                            metadata={
+                                "saved_from_editor": True,
+                                "working_directory": self.working_directory,
+                            },
+                        )
                     )
                     if success:
                         logger.info(f"Document stored in database: {message}")
@@ -247,13 +251,14 @@ if __name__ == "__main__":
         """Create a backup of the file."""
         try:
             import datetime
+
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = os.path.basename(file_path)
             backup_name = f"{filename}.{timestamp}.bak"
             backup_path = os.path.join(self.backup_directory, backup_name)
 
-            with open(file_path, 'r', encoding='utf-8') as src:
-                with open(backup_path, 'w', encoding='utf-8') as dst:
+            with open(file_path, encoding="utf-8") as src:
+                with open(backup_path, "w", encoding="utf-8") as dst:
                     dst.write(src.read())
 
             logger.info(f"Backup created: {backup_path}")
@@ -268,9 +273,9 @@ if __name__ == "__main__":
         if file_path in self.recent_files:
             self.recent_files.remove(file_path)
         self.recent_files.insert(0, file_path)
-        self.recent_files = self.recent_files[:self.max_recent_files]
+        self.recent_files = self.recent_files[: self.max_recent_files]
 
-    def list_files(self, directory: str = None) -> List[str]:
+    def list_files(self, directory: str = None) -> list[str]:
         """List files in directory."""
         if directory is None:
             directory = self.working_directory
@@ -288,14 +293,14 @@ if __name__ == "__main__":
             logger.error(f"Error listing files in {directory}: {e}")
             return []
 
-    def search_related_documents(self, query: str, limit: int = 5) -> Dict[str, List]:
+    def search_related_documents(self, query: str, limit: int = 5) -> dict[str, list]:
         """Search for related documents in the database."""
         try:
             results = self.document_pipeline.search_documents(
                 query=query,
                 collection_type="documents",
                 include_relations=True,
-                limit=limit
+                limit=limit,
             )
 
             return {
@@ -304,7 +309,7 @@ if __name__ == "__main__":
                         "id": result.id,
                         "content_preview": result.content[:200] + "...",
                         "metadata": result.metadata,
-                        "relevance_score": result.relevance_score
+                        "relevance_score": result.relevance_score,
                     }
                     for result in results
                 ]
@@ -313,12 +318,13 @@ if __name__ == "__main__":
             logger.error(f"Error searching related documents: {e}")
             return {"documents": []}
 
-    def get_document_suggestions(self, content: str, document_type: str = "document") -> Dict[str, Any]:
+    def get_document_suggestions(
+        self, content: str, document_type: str = "document"
+    ) -> dict[str, Any]:
         """Get suggestions for policies, templates, and related documents."""
         try:
             suggestions = self.document_pipeline.get_document_suggestions(
-                content=content,
-                document_type=document_type
+                content=content, document_type=document_type
             )
 
             # Format suggestions for UI display
@@ -327,10 +333,12 @@ if __name__ == "__main__":
                 formatted_suggestions[category] = [
                     {
                         "id": result.id,
-                        "title": result.metadata.get("title", result.metadata.get("filename", "Untitled")),
+                        "title": result.metadata.get(
+                            "title", result.metadata.get("filename", "Untitled")
+                        ),
                         "content_preview": result.content[:150] + "...",
                         "relevance_score": result.relevance_score,
-                        "metadata": result.metadata
+                        "metadata": result.metadata,
                     }
                     for result in results
                 ]
@@ -340,7 +348,9 @@ if __name__ == "__main__":
             logger.error(f"Error getting document suggestions: {e}")
             return {}
 
-    def store_policy_manual(self, title: str, content: str, policy_type: str = "manual") -> bool:
+    def store_policy_manual(
+        self, title: str, content: str, policy_type: str = "manual"
+    ) -> bool:
         """Store a policy manual in the database."""
         try:
             success, message = self.document_pipeline.store_policy_manual(
@@ -348,7 +358,7 @@ if __name__ == "__main__":
                 content=content,
                 policy_type=policy_type,
                 authority_level="high",
-                metadata={"source": "document_editor"}
+                metadata={"source": "document_editor"},
             )
             if success:
                 logger.info(f"Policy manual stored: {message}")
@@ -359,7 +369,7 @@ if __name__ == "__main__":
             logger.error(f"Error storing policy manual: {e}")
             return False
 
-    def get_database_stats(self) -> Dict[str, Any]:
+    def get_database_stats(self) -> dict[str, Any]:
         """Get database statistics."""
         try:
             return self.document_pipeline.get_collection_stats()
@@ -369,20 +379,19 @@ if __name__ == "__main__":
 
     def add_chat_message(self, role: str, content: str):
         """Add a message to chat history."""
-        self.chat_history.append({
-            "role": role,
-            "content": content
-        })
+        self.chat_history.append({"role": role, "content": content})
 
         # Maintain max history limit
         if len(self.chat_history) > self.max_chat_history:
-            self.chat_history = self.chat_history[-self.max_chat_history:]
+            self.chat_history = self.chat_history[-self.max_chat_history :]
 
     def clear_chat_history(self):
         """Clear the chat history."""
         self.chat_history.clear()
 
-    async def process_chat_message(self, message: str, current_content: str, current_file: str, webui_manager) -> str:
+    async def process_chat_message(
+        self, message: str, current_content: str, current_file: str, webui_manager
+    ) -> str:
         """Process a chat message and return AI response."""
         try:
             # Add user message to history
@@ -419,13 +428,21 @@ if __name__ == "__main__":
                         temperature=llm_temperature,
                         base_url=llm_base_url or None,
                         api_key=llm_api_key or None,
-                        num_ctx=ollama_num_ctx if llm_provider_name == "ollama" else None,
+                        num_ctx=ollama_num_ctx
+                        if llm_provider_name == "ollama"
+                        else None,
                     )
 
                     # Get file context
-                    language = self.get_file_language(current_file) if current_file else 'text'
+                    language = (
+                        self.get_file_language(current_file) if current_file else "text"
+                    )
                     file_context = f"Current file: {current_file if current_file else 'Untitled'} ({language})"
-                    content_preview = current_content[:500] + "..." if len(current_content) > 500 else current_content
+                    content_preview = (
+                        current_content[:500] + "..."
+                        if len(current_content) > 500
+                        else current_content
+                    )
 
                     # Create system prompt for document chat
                     system_prompt = f"""You are a helpful AI assistant integrated with a document editor.
@@ -449,14 +466,18 @@ Provide helpful, contextual responses. If suggesting edits, be specific about wh
                     conversation = [{"role": "system", "content": system_prompt}]
 
                     # Add recent chat history for context (last 6 messages)
-                    recent_history = self.chat_history[-6:] if len(self.chat_history) > 6 else self.chat_history
+                    recent_history = (
+                        self.chat_history[-6:]
+                        if len(self.chat_history) > 6
+                        else self.chat_history
+                    )
                     for msg in recent_history:
                         if msg["role"] in ["user", "assistant"]:
                             conversation.append(msg)
 
                     # Get response from LLM
                     response = llm.invoke(conversation)
-                    if hasattr(response, 'content'):
+                    if hasattr(response, "content"):
                         ai_response = response.content.strip()
                     else:
                         ai_response = str(response).strip()
@@ -482,6 +503,7 @@ Provide helpful, contextual responses. If suggesting edits, be specific about wh
             self.add_chat_message("assistant", error_response)
             return error_response
 
+
 async def handle_file_open(webui_manager: WebuiManager, file_path: str):
     """Handle opening a file."""
     if not webui_manager.de_manager:
@@ -491,18 +513,21 @@ async def handle_file_open(webui_manager: WebuiManager, file_path: str):
         content, language = webui_manager.de_manager.read_file(file_path)
 
         editor_comp = webui_manager.get_component_by_id("document_editor.editor")
-        file_path_comp = webui_manager.get_component_by_id("document_editor.current_file_path")
+        file_path_comp = webui_manager.get_component_by_id(
+            "document_editor.current_file_path"
+        )
         status_comp = webui_manager.get_component_by_id("document_editor.status")
 
         return {
             editor_comp: gr.Code(value=content, language=language, interactive=True),
             file_path_comp: gr.Textbox(value=file_path),
-            status_comp: gr.Textbox(value=f"Opened: {file_path}")
+            status_comp: gr.Textbox(value=f"Opened: {file_path}"),
         }, f"File opened: {file_path}"
 
     except Exception as e:
         logger.error(f"Error opening file {file_path}: {e}")
         return {}, f"Error opening file: {str(e)}"
+
 
 async def handle_file_save(webui_manager: WebuiManager, content: str, file_path: str):
     """Handle saving a file."""
@@ -528,6 +553,7 @@ async def handle_file_save(webui_manager: WebuiManager, content: str, file_path:
     except Exception as e:
         logger.error(f"Error saving file {file_path}: {e}")
         return {}, f"Error saving file: {str(e)}"
+
 
 async def handle_new_file(webui_manager: WebuiManager, filename: str, file_type: str):
     """Handle creating a new file."""
@@ -578,13 +604,17 @@ async def handle_new_file(webui_manager: WebuiManager, filename: str, file_type:
             content, language = webui_manager.de_manager.read_file(file_path)
 
             editor_comp = webui_manager.get_component_by_id("document_editor.editor")
-            file_path_comp = webui_manager.get_component_by_id("document_editor.current_file_path")
+            file_path_comp = webui_manager.get_component_by_id(
+                "document_editor.current_file_path"
+            )
             status_comp = webui_manager.get_component_by_id("document_editor.status")
 
             return {
-                editor_comp: gr.Code(value=content, language=language, interactive=True),
+                editor_comp: gr.Code(
+                    value=content, language=language, interactive=True
+                ),
                 file_path_comp: gr.Textbox(value=file_path),
-                status_comp: gr.Textbox(value=f"Created: {filename}")
+                status_comp: gr.Textbox(value=f"Created: {filename}"),
             }, f"File created: {filename}"
         else:
             return {}, f"Error creating file: {filename}"
@@ -593,17 +623,24 @@ async def handle_new_file(webui_manager: WebuiManager, filename: str, file_type:
         logger.error(f"Error creating file {filename}: {e}")
         return {}, f"Error creating file: {str(e)}"
 
-async def handle_agent_edit(webui_manager: WebuiManager, components: Dict[Component, Any]):
+
+async def handle_agent_edit(
+    webui_manager: WebuiManager, components: dict[Component, Any]
+):
     """Handle agent-assisted editing."""
     try:
         # Get current content and file
         editor_comp = webui_manager.get_component_by_id("document_editor.editor")
         current_content = components.get(editor_comp, "")
 
-        file_path_comp = webui_manager.get_component_by_id("document_editor.current_file_path")
+        file_path_comp = webui_manager.get_component_by_id(
+            "document_editor.current_file_path"
+        )
         current_file = components.get(file_path_comp, "")
 
-        agent_instruction_comp = webui_manager.get_component_by_id("document_editor.agent_instruction")
+        agent_instruction_comp = webui_manager.get_component_by_id(
+            "document_editor.agent_instruction"
+        )
         instruction = components.get(agent_instruction_comp, "").strip()
 
         if not instruction:
@@ -648,13 +685,17 @@ async def handle_agent_edit(webui_manager: WebuiManager, components: Dict[Compon
                 )
 
                 # Get file language for context
-                language = webui_manager.de_manager.get_file_language(current_file) if current_file else 'text'
+                language = (
+                    webui_manager.de_manager.get_file_language(current_file)
+                    if current_file
+                    else "text"
+                )
 
                 # Create system prompt for document editing
                 system_prompt = f"""You are a helpful assistant specialized in editing documents.
 
 Current document type: {language}
-File: {current_file if current_file else 'Untitled'}
+File: {current_file if current_file else "Untitled"}
 
 Instructions:
 1. Follow the user's editing instruction precisely
@@ -673,23 +714,29 @@ Provide the edited content:"""
 
                 # Get response from LLM
                 response = llm.invoke(system_prompt)
-                if hasattr(response, 'content'):
+                if hasattr(response, "content"):
                     new_content = response.content.strip()
                 else:
                     new_content = str(response).strip()
 
                 # Clean up the response (remove any markdown code blocks if present)
-                if new_content.startswith('```'):
-                    lines = new_content.split('\n')
+                if new_content.startswith("```"):
+                    lines = new_content.split("\n")
                     if len(lines) > 2:
-                        new_content = '\n'.join(lines[1:-1])
+                        new_content = "\n".join(lines[1:-1])
 
-                status_comp = webui_manager.get_component_by_id("document_editor.status")
+                status_comp = webui_manager.get_component_by_id(
+                    "document_editor.status"
+                )
 
                 return {
-                    editor_comp: gr.Code(value=new_content, language=language, interactive=True),
+                    editor_comp: gr.Code(
+                        value=new_content, language=language, interactive=True
+                    ),
                     agent_instruction_comp: gr.Textbox(value=""),
-                    status_comp: gr.Textbox(value=f"Agent edit applied using {llm_model_name}")
+                    status_comp: gr.Textbox(
+                        value=f"Agent edit applied using {llm_model_name}"
+                    ),
                 }, f"Agent edit applied using {llm_model_name}"
 
             except Exception as e:
@@ -698,35 +745,46 @@ Provide the edited content:"""
                 pass
 
         # Fallback: Simple demonstration - add instruction as comment
-        language = webui_manager.de_manager.get_file_language(current_file) if current_file else 'text'
+        language = (
+            webui_manager.de_manager.get_file_language(current_file)
+            if current_file
+            else "text"
+        )
 
-        if language == 'python':
+        if language == "python":
             comment_prefix = "#"
-        elif language in ['javascript', 'css', 'java']:
+        elif language in ["javascript", "css", "java"]:
             comment_prefix = "//"
-        elif language == 'html':
+        elif language == "html":
             comment_prefix = "<!--"
             comment_suffix = "-->"
         else:
             comment_prefix = "#"
 
         # Simple demonstration - add instruction as comment
-        if language == 'html':
-            new_content = f"{current_content}\n\n<!-- Agent instruction: {instruction} -->"
+        if language == "html":
+            new_content = (
+                f"{current_content}\n\n<!-- Agent instruction: {instruction} -->"
+            )
         else:
             new_content = f"{current_content}\n\n{comment_prefix} Agent instruction: {instruction}"
 
         status_comp = webui_manager.get_component_by_id("document_editor.status")
 
         return {
-            editor_comp: gr.Code(value=new_content, language=language, interactive=True),
+            editor_comp: gr.Code(
+                value=new_content, language=language, interactive=True
+            ),
             agent_instruction_comp: gr.Textbox(value=""),
-            status_comp: gr.Textbox(value="Agent edit applied (demo - configure LLM in settings)")
+            status_comp: gr.Textbox(
+                value="Agent edit applied (demo - configure LLM in settings)"
+            ),
         }, "Agent edit applied (demo mode)"
 
     except Exception as e:
         logger.error(f"Error in agent edit: {e}")
         return {}, f"Error in agent edit: {str(e)}"
+
 
 async def handle_refresh_files(webui_manager: WebuiManager):
     """Handle refreshing the file list."""
@@ -758,17 +816,20 @@ async def handle_refresh_files(webui_manager: WebuiManager):
 
         combined_md = files_md + "\n" + recent_md
 
-        recent_files_comp = webui_manager.get_component_by_id("document_editor.recent_files_display")
+        recent_files_comp = webui_manager.get_component_by_id(
+            "document_editor.recent_files_display"
+        )
         status_comp = webui_manager.get_component_by_id("document_editor.status")
 
         return {
             recent_files_comp: gr.Markdown(value=combined_md),
-            status_comp: gr.Textbox(value=f"Found {len(files)} files")
+            status_comp: gr.Textbox(value=f"Found {len(files)} files"),
         }, f"File list refreshed: {len(files)} files found"
 
     except Exception as e:
         logger.error(f"Error refreshing files: {e}")
         return {}, f"Error refreshing files: {str(e)}"
+
 
 async def handle_open_example(webui_manager: WebuiManager, example_file: str):
     """Handle opening an example file."""
@@ -779,6 +840,7 @@ async def handle_open_example(webui_manager: WebuiManager, example_file: str):
         logger.error(f"Error opening example {example_file}: {e}")
         return {}, f"Error opening example: {str(e)}"
 
+
 async def handle_search_documents(webui_manager: WebuiManager, search_query: str):
     """Handle searching for related documents."""
     if not webui_manager.de_manager:
@@ -788,7 +850,9 @@ async def handle_search_documents(webui_manager: WebuiManager, search_query: str
         if not search_query.strip():
             return {}, "Please enter a search query"
 
-        results = webui_manager.de_manager.search_related_documents(search_query, limit=8)
+        results = webui_manager.de_manager.search_related_documents(
+            search_query, limit=8
+        )
 
         # Format results for display
         if results["documents"]:
@@ -799,21 +863,30 @@ async def handle_search_documents(webui_manager: WebuiManager, search_query: str
                 results_md += f"{i}. **{title}** (Score: {score})\n"
                 results_md += f"   *{doc['content_preview']}*\n\n"
         else:
-            results_md = "**🔍 Search Results**\n\n*No documents found matching your query.*"
+            results_md = (
+                "**🔍 Search Results**\n\n*No documents found matching your query.*"
+            )
 
-        search_results_comp = webui_manager.get_component_by_id("document_editor.search_results")
+        search_results_comp = webui_manager.get_component_by_id(
+            "document_editor.search_results"
+        )
         status_comp = webui_manager.get_component_by_id("document_editor.status")
 
         return {
             search_results_comp: gr.Markdown(value=results_md),
-            status_comp: gr.Textbox(value=f"Found {len(results['documents'])} documents")
+            status_comp: gr.Textbox(
+                value=f"Found {len(results['documents'])} documents"
+            ),
         }, f"Search completed: {len(results['documents'])} documents found"
 
     except Exception as e:
         logger.error(f"Error searching documents: {e}")
         return {}, f"Error searching documents: {str(e)}"
 
-async def handle_get_suggestions(webui_manager: WebuiManager, content: str, current_file: str):
+
+async def handle_get_suggestions(
+    webui_manager: WebuiManager, content: str, current_file: str
+):
     """Handle getting document suggestions based on current content."""
     if not webui_manager.de_manager:
         return {}, "No document editor manager available"
@@ -827,7 +900,9 @@ async def handle_get_suggestions(webui_manager: WebuiManager, content: str, curr
         if current_file:
             document_type = webui_manager.de_manager.get_file_language(current_file)
 
-        suggestions = webui_manager.de_manager.get_document_suggestions(content, document_type)
+        suggestions = webui_manager.de_manager.get_document_suggestions(
+            content, document_type
+        )
 
         # Format suggestions for display
         suggestions_md = "**💡 Document Suggestions**\n\n"
@@ -856,22 +931,29 @@ async def handle_get_suggestions(webui_manager: WebuiManager, content: str, curr
                 suggestions_md += f"  *{template['content_preview']}*\n\n"
 
         if not any(suggestions.values()):
-            suggestions_md += "*No suggestions available. Try saving some documents first.*"
+            suggestions_md += (
+                "*No suggestions available. Try saving some documents first.*"
+            )
 
-        suggestions_comp = webui_manager.get_component_by_id("document_editor.suggestions_display")
+        suggestions_comp = webui_manager.get_component_by_id(
+            "document_editor.suggestions_display"
+        )
         status_comp = webui_manager.get_component_by_id("document_editor.status")
 
         total_suggestions = sum(len(v) for v in suggestions.values())
         return {
             suggestions_comp: gr.Markdown(value=suggestions_md),
-            status_comp: gr.Textbox(value=f"Generated {total_suggestions} suggestions")
+            status_comp: gr.Textbox(value=f"Generated {total_suggestions} suggestions"),
         }, f"Suggestions generated: {total_suggestions} items"
 
     except Exception as e:
         logger.error(f"Error getting suggestions: {e}")
         return {}, f"Error getting suggestions: {str(e)}"
 
-async def handle_store_as_policy(webui_manager: WebuiManager, content: str, policy_title: str, policy_type: str):
+
+async def handle_store_as_policy(
+    webui_manager: WebuiManager, content: str, policy_title: str, policy_type: str
+):
     """Handle storing current document as a policy manual."""
     if not webui_manager.de_manager:
         return {}, "No document editor manager available"
@@ -884,9 +966,7 @@ async def handle_store_as_policy(webui_manager: WebuiManager, content: str, poli
             return {}, "Policy title is required"
 
         success = webui_manager.de_manager.store_policy_manual(
-            title=policy_title,
-            content=content,
-            policy_type=policy_type
+            title=policy_title, content=content, policy_type=policy_type
         )
 
         status_comp = webui_manager.get_component_by_id("document_editor.status")
@@ -904,17 +984,24 @@ async def handle_store_as_policy(webui_manager: WebuiManager, content: str, poli
         logger.error(f"Error storing policy: {e}")
         return {}, f"Error storing policy: {str(e)}"
 
-async def handle_chat_message(webui_manager: WebuiManager, components: Dict[Component, Any]):
+
+async def handle_chat_message(
+    webui_manager: WebuiManager, components: dict[Component, Any]
+):
     """Handle sending a chat message."""
     if not webui_manager.de_manager:
         return {}, "No document editor manager available"
 
     try:
         # Get components
-        chat_input_comp = webui_manager.get_component_by_id("document_editor.chat_input")
+        chat_input_comp = webui_manager.get_component_by_id(
+            "document_editor.chat_input"
+        )
         chatbot_comp = webui_manager.get_component_by_id("document_editor.chatbot")
         editor_comp = webui_manager.get_component_by_id("document_editor.editor")
-        file_path_comp = webui_manager.get_component_by_id("document_editor.current_file_path")
+        file_path_comp = webui_manager.get_component_by_id(
+            "document_editor.current_file_path"
+        )
         status_comp = webui_manager.get_component_by_id("document_editor.status")
 
         # Get values
@@ -934,12 +1021,13 @@ async def handle_chat_message(webui_manager: WebuiManager, components: Dict[Comp
         return {
             chatbot_comp: gr.Chatbot(value=webui_manager.de_manager.chat_history),
             chat_input_comp: gr.Textbox(value=""),
-            status_comp: gr.Textbox(value="Chat message processed")
+            status_comp: gr.Textbox(value="Chat message processed"),
         }, "Chat message sent"
 
     except Exception as e:
         logger.error(f"Error handling chat message: {e}")
         return {}, f"Error handling chat message: {str(e)}"
+
 
 async def handle_clear_chat(webui_manager: WebuiManager):
     """Handle clearing the chat history."""
@@ -954,12 +1042,13 @@ async def handle_clear_chat(webui_manager: WebuiManager):
 
         return {
             chatbot_comp: gr.Chatbot(value=[]),
-            status_comp: gr.Textbox(value="Chat history cleared")
+            status_comp: gr.Textbox(value="Chat history cleared"),
         }, "Chat history cleared"
 
     except Exception as e:
         logger.error(f"Error clearing chat: {e}")
         return {}, f"Error clearing chat: {str(e)}"
+
 
 def create_document_editor_tab(webui_manager: WebuiManager):
     """Create the document editor tab with IDE-style three-column layout."""
@@ -984,38 +1073,55 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 # File upload (initially hidden, shows when upload clicked)
                 file_upload = gr.File(
                     label="",
-                    file_types=[".txt", ".md", ".py", ".js", ".html", ".css", ".json", ".xml", ".yaml", ".yml"],
+                    file_types=[
+                        ".txt",
+                        ".md",
+                        ".py",
+                        ".js",
+                        ".html",
+                        ".css",
+                        ".json",
+                        ".xml",
+                        ".yaml",
+                        ".yml",
+                    ],
                     interactive=True,
                     container=False,
-                    visible=False
+                    visible=False,
                 )
 
             # File tree/selector
             with gr.Group():
                 gr.Markdown("**📂 Files**")
-                refresh_files_btn = gr.Button("🔄 Refresh Files", variant="secondary", size="sm")
+                refresh_files_btn = gr.Button(
+                    "🔄 Refresh Files", variant="secondary", size="sm"
+                )
                 file_selector = gr.Dropdown(
                     label="",
                     choices=[],
                     interactive=True,
                     container=False,
                     allow_custom_value=True,
-                    info="Select a file to open"
+                    info="Select a file to open",
                 )
-                open_selected_btn = gr.Button("📂 Open Selected", variant="primary", size="sm")
+                open_selected_btn = gr.Button(
+                    "📂 Open Selected", variant="primary", size="sm"
+                )
 
             # Recent files
             with gr.Group():
                 gr.Markdown("**🕒 Files & Documents**")
                 recent_files_display = gr.HTML(
                     value="<div style='padding: 10px; color: #888;'>Click refresh to load files</div>",
-                    elem_id="files_list"
+                    elem_id="files_list",
                 )
 
             # Quick actions
             with gr.Group():
                 gr.Markdown("**⚡ Quick Actions**")
-                export_btn = gr.Button("💾 Export Current", variant="secondary", size="sm")
+                export_btn = gr.Button(
+                    "💾 Export Current", variant="secondary", size="sm"
+                )
                 download_btn = gr.Button("⬇️ Download", variant="secondary", size="sm")
 
         # Main Editor Area
@@ -1025,10 +1131,12 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 with gr.Column(scale=4):
                     active_tabs_display = gr.HTML(
                         value='<div style="display: flex; border-bottom: 1px solid #444; padding: 5px 0; min-height: 35px; align-items: center;"><span style="color: #888; padding: 10px;">No files open</span></div>',
-                        elem_id="tabs_container"
+                        elem_id="tabs_container",
                     )
                 with gr.Column(scale=1):
-                    close_tab_btn = gr.Button("✕ Close Tab", variant="secondary", size="sm", visible=False)
+                    close_tab_btn = gr.Button(
+                        "✕ Close Tab", variant="secondary", size="sm", visible=False
+                    )
 
             # Editor controls
             with gr.Row():
@@ -1039,7 +1147,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                         interactive=False,
                         container=False,
                         show_label=False,
-                        max_lines=1
+                        max_lines=1,
                     )
                 with gr.Column(scale=1):
                     with gr.Row():
@@ -1048,7 +1156,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                             label="Auto-save",
                             value=True,
                             interactive=True,
-                            container=False
+                            container=False,
                         )
 
             # Main code editor
@@ -1058,7 +1166,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 interactive=True,
                 lines=28,
                 show_label=False,
-                container=True
+                container=True,
             )
 
             # Status bar
@@ -1068,7 +1176,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 interactive=False,
                 container=False,
                 show_label=False,
-                max_lines=1
+                max_lines=1,
             )
 
     # Bottom Panel - AI Assistant & Chat
@@ -1079,14 +1187,16 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 gr.Markdown("### 🤖 CogniDoc AI Assistant")
 
                 chatbot = gr.Chatbot(
-                    lambda: webui_manager.de_manager.chat_history if webui_manager.de_manager else [],
+                    lambda: webui_manager.de_manager.chat_history
+                    if webui_manager.de_manager
+                    else [],
                     elem_id="document_editor_chatbot",
                     label="",
                     type="messages",
                     height=200,
                     show_copy_button=True,
                     show_label=False,
-                    container=True
+                    container=True,
                 )
 
                 # Chat input row
@@ -1097,10 +1207,14 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                         lines=1,
                         interactive=True,
                         container=False,
-                        scale=5
+                        scale=5,
                     )
-                    chat_send_btn = gr.Button("💬", variant="primary", size="sm", scale=1)
-                    clear_chat_btn = gr.Button("🗑️", variant="secondary", size="sm", scale=1)
+                    chat_send_btn = gr.Button(
+                        "💬", variant="primary", size="sm", scale=1
+                    )
+                    clear_chat_btn = gr.Button(
+                        "🗑️", variant="secondary", size="sm", scale=1
+                    )
 
     # Bottom Panel - Policy Management (Collapsible)
     with gr.Row():
@@ -1117,17 +1231,24 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                                     placeholder="Policy title...",
                                     interactive=True,
                                     container=False,
-                                    scale=2
+                                    scale=2,
                                 )
                                 policy_type_dropdown = gr.Dropdown(
                                     label="",
-                                    choices=["manual", "procedure", "guideline", "template"],
+                                    choices=[
+                                        "manual",
+                                        "procedure",
+                                        "guideline",
+                                        "template",
+                                    ],
                                     value="manual",
                                     interactive=True,
                                     container=False,
-                                    scale=1
+                                    scale=1,
                                 )
-                            store_as_policy_btn = gr.Button("📋 Store as Policy", variant="secondary", size="sm")
+                            store_as_policy_btn = gr.Button(
+                                "📋 Store as Policy", variant="secondary", size="sm"
+                            )
 
                     with gr.Column(scale=2):
                         # Policy search
@@ -1137,11 +1258,18 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                                 label="",
                                 placeholder="Search policies...",
                                 interactive=True,
-                                container=False
+                                container=False,
                             )
                             with gr.Row():
-                                search_policies_btn = gr.Button("🔍 Search", variant="secondary", size="sm", scale=1)
-                                upload_policy_btn = gr.Button("📤 Upload Policy", variant="secondary", size="sm", scale=1)
+                                search_policies_btn = gr.Button(
+                                    "🔍 Search", variant="secondary", size="sm", scale=1
+                                )
+                                upload_policy_btn = gr.Button(
+                                    "📤 Upload Policy",
+                                    variant="secondary",
+                                    size="sm",
+                                    scale=1,
+                                )
 
                             # Policy upload (initially hidden)
                             policy_upload = gr.File(
@@ -1149,14 +1277,13 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                                 file_types=[".pdf", ".txt", ".md", ".docx", ".html"],
                                 interactive=True,
                                 container=False,
-                                visible=False
+                                visible=False,
                             )
 
                 with gr.Row():
                     # Policy results
                     policy_results = gr.Markdown(
-                        "*Policy search results will appear here*",
-                        container=False
+                        "*Policy search results will appear here*", container=False
                     )
 
         # Hidden components for tab management
@@ -1166,62 +1293,60 @@ def create_document_editor_tab(webui_manager: WebuiManager):
         close_tab_trigger = gr.Textbox(visible=False, elem_id="close_tab_trigger")
 
     # Store all components
-    tab_components.update({
-        # File management
-        "new_file_btn": new_file_btn,
-        "upload_btn": upload_btn,
-        "file_upload": file_upload,
-        "refresh_files_btn": refresh_files_btn,
-        "file_selector": file_selector,
-        "open_selected_btn": open_selected_btn,
-        "recent_files_display": recent_files_display,
-        "export_btn": export_btn,
-        "download_btn": download_btn,
-
-        # Editor with tabs
-        "active_tabs_display": active_tabs_display,
-        "close_tab_btn": close_tab_btn,
-        "current_file_display": current_file_display,
-        "save_btn": save_btn,
-        "auto_save_toggle": auto_save_toggle,
-        "editor": editor,
-        "status_display": status_display,
-        "current_file_path": current_file_path,
-
-        # AI Assistant
-        "chatbot": chatbot,
-        "chat_input": chat_input,
-        "chat_send_btn": chat_send_btn,
-        "clear_chat_btn": clear_chat_btn,
-
-        # Policy management
-        "policy_title_input": policy_title_input,
-        "policy_type_dropdown": policy_type_dropdown,
-        "store_as_policy_btn": store_as_policy_btn,
-        "policy_search_input": policy_search_input,
-        "search_policies_btn": search_policies_btn,
-        "policy_upload": policy_upload,
-        "upload_policy_btn": upload_policy_btn,
-        "policy_results": policy_results,
-
-        # Tab management
-        "switch_tab_trigger": switch_tab_trigger,
-        "close_tab_trigger": close_tab_trigger,
-        "open_file_trigger": open_file_trigger
-    })
+    tab_components.update(
+        {
+            # File management
+            "new_file_btn": new_file_btn,
+            "upload_btn": upload_btn,
+            "file_upload": file_upload,
+            "refresh_files_btn": refresh_files_btn,
+            "file_selector": file_selector,
+            "open_selected_btn": open_selected_btn,
+            "recent_files_display": recent_files_display,
+            "export_btn": export_btn,
+            "download_btn": download_btn,
+            # Editor with tabs
+            "active_tabs_display": active_tabs_display,
+            "close_tab_btn": close_tab_btn,
+            "current_file_display": current_file_display,
+            "save_btn": save_btn,
+            "auto_save_toggle": auto_save_toggle,
+            "editor": editor,
+            "status_display": status_display,
+            "current_file_path": current_file_path,
+            # AI Assistant
+            "chatbot": chatbot,
+            "chat_input": chat_input,
+            "chat_send_btn": chat_send_btn,
+            "clear_chat_btn": clear_chat_btn,
+            # Policy management
+            "policy_title_input": policy_title_input,
+            "policy_type_dropdown": policy_type_dropdown,
+            "store_as_policy_btn": store_as_policy_btn,
+            "policy_search_input": policy_search_input,
+            "search_policies_btn": search_policies_btn,
+            "policy_upload": policy_upload,
+            "upload_policy_btn": upload_policy_btn,
+            "policy_results": policy_results,
+            # Tab management
+            "switch_tab_trigger": switch_tab_trigger,
+            "close_tab_trigger": close_tab_trigger,
+            "open_file_trigger": open_file_trigger,
+        }
+    )
 
     webui_manager.add_components("document_editor", tab_components)
     all_managed_components = set(webui_manager.get_components())
 
     # Tab management state
-    if not hasattr(webui_manager, 'editor_tabs'):
+    if not hasattr(webui_manager, "editor_tabs"):
         webui_manager.editor_tabs = {}  # {tab_id: {path, content, language, title}}
         webui_manager.active_tab = None
 
     # Tab management functions
     def generate_tab_id():
         """Generate a unique tab ID."""
-        import uuid
+
         return str(uuid.uuid4())[:8]
 
     def update_tabs_display():
@@ -1233,14 +1358,14 @@ def create_document_editor_tab(webui_manager: WebuiManager):
 
         for tab_id, tab_data in webui_manager.editor_tabs.items():
             is_active = tab_id == webui_manager.active_tab
-            title = tab_data.get('title', 'Untitled')
+            title = tab_data.get("title", "Untitled")
 
             # Truncate long titles
             if len(title) > 20:
-                title = title[:17] + '...'
+                title = title[:17] + "..."
 
             # Tab styling
-            tab_style = f'''
+            tab_style = f"""
                 padding: 6px 12px;
                 margin: 2px;
                 border: 1px solid #555;
@@ -1250,18 +1375,20 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 color: {"#fff" if is_active else "#ccc"};
                 font-size: 13px;
                 transition: all 0.2s;
-            '''
+            """
 
             tabs_html += f'<div style="{tab_style}" onclick="window.switchTab(\'{tab_id}\')" title="{tab_data.get("path", "")}">'
-            tabs_html += f'{title}'
-            if len(webui_manager.editor_tabs) > 1:  # Show close button only if multiple tabs
+            tabs_html += f"{title}"
+            if (
+                len(webui_manager.editor_tabs) > 1
+            ):  # Show close button only if multiple tabs
                 tabs_html += f' <span onclick="event.stopPropagation(); window.closeTab(\'{tab_id}\')" style="margin-left: 8px; color: #999; hover: #fff;">✕</span>'
-            tabs_html += '</div>'
+            tabs_html += "</div>"
 
-        tabs_html += '</div>'
+        tabs_html += "</div>"
 
         # Add JavaScript for tab interactions
-        tabs_html += '''
+        tabs_html += """
         <script>
         window.switchTab = function(tabId) {
             // Trigger Gradio event to switch tab
@@ -1274,7 +1401,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
             document.getElementById('close_tab_trigger').dispatchEvent(new Event('input'));
         };
         </script>
-        '''
+        """
 
         return tabs_html
 
@@ -1291,7 +1418,11 @@ def create_document_editor_tab(webui_manager: WebuiManager):
         """Refresh file list from both filesystem and database."""
         try:
             if not webui_manager.de_manager:
-                return gr.Dropdown(choices=[]), "*No document editor available*", "❌ No manager"
+                return (
+                    gr.Dropdown(choices=[]),
+                    "*No document editor available*",
+                    "❌ No manager",
+                )
 
             # Get files from filesystem
             filesystem_files = webui_manager.de_manager.list_files()
@@ -1300,17 +1431,20 @@ def create_document_editor_tab(webui_manager: WebuiManager):
             database_docs = []
             try:
                 from ...database.models import QueryRequest
+
                 query_request = QueryRequest(
                     query="documents",
                     collection_name="documents",
                     limit=50,
-                    include_metadata=True
+                    include_metadata=True,
                 )
-                db_results = webui_manager.de_manager.document_pipeline.manager.search(query_request)
+                db_results = webui_manager.de_manager.document_pipeline.manager.search(
+                    query_request
+                )
                 database_docs = [
                     f"db:{result.metadata.get('filename', result.id)}"
                     for result in db_results
-                    if result.metadata.get('filename')
+                    if result.metadata.get("filename")
                 ]
             except Exception as e:
                 logger.warning(f"Could not load database documents: {e}")
@@ -1335,26 +1469,26 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 for i, file in enumerate(filesystem_files[:8], 1):
                     filename = os.path.basename(file)
                     file_path = f"fs:./tmp/documents/{file}"
-                    files_html += f'''
+                    files_html += f"""
                     <div style="margin: 2px 0; padding: 4px 8px; border: 1px solid #444; border-radius: 3px; cursor: pointer; hover: background-color: #333;"
                          onclick="window.openFileInTab('{file_path}', '{filename}')"
                          title="Click to open in new tab">
                         📄 {filename}
                     </div>
-                    '''
+                    """
 
             # Add database documents
             if database_docs:
                 files_html += '<div style="margin: 15px 0 5px 0;"><strong>🗄️ Database Documents:</strong></div>'
                 for i, doc_path in enumerate(database_docs[:8], 1):
-                    filename = doc_path.replace('db:', '')
-                    files_html += f'''
+                    filename = doc_path.replace("db:", "")
+                    files_html += f"""
                     <div style="margin: 2px 0; padding: 4px 8px; border: 1px solid #444; border-radius: 3px; cursor: pointer; hover: background-color: #333;"
                          onclick="window.openFileInTab('{doc_path}', '{filename}')"
                          title="Click to open in new tab">
                         📄 {filename} <span style="color: #888; font-size: 11px;">(DB)</span>
                     </div>
-                    '''
+                    """
 
             # Add recent files
             recent_files = webui_manager.de_manager.recent_files
@@ -1362,16 +1496,18 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 files_html += '<div style="margin: 15px 0 5px 0;"><strong>🕒 Recent Files:</strong></div>'
                 for file in recent_files[:5]:
                     filename = os.path.basename(file)
-                    file_path = file if file.startswith(('fs:', 'db:')) else f"fs:{file}"
-                    files_html += f'''
+                    file_path = (
+                        file if file.startswith(("fs:", "db:")) else f"fs:{file}"
+                    )
+                    files_html += f"""
                     <div style="margin: 2px 0; padding: 4px 8px; border: 1px solid #444; border-radius: 3px; cursor: pointer; hover: background-color: #333;"
                          onclick="window.openFileInTab('{file_path}', '{filename}')"
                          title="Click to open in new tab">
                         📄 {filename}
                     </div>
-                    '''
+                    """
 
-            files_html += '''
+            files_html += """
             <script>
             window.openFileInTab = function(filePath, fileName) {
                 // Trigger Gradio event to open file in new tab
@@ -1380,14 +1516,16 @@ def create_document_editor_tab(webui_manager: WebuiManager):
             };
             </script>
             </div>
-            '''
+            """
 
             total_files = len(all_files)
-            gr.Info(f"Found {total_files} files ({len(filesystem_files)} local, {len(database_docs)} in database)")
+            gr.Info(
+                f"Found {total_files} files ({len(filesystem_files)} local, {len(database_docs)} in database)"
+            )
             return (
                 gr.Dropdown(choices=all_files),
                 gr.HTML(value=files_html),
-                f"📁 Found {total_files} files"
+                f"📁 Found {total_files} files",
             )
 
         except Exception as e:
@@ -1395,8 +1533,10 @@ def create_document_editor_tab(webui_manager: WebuiManager):
             gr.Error(error_msg)
             return (
                 gr.Dropdown(choices=[]),
-                gr.HTML(value="<div style='padding: 10px; color: #f44;'>Error loading files</div>"),
-                f"❌ {error_msg}"
+                gr.HTML(
+                    value="<div style='padding: 10px; color: #f44;'>Error loading files</div>"
+                ),
+                f"❌ {error_msg}",
             )
 
     async def open_selected_wrapper(file_path: str):
@@ -1408,7 +1548,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                     gr.Code(value="", language="text"),
                     "No file selected",
                     "",
-                    gr.Button(visible=False)
+                    gr.Button(visible=False),
                 )
 
             if not webui_manager.de_manager:
@@ -1417,7 +1557,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                     gr.Code(value="", language="text"),
                     "No document editor available",
                     "",
-                    gr.Button(visible=False)
+                    gr.Button(visible=False),
                 )
 
             # Get filename for tab
@@ -1430,17 +1570,21 @@ def create_document_editor_tab(webui_manager: WebuiManager):
 
             # Check if file is already open in a tab
             for tab_id, tab_data in webui_manager.editor_tabs.items():
-                if tab_data['path'] == file_path:
+                if tab_data["path"] == file_path:
                     # Switch to existing tab
                     webui_manager.active_tab = tab_id
                     tabs_html = update_tabs_display()
                     gr.Info(f"Switched to existing tab: {filename}")
                     return (
                         gr.HTML(value=tabs_html),
-                        gr.Code(value=tab_data['content'], language=tab_data['language'], interactive=True),
+                        gr.Code(
+                            value=tab_data["content"],
+                            language=tab_data["language"],
+                            interactive=True,
+                        ),
                         f"📄 {filename}",
                         file_path,
-                        gr.Button(visible=len(webui_manager.editor_tabs) > 1)
+                        gr.Button(visible=len(webui_manager.editor_tabs) > 1),
                     )
 
             # Load file content based on source
@@ -1448,35 +1592,42 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 # Load from database
                 db_filename = file_path[3:]
                 from ...database.models import QueryRequest
+
                 query_request = QueryRequest(
                     query=db_filename,
                     collection_name="documents",
                     limit=10,
-                    include_metadata=True
+                    include_metadata=True,
                 )
-                db_results = webui_manager.de_manager.document_pipeline.manager.search(query_request)
+                db_results = webui_manager.de_manager.document_pipeline.manager.search(
+                    query_request
+                )
 
                 for result in db_results:
-                    if result.metadata.get('filename') == db_filename:
+                    if result.metadata.get("filename") == db_filename:
                         content = result.content
                         file_extension = Path(db_filename).suffix.lower()
-                        language = SUPPORTED_FORMATS.get(file_extension, 'text')
+                        language = SUPPORTED_FORMATS.get(file_extension, "text")
                         break
                 else:
-                    raise FileNotFoundError(f"Document not found in database: {db_filename}")
+                    raise FileNotFoundError(
+                        f"Document not found in database: {db_filename}"
+                    )
             else:
                 # Load from filesystem
-                actual_path = file_path[3:] if file_path.startswith("fs:") else file_path
+                actual_path = (
+                    file_path[3:] if file_path.startswith("fs:") else file_path
+                )
                 content, language = webui_manager.de_manager.read_file(actual_path)
 
             # Create new tab
             tab_id = generate_tab_id()
             webui_manager.editor_tabs[tab_id] = {
-                'path': file_path,
-                'content': content,
-                'language': language,
-                'title': filename,
-                'modified': False
+                "path": file_path,
+                "content": content,
+                "language": language,
+                "title": filename,
+                "modified": False,
             }
             webui_manager.active_tab = tab_id
 
@@ -1488,7 +1639,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 gr.Code(value=content, language=language, interactive=True),
                 f"📄 {filename}",
                 file_path,
-                gr.Button(visible=len(webui_manager.editor_tabs) > 1)
+                gr.Button(visible=len(webui_manager.editor_tabs) > 1),
             )
 
         except Exception as e:
@@ -1499,7 +1650,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 gr.Code(value="", language="text"),
                 f"❌ Error: {str(e)}",
                 "",
-                gr.Button(visible=False)
+                gr.Button(visible=False),
             )
 
     async def handle_file_upload(uploaded_file):
@@ -1515,11 +1666,13 @@ def create_document_editor_tab(webui_manager: WebuiManager):
             file_path = uploaded_file.name
             filename = os.path.basename(file_path)
 
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(file_path, encoding="utf-8", errors="ignore") as f:
                 content = f.read()
 
             # Store in working directory
-            destination_path = os.path.join(webui_manager.de_manager.working_directory, filename)
+            destination_path = os.path.join(
+                webui_manager.de_manager.working_directory, filename
+            )
             success = webui_manager.de_manager.save_file(destination_path, content)
 
             if success:
@@ -1547,27 +1700,31 @@ def create_document_editor_tab(webui_manager: WebuiManager):
             filename = os.path.basename(file_path)
 
             # Handle different file types
-            if filename.lower().endswith('.pdf'):
+            if filename.lower().endswith(".pdf"):
                 # For PDF files, we'd need a PDF reader - placeholder for now
                 content = f"PDF Policy Document: {filename}\n\n[PDF content would be extracted here]"
             else:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                with open(file_path, encoding="utf-8", errors="ignore") as f:
                     content = f.read()
 
             # Store as policy in database
-            policy_title = filename.replace('.pdf', '').replace('.txt', '').replace('.md', '')
+            policy_title = (
+                filename.replace(".pdf", "").replace(".txt", "").replace(".md", "")
+            )
             success = webui_manager.de_manager.store_policy_manual(
                 title=policy_title,
                 content=content,
                 policy_type="uploaded",
-                metadata={"source": "file_upload", "original_filename": filename}
+                metadata={"source": "file_upload", "original_filename": filename},
             )
 
             if success:
                 gr.Info(f"Policy uploaded and stored: {policy_title}")
                 return gr.File(visible=False), f"✅ Policy uploaded: {policy_title}"
             else:
-                return gr.File(visible=False), f"❌ Failed to store policy: {policy_title}"
+                return gr.File(
+                    visible=False
+                ), f"❌ Failed to store policy: {policy_title}"
 
         except Exception as e:
             error_msg = f"Error uploading policy: {str(e)}"
@@ -1581,13 +1738,14 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 return "*No document editor available*", "❌ No manager"
 
             if not search_query.strip():
-                return "*Enter a search query to find policies*", "Please enter a search query"
+                return (
+                    "*Enter a search query to find policies*",
+                    "Please enter a search query",
+                )
 
             # Search in policy_manuals collection
             results = webui_manager.de_manager.document_pipeline.search_documents(
-                query=search_query,
-                collection_type="policies",
-                limit=10
+                query=search_query, collection_type="policies", limit=10
             )
 
             # Format results
@@ -1598,7 +1756,9 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                     policy_type = result.metadata.get("policy_type", "manual")
                     score = f"{result.relevance_score:.3f}"
                     results_md += f"{i}. **{title}** ({policy_type})\n"
-                    results_md += f"   Score: {score} | Preview: *{result.content[:100]}...*\n\n"
+                    results_md += (
+                        f"   Score: {score} | Preview: *{result.content[:100]}...*\n\n"
+                    )
             else:
                 results_md = "**📋 Policy Search Results:**\n\n*No policies found matching your query.*"
 
@@ -1619,13 +1779,16 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                     gr.Code(value="", language="text"),
                     "No document editor available",
                     "",
-                    gr.Button(visible=False)
+                    gr.Button(visible=False),
                 )
 
             import datetime
+
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"document_{timestamp}.md"
-            file_path = os.path.join(webui_manager.de_manager.working_directory, filename)
+            file_path = os.path.join(
+                webui_manager.de_manager.working_directory, filename
+            )
 
             template_content = f"# New Document\n\nCreated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n\nStart writing your content here...\n"
             success = webui_manager.de_manager.save_file(file_path, template_content)
@@ -1636,11 +1799,11 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 # Create new tab
                 tab_id = generate_tab_id()
                 webui_manager.editor_tabs[tab_id] = {
-                    'path': file_path,
-                    'content': content,
-                    'language': language,
-                    'title': f"{filename} (new)",
-                    'modified': False
+                    "path": file_path,
+                    "content": content,
+                    "language": language,
+                    "title": f"{filename} (new)",
+                    "modified": False,
                 }
                 webui_manager.active_tab = tab_id
 
@@ -1652,7 +1815,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                     gr.Code(value=content, language=language, interactive=True),
                     f"📄 {filename} (new)",
                     file_path,
-                    gr.Button(visible=len(webui_manager.editor_tabs) > 1)
+                    gr.Button(visible=len(webui_manager.editor_tabs) > 1),
                 )
             else:
                 return (
@@ -1660,7 +1823,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                     gr.Code(value="", language="text"),
                     f"❌ Failed to create: {filename}",
                     "",
-                    gr.Button(visible=False)
+                    gr.Button(visible=False),
                 )
 
         except Exception as e:
@@ -1671,7 +1834,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 gr.Code(value="", language="text"),
                 f"❌ Error: {str(e)}",
                 "",
-                gr.Button(visible=False)
+                gr.Button(visible=False),
             )
 
     async def save_file_wrapper(content: str, file_path: str):
@@ -1689,29 +1852,37 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 gr.Info(f"Saved to filesystem and database: {filename}")
                 return f"✅ Saved: {filename}"
             else:
-                return f"❌ Failed to save"
+                return "❌ Failed to save"
 
         except Exception as e:
             error_msg = f"Error saving: {str(e)}"
             gr.Error(error_msg)
             return f"❌ {error_msg}"
 
-    async def chat_wrapper(components_dict: Dict[Component, Any]):
+    async def chat_wrapper(components_dict: dict[Component, Any]):
         """Handle chat messages with document context."""
         try:
             if not webui_manager.de_manager:
                 return [], "", "❌ No document editor available"
 
-            chat_input_comp = webui_manager.get_component_by_id("document_editor.chat_input")
+            chat_input_comp = webui_manager.get_component_by_id(
+                "document_editor.chat_input"
+            )
             editor_comp = webui_manager.get_component_by_id("document_editor.editor")
-            current_file_path_comp = webui_manager.get_component_by_id("document_editor.current_file_path")
+            current_file_path_comp = webui_manager.get_component_by_id(
+                "document_editor.current_file_path"
+            )
 
             chat_message = components_dict.get(chat_input_comp, "").strip()
             current_content = components_dict.get(editor_comp, "")
             current_file = components_dict.get(current_file_path_comp, "")
 
             if not chat_message:
-                return webui_manager.de_manager.chat_history, "", "Please enter a message"
+                return (
+                    webui_manager.de_manager.chat_history,
+                    "",
+                    "Please enter a message",
+                )
 
             ai_response = await webui_manager.de_manager.process_chat_message(
                 chat_message, current_content, current_file, webui_manager
@@ -1747,17 +1918,18 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 return gr.HTML(), gr.Code(), "", "", gr.Button(visible=False)
 
             import json
+
             file_info = json.loads(trigger_value)
-            file_path = file_info['path']
-            file_name = file_info['name']
+            file_path = file_info["path"]
+            file_name = file_info["name"]
 
             # Check if file is already open in a tab
             for tab_id, tab_data in webui_manager.editor_tabs.items():
-                if tab_data['path'] == file_path:
+                if tab_data["path"] == file_path:
                     # Switch to existing tab
                     webui_manager.active_tab = tab_id
-                    tab_content = tab_data['content']
-                    language = tab_data['language']
+                    tab_content = tab_data["content"]
+                    language = tab_data["language"]
 
                     tabs_html = update_tabs_display()
                     gr.Info(f"Switched to tab: {file_name}")
@@ -1766,7 +1938,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                         gr.Code(value=tab_content, language=language, interactive=True),
                         f"📄 {file_name}",
                         file_path,
-                        gr.Button(visible=len(webui_manager.editor_tabs) > 1)
+                        gr.Button(visible=len(webui_manager.editor_tabs) > 1),
                     )
 
             # Open file content
@@ -1774,35 +1946,42 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 # Load from database
                 filename = file_path[3:]
                 from ...database.models import QueryRequest
+
                 query_request = QueryRequest(
                     query=filename,
                     collection_name="documents",
                     limit=10,
-                    include_metadata=True
+                    include_metadata=True,
                 )
-                db_results = webui_manager.de_manager.document_pipeline.manager.search(query_request)
+                db_results = webui_manager.de_manager.document_pipeline.manager.search(
+                    query_request
+                )
 
                 for result in db_results:
-                    if result.metadata.get('filename') == filename:
+                    if result.metadata.get("filename") == filename:
                         content = result.content
                         file_extension = Path(filename).suffix.lower()
-                        language = SUPPORTED_FORMATS.get(file_extension, 'text')
+                        language = SUPPORTED_FORMATS.get(file_extension, "text")
                         break
                 else:
-                    raise FileNotFoundError(f"Document not found in database: {filename}")
+                    raise FileNotFoundError(
+                        f"Document not found in database: {filename}"
+                    )
             else:
                 # Load from filesystem
-                actual_path = file_path[3:] if file_path.startswith("fs:") else file_path
+                actual_path = (
+                    file_path[3:] if file_path.startswith("fs:") else file_path
+                )
                 content, language = webui_manager.de_manager.read_file(actual_path)
 
             # Create new tab
             tab_id = generate_tab_id()
             webui_manager.editor_tabs[tab_id] = {
-                'path': file_path,
-                'content': content,
-                'language': language,
-                'title': file_name,
-                'modified': False
+                "path": file_path,
+                "content": content,
+                "language": language,
+                "title": file_name,
+                "modified": False,
             }
             webui_manager.active_tab = tab_id
 
@@ -1814,13 +1993,19 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 gr.Code(value=content, language=language, interactive=True),
                 f"📄 {file_name}",
                 file_path,
-                gr.Button(visible=len(webui_manager.editor_tabs) > 1)
+                gr.Button(visible=len(webui_manager.editor_tabs) > 1),
             )
 
         except Exception as e:
             error_msg = f"Error opening file in tab: {str(e)}"
             gr.Error(error_msg)
-            return gr.HTML(), gr.Code(), f"❌ Error: {str(e)}", "", gr.Button(visible=False)
+            return (
+                gr.HTML(),
+                gr.Code(),
+                f"❌ Error: {str(e)}",
+                "",
+                gr.Button(visible=False),
+            )
 
     async def switch_tab_wrapper(tab_id: str):
         """Switch to a different tab."""
@@ -1829,7 +2014,10 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 return gr.HTML(), gr.Code(), "", "", gr.Button(visible=False)
 
             # Save current tab content if there's an active tab
-            if webui_manager.active_tab and webui_manager.active_tab in webui_manager.editor_tabs:
+            if (
+                webui_manager.active_tab
+                and webui_manager.active_tab in webui_manager.editor_tabs
+            ):
                 # This would save the current editor content to the tab state
                 # For now, we'll implement this later
                 pass
@@ -1843,16 +2031,26 @@ def create_document_editor_tab(webui_manager: WebuiManager):
 
             return (
                 gr.HTML(value=tabs_html),
-                gr.Code(value=tab_data['content'], language=tab_data['language'], interactive=True),
+                gr.Code(
+                    value=tab_data["content"],
+                    language=tab_data["language"],
+                    interactive=True,
+                ),
                 f"📄 {tab_data['title']}",
-                tab_data['path'],
-                gr.Button(visible=len(webui_manager.editor_tabs) > 1)
+                tab_data["path"],
+                gr.Button(visible=len(webui_manager.editor_tabs) > 1),
             )
 
         except Exception as e:
             error_msg = f"Error switching tab: {str(e)}"
             gr.Error(error_msg)
-            return gr.HTML(), gr.Code(), f"❌ Error: {str(e)}", "", gr.Button(visible=False)
+            return (
+                gr.HTML(),
+                gr.Code(),
+                f"❌ Error: {str(e)}",
+                "",
+                gr.Button(visible=False),
+            )
 
     async def close_tab_wrapper(tab_id: str):
         """Close a tab."""
@@ -1860,7 +2058,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
             if not tab_id or tab_id not in webui_manager.editor_tabs:
                 return gr.HTML(), gr.Code(), "", "", gr.Button(visible=False)
 
-            tab_title = webui_manager.editor_tabs[tab_id]['title']
+            tab_title = webui_manager.editor_tabs[tab_id]["title"]
             del webui_manager.editor_tabs[tab_id]
 
             # If we closed the active tab, switch to another one
@@ -1871,14 +2069,20 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                     tab_data = webui_manager.editor_tabs[webui_manager.active_tab]
 
                     tabs_html = update_tabs_display()
-                    gr.Info(f"Closed tab: {tab_title}, switched to: {tab_data['title']}")
+                    gr.Info(
+                        f"Closed tab: {tab_title}, switched to: {tab_data['title']}"
+                    )
 
                     return (
                         gr.HTML(value=tabs_html),
-                        gr.Code(value=tab_data['content'], language=tab_data['language'], interactive=True),
+                        gr.Code(
+                            value=tab_data["content"],
+                            language=tab_data["language"],
+                            interactive=True,
+                        ),
                         f"📄 {tab_data['title']}",
-                        tab_data['path'],
-                        gr.Button(visible=len(webui_manager.editor_tabs) > 1)
+                        tab_data["path"],
+                        gr.Button(visible=len(webui_manager.editor_tabs) > 1),
                     )
                 else:
                     # No tabs left
@@ -1891,7 +2095,7 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                         gr.Code(value="", language="text", interactive=True),
                         "💡 Ready - Create or open a file to start editing",
                         "",
-                        gr.Button(visible=False)
+                        gr.Button(visible=False),
                     )
             else:
                 # Closed a non-active tab
@@ -1902,16 +2106,26 @@ def create_document_editor_tab(webui_manager: WebuiManager):
                 active_tab_data = webui_manager.editor_tabs[webui_manager.active_tab]
                 return (
                     gr.HTML(value=tabs_html),
-                    gr.Code(value=active_tab_data['content'], language=active_tab_data['language'], interactive=True),
+                    gr.Code(
+                        value=active_tab_data["content"],
+                        language=active_tab_data["language"],
+                        interactive=True,
+                    ),
                     f"📄 {active_tab_data['title']}",
-                    active_tab_data['path'],
-                    gr.Button(visible=len(webui_manager.editor_tabs) > 1)
+                    active_tab_data["path"],
+                    gr.Button(visible=len(webui_manager.editor_tabs) > 1),
                 )
 
         except Exception as e:
             error_msg = f"Error closing tab: {str(e)}"
             gr.Error(error_msg)
-            return gr.HTML(), gr.Code(), f"❌ Error: {str(e)}", "", gr.Button(visible=False)
+            return (
+                gr.HTML(),
+                gr.Code(),
+                f"❌ Error: {str(e)}",
+                "",
+                gr.Button(visible=False),
+            )
 
     # Connect event handlers
     upload_btn.click(fn=toggle_file_upload, outputs=[file_upload])
@@ -1921,82 +2135,117 @@ def create_document_editor_tab(webui_manager: WebuiManager):
     file_upload.change(
         fn=handle_file_upload,
         inputs=[file_upload],
-        outputs=[file_upload, status_display]
+        outputs=[file_upload, status_display],
     )
 
     # Policy upload handler
     policy_upload.change(
         fn=handle_policy_upload,
         inputs=[policy_upload],
-        outputs=[policy_upload, status_display]
+        outputs=[policy_upload, status_display],
     )
 
     refresh_files_btn.click(
         fn=refresh_files_wrapper,
-        outputs=[file_selector, recent_files_display, status_display]
+        outputs=[file_selector, recent_files_display, status_display],
     )
 
     open_selected_btn.click(
         fn=open_selected_wrapper,
         inputs=[file_selector],
-        outputs=[active_tabs_display, editor, current_file_display, current_file_path, close_tab_btn]
+        outputs=[
+            active_tabs_display,
+            editor,
+            current_file_display,
+            current_file_path,
+            close_tab_btn,
+        ],
     )
 
     new_file_btn.click(
         fn=new_file_wrapper,
-        outputs=[active_tabs_display, editor, current_file_display, current_file_path, close_tab_btn]
+        outputs=[
+            active_tabs_display,
+            editor,
+            current_file_display,
+            current_file_path,
+            close_tab_btn,
+        ],
     )
 
     # Tab management event handlers
     open_file_trigger.change(
         fn=open_file_in_tab,
         inputs=[open_file_trigger],
-        outputs=[active_tabs_display, editor, current_file_display, current_file_path, close_tab_btn]
+        outputs=[
+            active_tabs_display,
+            editor,
+            current_file_display,
+            current_file_path,
+            close_tab_btn,
+        ],
     )
 
     switch_tab_trigger.change(
         fn=switch_tab_wrapper,
         inputs=[switch_tab_trigger],
-        outputs=[active_tabs_display, editor, current_file_display, current_file_path, close_tab_btn]
+        outputs=[
+            active_tabs_display,
+            editor,
+            current_file_display,
+            current_file_path,
+            close_tab_btn,
+        ],
     )
 
     close_tab_trigger.change(
         fn=close_tab_wrapper,
         inputs=[close_tab_trigger],
-        outputs=[active_tabs_display, editor, current_file_display, current_file_path, close_tab_btn]
+        outputs=[
+            active_tabs_display,
+            editor,
+            current_file_display,
+            current_file_path,
+            close_tab_btn,
+        ],
     )
 
     close_tab_btn.click(
-        fn=lambda: close_tab_wrapper(webui_manager.active_tab) if webui_manager.active_tab else (gr.HTML(), gr.Code(), "", "", gr.Button(visible=False)),
-        outputs=[active_tabs_display, editor, current_file_display, current_file_path, close_tab_btn]
+        fn=lambda: close_tab_wrapper(webui_manager.active_tab)
+        if webui_manager.active_tab
+        else (gr.HTML(), gr.Code(), "", "", gr.Button(visible=False)),
+        outputs=[
+            active_tabs_display,
+            editor,
+            current_file_display,
+            current_file_path,
+            close_tab_btn,
+        ],
     )
 
     save_btn.click(
         fn=save_file_wrapper,
         inputs=[editor, current_file_path],
-        outputs=[status_display]
+        outputs=[status_display],
     )
 
     # Policy search handler
     search_policies_btn.click(
         fn=search_policies_wrapper,
         inputs=[policy_search_input],
-        outputs=[policy_results, status_display]
+        outputs=[policy_results, status_display],
     )
 
     chat_send_btn.click(
         fn=chat_wrapper,
         inputs=all_managed_components,
-        outputs=[chatbot, chat_input, status_display]
+        outputs=[chatbot, chat_input, status_display],
     )
 
     chat_input.submit(
         fn=chat_wrapper,
         inputs=all_managed_components,
-        outputs=[chatbot, chat_input, status_display]
+        outputs=[chatbot, chat_input, status_display],
     )
 
-    clear_chat_btn.click(
-        fn=clear_chat_wrapper,
-        outputs=[chatbot, status_display]
-    )
+    clear_chat_btn.click(fn=clear_chat_wrapper, outputs=[chatbot, status_display])

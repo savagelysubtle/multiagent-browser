@@ -1,13 +1,13 @@
 """Database utilities and helper functions."""
 
-import logging
-from typing import List, Dict, Any, Optional
-from uuid import uuid4
-from datetime import datetime
 import hashlib
+import logging
+from datetime import datetime
+from typing import Any
+from uuid import uuid4
 
-from .models import DocumentModel, CollectionConfig, SearchResult
 from .chroma_manager import ChromaManager
+from .models import CollectionConfig, DocumentModel, SearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -20,19 +20,19 @@ class DatabaseUtils:
         self.manager = ChromaManager()
 
     @staticmethod
-    def generate_document_id(content: str, source: Optional[str] = None) -> str:
+    def generate_document_id(content: str, source: str | None = None) -> str:
         """Generate a unique document ID based on content and source."""
         # Create a hash of the content and source for deterministic IDs
-        content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
-        source_hash = hashlib.md5((source or '').encode('utf-8')).hexdigest()
+        content_hash = hashlib.md5(content.encode("utf-8")).hexdigest()
+        source_hash = hashlib.md5((source or "").encode("utf-8")).hexdigest()
         return f"doc_{content_hash[:8]}_{source_hash[:8]}"
 
     @staticmethod
     def create_document_from_text(
         content: str,
-        source: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        doc_id: Optional[str] = None
+        source: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        doc_id: str | None = None,
     ) -> DocumentModel:
         """Create a DocumentModel from text content."""
         if doc_id is None:
@@ -43,29 +43,35 @@ class DatabaseUtils:
             content=content,
             metadata=metadata or {},
             source=source,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
-    def setup_default_collections(self) -> Dict[str, bool]:
+    def setup_default_collections(self) -> dict[str, bool]:
         """Set up default collections for the application."""
         results = {}
 
         default_collections = [
             CollectionConfig(
                 name="documents",
-                metadata={"description": "General document storage", "type": "documents"}
+                metadata={
+                    "description": "General document storage",
+                    "type": "documents",
+                },
             ),
             CollectionConfig(
                 name="browser_sessions",
-                metadata={"description": "Browser session data", "type": "sessions"}
+                metadata={"description": "Browser session data", "type": "sessions"},
             ),
             CollectionConfig(
                 name="user_interactions",
-                metadata={"description": "User interaction logs", "type": "interactions"}
+                metadata={
+                    "description": "User interaction logs",
+                    "type": "interactions",
+                },
             ),
             CollectionConfig(
                 name="agent_logs",
-                metadata={"description": "Agent operation logs", "type": "logs"}
+                metadata={"description": "Agent operation logs", "type": "logs"},
             ),
             CollectionConfig(
                 name="mcp_configurations",
@@ -73,9 +79,9 @@ class DatabaseUtils:
                     "description": "MCP server configurations with versioning",
                     "type": "mcp_configs",
                     "auto_startup": True,
-                    "max_versions": 10
-                }
-            )
+                    "max_versions": 10,
+                },
+            ),
         ]
 
         for config in default_collections:
@@ -85,7 +91,9 @@ class DatabaseUtils:
                 logger.info(f"Created default collection: {config.name}")
             except Exception as e:
                 results[config.name] = False
-                logger.error(f"Failed to create default collection '{config.name}': {e}")
+                logger.error(
+                    f"Failed to create default collection '{config.name}': {e}"
+                )
 
         return results
 
@@ -95,7 +103,7 @@ class DatabaseUtils:
         url: str,
         title: str,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Store browser session data."""
         try:
@@ -104,7 +112,7 @@ class DatabaseUtils:
                 "url": url,
                 "title": title,
                 "type": "browser_session",
-                **(metadata or {})
+                **(metadata or {}),
             }
 
             document = DocumentModel(
@@ -112,7 +120,7 @@ class DatabaseUtils:
                 content=content,
                 metadata=session_metadata,
                 source=url,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             return self.manager.add_document("browser_sessions", document)
@@ -125,14 +133,14 @@ class DatabaseUtils:
         self,
         interaction_type: str,
         interaction_data: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Store user interaction data."""
         try:
             interaction_metadata = {
                 "interaction_type": interaction_type,
                 "type": "user_interaction",
-                **(metadata or {})
+                **(metadata or {}),
             }
 
             document = DocumentModel(
@@ -140,7 +148,7 @@ class DatabaseUtils:
                 content=interaction_data,
                 metadata=interaction_metadata,
                 source="web_ui",
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             return self.manager.add_document("user_interactions", document)
@@ -154,8 +162,8 @@ class DatabaseUtils:
         query: str,
         collection_name: str = "documents",
         limit: int = 10,
-        metadata_filters: Optional[Dict[str, Any]] = None
-    ) -> List[SearchResult]:
+        metadata_filters: dict[str, Any] | None = None,
+    ) -> list[SearchResult]:
         """Search for documents with optional metadata filtering."""
         from .models import QueryRequest
 
@@ -163,12 +171,12 @@ class DatabaseUtils:
             query=query,
             collection_name=collection_name,
             limit=limit,
-            metadata_filters=metadata_filters or {}
+            metadata_filters=metadata_filters or {},
         )
 
         return self.manager.search(query_request)
 
-    def get_collection_info(self) -> Dict[str, Dict[str, Any]]:
+    def get_collection_info(self) -> dict[str, dict[str, Any]]:
         """Get information about all collections."""
         collections_info = {}
 
@@ -178,14 +186,14 @@ class DatabaseUtils:
 
         return collections_info
 
-    def cleanup_old_data(self, days_old: int = 30) -> Dict[str, int]:
+    def cleanup_old_data(self, days_old: int = 30) -> dict[str, int]:
         """Clean up old data from collections."""
         # This is a placeholder for future implementation
         # Would require querying by timestamp and deleting old documents
         logger.info(f"Cleanup requested for data older than {days_old} days")
         return {"cleaned_documents": 0}
 
-    def export_collection(self, collection_name: str) -> Optional[List[Dict[str, Any]]]:
+    def export_collection(self, collection_name: str) -> list[dict[str, Any]] | None:
         """Export all documents from a collection."""
         try:
             collection = self.manager.get_collection(collection_name)
@@ -201,7 +209,7 @@ class DatabaseUtils:
             logger.error(f"Failed to export collection '{collection_name}': {e}")
             return None
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self) -> dict[str, Any]:
         """Perform a health check on the database."""
         try:
             # Test basic operations
@@ -211,7 +219,7 @@ class DatabaseUtils:
                 "status": "healthy",
                 "collections_count": len(collections),
                 "collections": collections,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             return health_status
@@ -221,5 +229,5 @@ class DatabaseUtils:
             return {
                 "status": "unhealthy",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }

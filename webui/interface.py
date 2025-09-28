@@ -1,9 +1,9 @@
 import gradio as gr
 
-from .webui_manager import WebuiManager
+from .pages.agents_page import create_agents_page
 from .pages.document_editor_page import create_document_editor_page
 from .pages.settings_page import create_settings_page
-from .pages.agents_page import create_agents_page
+from .webui_manager import WebuiManager
 
 theme_map = {
     "Default": gr.themes.Default(),
@@ -13,7 +13,7 @@ theme_map = {
     "Origin": gr.themes.Origin(),
     "Citrus": gr.themes.Citrus(),
     "Ocean": gr.themes.Ocean(),
-    "Base": gr.themes.Base()
+    "Base": gr.themes.Base(),
 }
 
 
@@ -55,7 +55,10 @@ def create_ui(theme_name="Ocean"):
     ui_manager = WebuiManager()
 
     with gr.Blocks(
-            title="AI Document Editor & Browser WebUI", theme=theme_map[theme_name], css=css, js=js_func,
+        title="AI Document Editor & Browser WebUI",
+        theme=theme_map[theme_name],
+        css=css,
+        js=js_func,
     ) as demo:
         with gr.Row():
             gr.Markdown(
