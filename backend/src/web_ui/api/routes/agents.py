@@ -1,0 +1,408 @@
+"""
+Agent API Routes.
+
+Provides REST endpoints for agent discovery, task submission, and task management.
+"""
+
+import logging
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from ...agent.orchestrator.simple_orchestrator import orchestrator
+from ..auth.dependencies import get_current_user
+from ..middleware.error_handler import AgentException, AppException
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/agents", tags=["agents"])
+
+
+# Request/Response Models
+class TaskSubmissionRequest(BaseModel):
+    """Request model for task submission."""
+
+    agent_type: str = Field(..., description="Type of agent to use")
+    action: str = Field(..., description="Action to perform")
+    payload: Dict[str, Any] = Field(..., description="Task parameters")
+
+
+class TaskSubmissionResponse(BaseModel):
+    """Response model for task submission."""
+
+    task_id: str
+    status: str
+    message: str
+    submitted_at: str
+
+
+class TaskResponse(BaseModel):
+    """Response model for task details."""
+
+    id: str
+    agent_type: str
+    action: str
+    status: str
+    created_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    result: Optional[Any] = None
+    error: Optional[str] = None
+    progress: Optional[Dict[str, Any]] = None
+
+
+class TaskListResponse(BaseModel):
+    """Response model for task list."""
+
+    tasks: List[TaskResponse]
+    total_count: int
+    page: int
+    limit: int
+
+
+class AgentCapability(BaseModel):
+    """Model for agent capability description."""
+
+    name: str
+    description: str
+    parameters: List[str]
+
+
+class AgentInfo(BaseModel):
+    """Model for agent information."""
+
+    type: str
+    name: str
+    description: str
+    actions: List[AgentCapability]
+
+
+class AvailableAgentsResponse(BaseModel):
+    """Response model for available agents."""
+
+    agents: List[AgentInfo]
+    total_agents: int
+
+
+# Route Handlers
+@router.get("/available", response_model=AvailableAgentsResponse)
+async def get_available_agents(user=Depends(get_current_user)):
+    """
+    Get list of available agents and their capabilities.
+
+    Returns information about all registered agents including:
+    - Agent types and names
+    - Available actions for each agent
+    - Required parameters for each action
+    """
+    try:
+        if not orchestrator:
+            raise AppException(
+                "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
+            )
+
+        # Get available agents from orchestrator
+        agents_info = orchestrator.get_available_agents()
+
+        # Convert to response model format
+        agents = []
+        for agent_info in agents_info:
+            actions = [
+                AgentCapability(
+                    name=action["name"],
+                    description=action["description"],
+                    parameters=action["parameters"],
+                )
+                for action in agent_info["actions"]
+            ]
+
+            agents.append(
+                AgentInfo(
+                    type=agent_info["type"],
+                    name=agent_info["name"],
+                    description=agent_info["description"],
+                    actions=actions,
+                )
+            )
+
+        return AvailableAgentsResponse(agents=agents, total_agents=len(agents))
+
+    except Exception as e:
+        logger.error(f"Failed to get available agents: {e}")
+        raise AppException("Failed to retrieve available agents")
+
+
+@router.post("/execute", response_model=TaskSubmissionResponse)
+async def execute_agent_task(
+    request: TaskSubmissionRequest, user=Depends(get_current_user)
+):
+    """
+    Submit a task to an agent for execution.
+
+    The task will be executed asynchronously and real-time updates
+    will be sent via WebSocket to the authenticated user.
+    """
+    try:
+        if not orchestrator:
+            raise AppException(
+                "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
+            )
+
+        # Validate agent type
+        available_agents = orchestrator.get_available_agents()
+        valid_agent_types = [agent["type"] for agent in available_agents]
+
+        if request.agent_type not in valid_agent_types:
+            raise ValueError(f"Unknown agent type: {request.agent_type}")
+
+        # Validate action for agent type
+        agent_info = next(
+            (a for a in available_agents if a["type"] == request.agent_type), None
+        )
+        if agent_info:
+            valid_actions = [action["name"] for action in agent_info["actions"]]
+            if request.action not in valid_actions:
+                raise ValueError(
+                    f"Unknown action '{request.action}' for agent '{request.agent_type}'"
+                )
+
+        # Submit task to orchestrator
+        task_id = await orchestrator.submit_task(
+            user_id=user.id,
+            agent_type=request.agent_type,
+            action=request.action,
+            payload=request.payload,
+        )
+
+        return TaskSubmissionResponse(
+            task_id=task_id,
+            status="submitted",
+            message=f"Task submitted to {request.agent_type}",
+            submitted_at=orchestrator.task_store[task_id].created_at.isoformat()
+            if orchestrator.task_store[task_id].created_at
+            else "",
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to submit task: {e}")
+        raise AgentException("Failed to submit agent task", request.agent_type)
+
+
+@router.get("/tasks", response_model=TaskListResponse)
+async def get_user_tasks(
+    limit: int = Query(
+        50, ge=1, le=100, description="Maximum number of tasks to return"
+    ),
+    page: int = Query(1, ge=1, description="Page number (1-based)"),
+    status: Optional[str] = Query(None, description="Filter by task status"),
+    user=Depends(get_current_user),
+):
+    """
+    Get user's agent tasks with pagination and filtering.
+
+    Returns a paginated list of tasks belonging to the authenticated user.
+    Tasks are ordered by creation date (newest first).
+    """
+    try:
+        if not orchestrator:
+            raise AppException(
+                "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
+            )
+
+        # Calculate offset for pagination
+        offset = (page - 1) * limit
+
+        # Get tasks from orchestrator with status filter
+        all_tasks = await orchestrator.get_user_tasks(
+            user_id=user.id,
+            limit=1000,  # Get more to handle pagination properly
+            status_filter=status,
+        )
+
+        # Apply pagination
+        total_count = len(all_tasks)
+        paginated_tasks = all_tasks[offset : offset + limit]
+
+        # Convert to response format
+        task_responses = []
+        for task in paginated_tasks:
+            task_responses.append(
+                TaskResponse(
+                    id=task.id,
+                    agent_type=task.agent_type,
+                    action=task.action,
+                    status=task.status,
+                    created_at=task.created_at.isoformat(),
+                    started_at=task.started_at.isoformat() if task.started_at else None,
+                    completed_at=task.completed_at.isoformat()
+                    if task.completed_at
+                    else None,
+                    result=task.result if task.status == "completed" else None,
+                    error=task.error if task.status == "failed" else None,
+                    progress=task.progress,
+                )
+            )
+
+        return TaskListResponse(
+            tasks=task_responses, total_count=total_count, page=page, limit=limit
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get user tasks: {e}")
+        raise AppException("Failed to retrieve user tasks")
+
+
+@router.get("/tasks/{task_id}", response_model=TaskResponse)
+async def get_task_details(task_id: str, user=Depends(get_current_user)):
+    """
+    Get detailed information about a specific task.
+
+    Returns comprehensive task information including current status,
+    results (if completed), and progress information.
+    """
+    try:
+        if not orchestrator:
+            raise AppException(
+                "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
+            )
+
+        # Get task from orchestrator
+        task = await orchestrator.get_task_by_id(user.id, task_id)
+
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        return TaskResponse(
+            id=task.id,
+            agent_type=task.agent_type,
+            action=task.action,
+            status=task.status,
+            created_at=task.created_at.isoformat() if task.created_at else "",
+            started_at=task.started_at.isoformat() if task.started_at else None,
+            completed_at=task.completed_at.isoformat() if task.completed_at else None,
+            result=task.result if task.status == "completed" else None,
+            error=task.error if task.status == "failed" else None,
+            progress=task.progress,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get task details for {task_id}: {e}")
+        raise AppException("Failed to retrieve task details")
+
+
+@router.delete("/tasks/{task_id}")
+async def cancel_task(task_id: str, user=Depends(get_current_user)):
+    """
+    Cancel a pending or running task.
+
+    Only tasks that are in 'pending' or 'running' status can be cancelled.
+    Completed or failed tasks cannot be cancelled.
+    """
+    try:
+        if not orchestrator:
+            raise AppException(
+                "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
+            )
+
+        # Attempt to cancel the task
+        success = await orchestrator.cancel_task(user.id, task_id)
+
+        if not success:
+            # Check if task exists to provide better error message
+            task = await orchestrator.get_task_by_id(user.id, task_id)
+            if not task:
+                raise HTTPException(status_code=404, detail="Task not found")
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Task cannot be cancelled (current status: {task.status})",
+                )
+
+        return {"message": "Task cancelled successfully", "task_id": task_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to cancel task {task_id}: {e}")
+        raise AppException("Failed to cancel task")
+
+
+@router.get("/stats")
+async def get_agent_stats(user=Depends(get_current_user)):
+    """
+    Get agent orchestrator statistics.
+
+    Returns system-wide statistics about agent usage and performance.
+    This endpoint provides insights into system health and usage patterns.
+    """
+    try:
+        if not orchestrator:
+            raise AppException(
+                "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
+            )
+
+        # Get general stats from orchestrator
+        stats = orchestrator.get_agent_stats()
+
+        # Get user-specific stats
+        user_tasks = await orchestrator.get_user_tasks(user.id, limit=1000)
+        user_stats = {
+            "user_total_tasks": len(user_tasks),
+            "user_running_tasks": len([t for t in user_tasks if t.status == "running"]),
+            "user_completed_tasks": len(
+                [t for t in user_tasks if t.status == "completed"]
+            ),
+            "user_failed_tasks": len([t for t in user_tasks if t.status == "failed"]),
+        }
+
+        return {
+            "system_stats": stats,
+            "user_stats": user_stats,
+            "timestamp": orchestrator.task_store[
+                next(iter(orchestrator.task_store))
+            ].created_at.isoformat()
+            if orchestrator.task_store
+            else None,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get agent stats: {e}")
+        raise AppException("Failed to retrieve agent statistics")
+
+
+@router.get("/health")
+async def health_check():
+    """
+    Health check endpoint for monitoring agent system status.
+
+    Returns the current health status of the agent orchestrator
+    and registered agents.
+    """
+    try:
+        health_status = {
+            "orchestrator_initialized": orchestrator is not None,
+            "registered_agents": list(orchestrator.agents.keys())
+            if orchestrator
+            else [],
+            "active_connections": len(orchestrator.running_tasks)
+            if orchestrator
+            else 0,
+            "status": "healthy" if orchestrator else "unhealthy",
+            "timestamp": orchestrator.task_store[
+                next(iter(orchestrator.task_store))
+            ].created_at.isoformat()
+            if orchestrator and orchestrator.task_store
+            else None,
+        }
+
+        status_code = 200 if orchestrator else 503
+        return health_status
+
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {"status": "unhealthy", "error": str(e), "timestamp": None}

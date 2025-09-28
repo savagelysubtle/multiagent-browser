@@ -1,0 +1,142 @@
+---
+description:
+globs: webui.py,**main.py,**.py
+alwaysApply: false
+---
+<cursor-rule>
+  <version>1.0.0</version>
+
+  <context>
+    This rule defines the orchestrator pattern implemented in the web-ui project. The architecture separates concerns between a simple entry point (webui.py) and a sophisticated orchestrator (src/web_ui/main.py) that handles multiple operational modes, service initialization, and error management for this unified AI research platform.
+  </context>
+
+  <project-architecture>
+    <name>Web-UI - Unified AI Research Platform</name>
+    <pattern>Orchestrator pattern with entry point + service coordinator</pattern>
+    <rationale>Manages complex services: ChromaDB, AI agents, MCP servers, browser automation, and multiple operational modes</rationale>
+  </project-architecture>
+
+  <architecture-pattern>
+    <entry-point>
+      <file>[webui.py](mdc:webui.py)</file>
+      <role>Simple command interface - the "front door"</role>
+      <responsibilities>
+        <responsibility>Accept user commands and arguments</responsibility>
+        <responsibility>Route to appropriate orchestrator</responsibility>
+        <responsibility>Stay minimal and focused</responsibility>
+      </responsibilities>
+    </entry-point>
+
+    <orchestrator>
+      <file>[src/web_ui/main.py](mdc:src/web_ui/main.py)</file>
+      <role>Application orchestrator - the "restaurant manager"</role>
+      <responsibilities>
+        <responsibility>Initialize all background services (database, MCP servers, agents)</responsibility>
+        <responsibility>Handle multiple operational modes (web UI, headless, debug)</responsibility>
+        <responsibility>Provide comprehensive logging and error handling</responsibility>
+        <responsibility>Coordinate between different application components</responsibility>
+        <responsibility>Manage application lifecycle and cleanup</responsibility>
+      </responsibilities>
+    </orchestrator>
+  </architecture-pattern>
+
+  <required-features>
+    <feature name="multiple-modes">
+      <description>Support different operational modes</description>
+      <examples>
+        <example>--headless: Run services without UI</example>
+        <example>--init-services: Initialize background services before UI</example>
+        <example>--log-level: Configurable logging levels</example>
+      </examples>
+    </feature>
+
+    <feature name="service-initialization">
+      <description>Proper initialization of web-ui background services</description>
+      <services>
+        <service>ChromaDB database connection and collections setup</service>
+        <service>Browser-use AI agents and deep research agents</service>
+        <service>Unified Python MCP server with tool registry</service>
+        <service>Document pipeline and processing workflows</service>
+        <service>Browser automation and controller services</service>
+      </services>
+    </feature>
+
+    <feature name="comprehensive-logging">
+      <description>Structured logging to both console and file</description>
+      <requirements>
+        <requirement>Log to both stdout and log file</requirement>
+        <requirement>Configurable log levels</requirement>
+        <requirement>Structured format with timestamps</requirement>
+      </requirements>
+    </feature>
+
+    <feature name="error-handling">
+      <description>Graceful error handling and recovery</description>
+      <requirements>
+        <requirement>Catch and log all exceptions</requirement>
+        <requirement>Provide meaningful error messages</requirement>
+        <requirement>Clean shutdown on errors</requirement>
+      </requirements>
+    </feature>
+  </required-features>
+
+  <implementation-guidelines>
+    <guideline>Entry point (webui.py) should be under 50 lines</guideline>
+    <guideline>Orchestrator should use argparse for comprehensive CLI options</guideline>
+    <guideline>Always include async support for background services</guideline>
+    <guideline>Use proper exception handling with context</guideline>
+    <guideline>Include help text and usage examples</guideline>
+  </implementation-guidelines>
+
+  <examples>
+    <good-practice>
+      <description>Web-UI entry point structure (webui.py)</description>
+      <example>
+# webui.py - Web-UI entry point
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+from web_ui.main import main
+
+if __name__ == '__main__':
+    main()
+      </example>
+    </good-practice>
+
+    <good-practice>
+      <description>Web-UI orchestrator with service coordination (src/web_ui/main.py)</description>
+      <example>
+# src/web_ui/main.py - Web-UI Application Orchestrator
+def main():
+    parser = argparse.ArgumentParser(description="Web-UI - Unified AI Research Platform")
+    parser.add_argument('--headless', help='Run services without UI')
+    parser.add_argument('--init-services', help='Initialize ChromaDB, agents, MCP servers')
+    parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'])
+    # Initialize ChromaDB, browser agents, deep research agents, MCP servers
+      </example>
+    </good-practice>
+  </examples>
+
+  <critical-instructions>
+    <instruction>MAINTAIN the orchestrator pattern in this web-ui project</instruction>
+    <instruction>KEEP webui.py simple (under 50 lines) - only route to orchestrator</instruction>
+    <instruction>USE src/web_ui/main.py for all complex initialization and coordination</instruction>
+    <instruction>ENSURE all web-ui services (ChromaDB, agents, MCP servers) initialize properly</instruction>
+    <instruction>PRESERVE multiple operational modes: web UI, headless, debug, service initialization</instruction>
+  </critical-instructions>
+</cursor-rule>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

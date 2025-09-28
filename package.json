@@ -1,0 +1,33 @@
+{
+  "name": "web-ui",
+  "version": "1.0.0",
+  "description": "Web-UI Agent Dashboard - Full-stack application with React frontend and Python backend",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"python webui.py\" \"npm run dev --prefix frontend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "python webui.py",
+    "install:frontend": "npm install --prefix frontend",
+    "install:backend": "uv sync --all-groups",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "build": "npm run build --prefix frontend",
+    "start": "python webui.py"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "web-ui",
+    "agent",
+    "dashboard",
+    "react",
+    "python",
+    "fastapi"
+  ],
+  "author": "Steve <simpleflowworks@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/savagelysubtle/web-ui.git"
+  }
+}
