@@ -41,61 +41,93 @@ export default function ChatView() {
     setIsProcessing(true);
 
     try {
-      // Determine the appropriate action based on the message content
-      let action = 'chat';
-      let payload: any = { message: inputMessage };
+      // Check if we should use direct document operations
+      const lowerMessage = inputMessage.toLowerCase();
 
-      // Simple intent detection based on keywords
-      if (inputMessage.toLowerCase().includes('create') && inputMessage.toLowerCase().includes('document')) {
-        action = 'create_document';
-        payload = {
-          filename: 'chat_document.md',
-          content: inputMessage,
-          document_type: 'markdown'
+      if (lowerMessage.includes('create') && lowerMessage.includes('document')) {
+        // Extract title from message
+        const titleMatch = inputMessage.match(/["']([^"']+)["']/) ||
+                          inputMessage.match(/called\s+(\S+)/) ||
+                          inputMessage.match(/named\s+(\S+)/);
+        const title = titleMatch ? titleMatch[1] : 'New Document';
+
+        // Create document directly
+        const response = await fetch('/api/documents/create-live', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({
+            title: title + '.md',
+            content: `# ${title}\n\nCreated from chat on ${new Date().toLocaleDateString()}\n\n`,
+            document_type: 'markdown',
+            metadata: {}
+          })
+        });
+
+        if (response.ok) {
+          const doc = await response.json();
+          const aiMessage: ChatMessage = {
+            id: Date.now().toString() + '_ai',
+            sender: 'ai',
+            text: `✅ I've created a new document called "${doc.title}"! The document is now available in your document list. You can start editing it right away.`,
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, aiMessage]);
+        } else {
+          throw new Error('Failed to create document');
+        }
+
+      } else if (lowerMessage.includes('search') || lowerMessage.includes('find')) {
+        // Use the existing search endpoint via agent
+        const response = await agentService.executeTask({
+          agent_type: 'document_editor',
+          action: 'search_documents',
+          payload: { query: inputMessage, limit: 10 }
+        });
+
+        const aiMessage: ChatMessage = {
+          id: Date.now().toString() + '_ai',
+          sender: 'ai',
+          text: `🔍 I've started searching for documents matching your query. Task ID: ${response.task_id}. Check the Tasks view for results.`,
+          timestamp: new Date().toISOString(),
         };
-      } else if (inputMessage.toLowerCase().includes('search') || inputMessage.toLowerCase().includes('find')) {
-        action = 'search_documents';
-        payload = { query: inputMessage, limit: 10 };
-      } else if (inputMessage.toLowerCase().includes('browse') || inputMessage.toLowerCase().includes('website')) {
-        setSelectedAgent('browser_use');
-        action = 'browse';
-        // Extract URL from message if present
-        const urlMatch = inputMessage.match(/(https?:\/\/[^\s]+)/);
-        payload = {
-          url: urlMatch ? urlMatch[0] : 'https://google.com',
-          instruction: inputMessage
-        };
-      } else if (inputMessage.toLowerCase().includes('research')) {
-        setSelectedAgent('deep_research');
-        action = 'research';
-        payload = {
-          topic: inputMessage,
-          depth: 'standard'
-        };
+        setMessages((prev) => [...prev, aiMessage]);
+
+      } else {
+        // Use the chat endpoint for general conversation
+        const response = await fetch('/api/documents/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({
+            message: inputMessage,
+            context_document_id: null
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const aiMessage: ChatMessage = {
+            id: Date.now().toString() + '_ai',
+            sender: 'ai',
+            text: data.response,
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, aiMessage]);
+        } else {
+          throw new Error('Chat request failed');
+        }
       }
-
-      // Submit task to agent
-      const response = await agentService.executeTask({
-        agent_type: selectedAgent,
-        action,
-        payload,
-      });
-
-      // Add AI response
-      const aiMessage: ChatMessage = {
-        id: Date.now().toString() + '_ai',
-        sender: 'ai',
-        text: `I've started a ${selectedAgent.replace('_', ' ')} task to help with your request. Task ID: ${response.task_id}. You can monitor the progress in the Tasks view.`,
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
 
     } catch (error: any) {
       const errorMessage: ChatMessage = {
         id: Date.now().toString() + '_error',
         sender: 'ai',
-        text: `Sorry, I encountered an error: ${error.message || 'Unknown error occurred'}`,
+        text: `Sorry, I encountered an error: ${error.message || 'Unknown error occurred'}. Please try again.`,
         timestamp: new Date().toISOString(),
       };
 
@@ -215,7 +247,7 @@ export default function ChatView() {
           {/* Quick Actions */}
           <div className="mt-3 flex flex-wrap gap-2">
             <button
-              onClick={() => setInputMessage('Create a new markdown document with a project plan')}
+              onClick={() => setInputMessage('Create a new document called "Project Plan"')}
               className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
             >
               Create Document
@@ -227,16 +259,16 @@ export default function ChatView() {
               Search Documents
             </button>
             <button
-              onClick={() => setInputMessage('Browse https://github.com and find trending repositories')}
+              onClick={() => setInputMessage('Help me write a technical specification document')}
               className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
             >
-              Browse Web
+              Get Writing Help
             </button>
             <button
-              onClick={() => setInputMessage('Research the latest trends in AI development')}
+              onClick={() => setInputMessage('What documents do I have?')}
               className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
             >
-              Research Topic
+              List Documents
             </button>
           </div>
         </div>

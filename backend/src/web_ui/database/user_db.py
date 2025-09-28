@@ -25,7 +25,9 @@ class UserDatabase:
         """Initialize the user database."""
         if db_path is None:
             # Default to data/users.db
-            db_path_obj = Path("data/users.db")
+            from .config import get_project_root
+
+            db_path_obj = get_project_root() / "data" / "users.db"
         else:
             db_path_obj = Path(db_path)
 

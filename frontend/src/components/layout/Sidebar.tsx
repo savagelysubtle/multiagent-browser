@@ -2,7 +2,6 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   FileText,
-  MessageCircle,
   ListTodo,
   Settings,
   ChevronLeft,
@@ -13,7 +12,6 @@ import { cn } from '../../utils/cn';
 
 const navigation = [
   { name: 'Editor', href: '/editor', icon: FileText },
-  { name: 'Chat', href: '/chat', icon: MessageCircle },
   { name: 'Tasks', href: '/tasks', icon: ListTodo },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
@@ -25,19 +23,19 @@ export default function Sidebar() {
 
   return (
     <div className={cn(
-      "bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300",
+      "bg-[#252526] border-r border-[#3e3e42] flex flex-col transition-all duration-300",
       sidebarCollapsed ? "w-16" : "w-64"
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between p-4 border-b border-[#3e3e42]">
         {!sidebarCollapsed && (
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h1 className="text-lg font-semibold text-gray-200">
             Web-UI
           </h1>
         )}
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="p-1 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+          className="p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-[#2a2d2e]"
         >
           {sidebarCollapsed ? (
             <ChevronRight className="h-5 w-5" />
@@ -58,10 +56,10 @@ export default function Sidebar() {
               key={item.name}
               onClick={() => navigate(item.href)}
               className={cn(
-                "w-full flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
+                "w-full flex items-center px-2 py-2 text-sm font-medium rounded transition-colors",
                 isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  ? "bg-[#094771] text-white"
+                  : "text-gray-400 hover:bg-[#2a2d2e] hover:text-gray-200"
               )}
               title={sidebarCollapsed ? item.name : undefined}
             >
@@ -73,12 +71,12 @@ export default function Sidebar() {
       </nav>
 
       {/* Connection Status */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-t border-[#3e3e42]">
         <div className={cn(
-          "flex items-center text-xs text-gray-500 dark:text-gray-400",
+          "flex items-center text-xs text-gray-400",
           sidebarCollapsed ? "justify-center" : ""
         )}>
-          <div className="w-2 h-2 bg-green-400 rounded-full mr-2" />
+          <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
           {!sidebarCollapsed && "Connected"}
         </div>
       </div>

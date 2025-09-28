@@ -12,28 +12,31 @@ interface ChatPanelProps {
 const ChatMessageComponent: React.FC<{ message: ChatMessage }> = ({ message }) => {
     const isUser = message.sender === 'user';
     return (
-        <div className={`flex items-start gap-3 my-4 ${isUser ? 'justify-end' : ''}`}>
+        <div className={`flex items-start gap-2 my-2 ${isUser ? 'justify-end' : ''}`}>
             {!isUser && (
-                <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                    <Icon name="sparkles" className="w-5 h-5 text-white" />
+                <div className="w-6 h-6 flex-shrink-0 rounded bg-[#0e639c] flex items-center justify-center">
+                    <Icon name="sparkles" className="w-4 h-4 text-white" />
                 </div>
             )}
-            <div className={`p-3 rounded-lg max-w-sm md:max-w-md lg:max-w-lg ${isUser ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-[#2d2d30] text-gray-800 dark:text-gray-200'}`}>
-                <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+            <div className={`px-3 py-2 rounded max-w-[85%] text-sm ${isUser
+                ? 'bg-[#094771] text-gray-100'
+                : 'bg-[#1e1e1e] text-gray-300 border border-[#3e3e42]'
+            }`}>
+                <p className="whitespace-pre-wrap break-words">{message.text}</p>
             </div>
         </div>
     );
 };
 
 const LoadingIndicator: React.FC = () => (
-    <div className="flex items-start gap-3 my-4">
-        <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-            <Icon name="sparkles" className="w-5 h-5 text-white" />
+    <div className="flex items-start gap-2 my-2">
+        <div className="w-6 h-6 flex-shrink-0 rounded bg-[#0e639c] flex items-center justify-center">
+            <Icon name="sparkles" className="w-4 h-4 text-white" />
         </div>
-        <div className="p-3 rounded-lg bg-gray-200 dark:bg-[#2d2d30] flex items-center gap-2 text-gray-800 dark:text-gray-200">
-            <span className="animate-pulse">●</span>
-            <span className="animate-pulse delay-150">●</span>
-            <span className="animate-pulse delay-300">●</span>
+        <div className="px-3 py-2 rounded bg-[#1e1e1e] border border-[#3e3e42] flex items-center gap-1 text-gray-300">
+            <span className="animate-pulse text-sm">●</span>
+            <span className="animate-pulse delay-150 text-sm">●</span>
+            <span className="animate-pulse delay-300 text-sm">●</span>
         </div>
     </div>
 );
@@ -65,34 +68,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, i
     };
 
     return (
-        <div className="w-full h-full bg-gray-100 dark:bg-[#252526] flex flex-col">
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-                <h2 className="text-sm font-bold tracking-wider uppercase">Gemini Assistant</h2>
+        <div className="w-full h-full bg-[#252526] flex flex-col">
+            <div className="p-3 border-b border-[#3e3e42] flex-shrink-0">
+                <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">AI Assistant</h2>
             </div>
-            <div className="flex-grow p-4 overflow-y-auto">
+            <div className="flex-grow p-3 overflow-y-auto">
                 {messages.map((msg) => (
                     <ChatMessageComponent key={msg.id} message={msg} />
                 ))}
                 {isLoading && <LoadingIndicator />}
                 <div ref={messagesEndRef} />
             </div>
-            <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 bg-gray-100 dark:bg-[#252526]">
-                <form onSubmit={handleSubmit} className="flex items-center gap-2">
+            <div className="p-3 border-t border-[#3e3e42] flex-shrink-0">
+                <form onSubmit={handleSubmit} className="flex items-end gap-2">
                     <textarea
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask Gemini anything..."
-                        className="flex-grow bg-gray-200 dark:bg-[#3c3c3c] text-gray-800 dark:text-gray-200 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        placeholder="Ask anything..."
+                        className="flex-grow bg-[#3c3c3c] text-gray-200 rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#007acc] resize-none border border-[#3e3e42] placeholder-gray-500 min-h-[36px] max-h-[120px]"
                         rows={1}
                         disabled={isLoading}
                     />
                     <button
                         type="submit"
                         disabled={isLoading || !input.trim()}
-                        className="p-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+                        className="p-2 bg-[#0e639c] text-white rounded hover:bg-[#1177bb] disabled:bg-[#3e3e42] disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
                     >
-                        <Icon name="send" className="w-5 h-5" />
+                        <Icon name="send" className="w-4 h-4" />
                     </button>
                 </form>
             </div>

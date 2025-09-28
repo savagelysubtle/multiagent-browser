@@ -718,7 +718,7 @@ def run_api_server(
     log_config = LoggingConfig.configure_uvicorn_logging(log_level.upper())
 
     uvicorn.run(
-        "src.web_ui.api.server:app",
+        "web_ui.api.server:app",
         host=host,
         port=port,
         reload=reload,

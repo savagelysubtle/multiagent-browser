@@ -8,7 +8,6 @@ import Header from '../components/layout/Header';
 
 // Feature views
 import EditorView from '../views/EditorView';
-import ChatView from '../views/ChatView';
 import TasksView from '../views/TasksView';
 import SettingsView from '../views/SettingsView';
 
@@ -16,7 +15,7 @@ export default function DashboardPage() {
   const { isConnected } = useWebSocket();
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-[#1e1e1e]">
       {/* Sidebar */}
       <Sidebar />
 
@@ -30,7 +29,6 @@ export default function DashboardPage() {
           <Routes>
             <Route path="/" element={<EditorView />} />
             <Route path="/editor" element={<EditorView />} />
-            <Route path="/chat" element={<ChatView />} />
             <Route path="/tasks" element={<TasksView />} />
             <Route path="/settings" element={<SettingsView />} />
           </Routes>

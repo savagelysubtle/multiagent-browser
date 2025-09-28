@@ -123,54 +123,153 @@ class SimpleAgentOrchestrator:
         ]
 
     async def submit_task(
-        self, user_id: str, agent_type: str, action: str, payload: dict
+        self,
+        agent_type: str,
+        action: str,
+        payload: dict[str, Any],
+        user_id: str | None = None,
     ) -> str:
-        """Submit a task for a specific user."""
+        """Submit a task to an agent and return task ID."""
         if agent_type not in self.agents:
             raise ValueError(f"Unknown agent type: {agent_type}")
 
-        # Check concurrent task limit
-        user_running_tasks = self._get_user_running_tasks(user_id)
-        if len(user_running_tasks) >= self.max_concurrent_tasks:
-            raise ValueError(
-                f"Maximum concurrent tasks ({self.max_concurrent_tasks}) reached for user"
-            )
-
+        # Create task object
         task = AgentTask(
             id=str(uuid.uuid4()),
-            user_id=user_id,
+            user_id=user_id or "anonymous",
             agent_type=agent_type,
             action=action,
             payload=payload,
             created_at=datetime.utcnow(),
         )
 
-        # Store task
         self.task_store[task.id] = task
 
-        # Track user tasks
-        if user_id not in self.user_tasks:
-            self.user_tasks[user_id] = []
-        self.user_tasks[user_id].append(task.id)
+        # Handle document_editor actions directly
+        if agent_type == "document_editor":
+            agent = self.agents[agent_type]
 
-        # Execute task asynchronously
-        asyncio_task = asyncio.create_task(self._execute_task(task))
-        self.running_tasks[task.id] = asyncio_task
+            try:
+                if action == "create_document":
+                    # Extract parameters
+                    filename = payload.get("filename", "untitled.md")
+                    content = payload.get("content", "")
+                    document_type = payload.get("document_type", "markdown")
+                    metadata = payload.get("metadata", {})
 
-        # Send immediate acknowledgment
-        await self._notify_task_status(
-            task,
-            {
-                "type": "task_created",
-                "task_id": task.id,
-                "agent_type": agent_type,
-                "action": action,
-            },
-        )
+                    # Call document agent method
+                    success, message, document_id = await agent.create_document(
+                        filename=filename,
+                        content=content,
+                        document_type=document_type,
+                        metadata=metadata,
+                    )
 
-        logger.info(
-            f"Task {task.id} submitted for user {user_id}: {agent_type}.{action}"
-        )
+                    # Update task
+                    task.status = "completed" if success else "failed"
+                    task.result = {
+                        "success": success,
+                        "message": message,
+                        "document_id": document_id,
+                    }
+
+                elif action == "edit_document":
+                    # Extract parameters
+                    document_id = payload.get("document_id")
+                    instruction = payload.get("instruction", "")
+                    use_llm = payload.get("use_llm", True)
+
+                    if not document_id:
+                        raise ValueError(
+                            "document_id is required for edit_document action"
+                        )
+
+                    # Call document agent method
+                    success, message, updated_id = await agent.edit_document(
+                        document_id=document_id,
+                        instruction=instruction,
+                        use_llm=use_llm,
+                    )
+
+                    # Update task
+                    task.status = "completed" if success else "failed"
+                    task.result = {
+                        "success": success,
+                        "message": message,
+                        "document_id": updated_id,
+                    }
+
+                elif action == "search_documents":
+                    # Extract parameters
+                    query = payload.get("query", "")
+                    collection_type = payload.get("collection_type", "documents")
+                    limit = payload.get("limit", 10)
+
+                    # Call document agent method
+                    results = await agent.search_documents(
+                        query=query, collection_type=collection_type, limit=limit
+                    )
+
+                    # Update task
+                    task.status = "completed"
+                    task.result = {
+                        "success": True,
+                        "documents": results,
+                        "count": len(results),
+                    }
+
+                elif action == "chat":
+                    # Extract parameters
+                    message = payload.get("message", "")
+                    context_document_id = payload.get("context_document_id")
+
+                    # Call document agent chat method
+                    response = await agent.chat_with_user(
+                        message=message, context_document_id=context_document_id
+                    )
+
+                    # Update task
+                    task.status = "completed"
+                    task.result = {"success": True, "response": response}
+
+                else:
+                    # Unknown action
+                    task.status = "failed"
+                    task.error = f"Unknown action for document_editor: {action}"
+
+            except Exception as e:
+                logger.error(f"Error executing document_editor task: {e}")
+                task.status = "failed"
+                task.error = str(e)
+
+            # Update completed_at time
+            task.completed_at = datetime.utcnow()
+
+            # Send WebSocket update if available
+            if self.ws_manager:
+                await self.ws_manager.send_task_update(
+                    task_id=task.id,
+                    status=task.status,
+                    data={
+                        "task_id": task.id,
+                        "agent_type": task.agent_type,
+                        "action": task.action,
+                        "status": task.status,
+                        "result": task.result,
+                        "error": task.error,
+                        "created_at": task.created_at.isoformat(),
+                        "completed_at": task.completed_at.isoformat()
+                        if task.completed_at is not None
+                        else None,
+                    },
+                )
+
+        else:
+            # For other agents, queue the task for processing
+            # TODO: Implement async processing for other agent types
+            task.status = "queued"
+            logger.info(f"Task {task.id} queued for {agent_type} agent")
+
         return task.id
 
     async def _execute_task(self, task: AgentTask):

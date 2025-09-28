@@ -6,11 +6,13 @@ and DocumentEditingAgent support.
 """
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
+from ...api.server import document_agent
 from ...database.chroma_manager import ChromaManager
 from ...database.models import DocumentModel
 from ...utils.logging_config import get_logger
@@ -163,3 +165,153 @@ async def list_documents(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list documents",
         )
+
+
+@router.post("/create-live", response_model=DocumentResponse)
+async def create_document_live(
+    request: DocumentCreateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new document using the document agent directly."""
+    logger.info(f"Creating document for user {current_user.id}: {request.title}")
+
+    try:
+        # Get or create document agent
+        from ...api.server import document_agent
+
+        if not document_agent:
+            raise HTTPException(status_code=503, detail="Document agent not available")
+
+        # Create document using agent
+        success, message, document_id = await document_agent.create_document(
+            filename=request.title,
+            content=request.content,
+            document_type=request.document_type or "markdown",
+            metadata={
+                "user_id": current_user.id,
+                "created_via": "web_ui",
+                "tags": request.metadata.get("tags", []) if request.metadata else [],
+            },
+        )
+
+        if success and document_id:
+            # Get the created document
+            document = document_manager.get_document("documents", document_id)
+            if document:
+                return DocumentResponse(
+                    id=document.id,
+                    title=document.metadata.get("filename", request.title),
+                    content=document.content,
+                    document_type=document.metadata.get("document_type", "markdown"),
+                    created_at=document.metadata.get(
+                        "created_at", datetime.now().isoformat()
+                    ),
+                    updated_at=document.metadata.get(
+                        "updated_at", datetime.now().isoformat()
+                    ),
+                    metadata=document.metadata,
+                    owner_id=current_user.id,
+                )
+
+        raise HTTPException(
+            status_code=400, detail=message or "Failed to create document"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating document: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal error creating document: {str(e)}"
+        )
+
+
+@router.put("/edit-live/{document_id}", response_model=DocumentResponse)
+async def edit_document_live(
+    document_id: str,
+    request: DocumentUpdateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Edit an existing document using the document agent directly."""
+    logger.info(f"Editing document {document_id} for user {current_user.id}")
+
+    try:
+        # Get or create document agent
+        from ...api.server import document_agent
+
+        if not document_agent:
+            raise HTTPException(status_code=503, detail="Document agent not available")
+
+        # Prepare instruction from update request
+        instruction = request.content if request.content else ""
+        if request.title:
+            instruction = f"Update title to: {request.title}\n{instruction}"
+
+        # Edit document using agent
+        success, message, updated_id = await document_agent.edit_document(
+            document_id=document_id,
+            instruction=instruction,
+            use_llm=False,  # Direct edit without LLM processing
+        )
+
+        if success and updated_id:
+            # Get the updated document
+            document = document_manager.get_document("documents", updated_id)
+            if document:
+                return DocumentResponse(
+                    id=document.id,
+                    title=document.metadata.get(
+                        "filename", document.metadata.get("title", "Untitled")
+                    ),
+                    content=document.content,
+                    document_type=document.metadata.get("document_type", "markdown"),
+                    created_at=document.metadata.get(
+                        "created_at", datetime.now().isoformat()
+                    ),
+                    updated_at=document.metadata.get(
+                        "updated_at", datetime.now().isoformat()
+                    ),
+                    metadata=document.metadata,
+                    owner_id=current_user.id,
+                )
+
+        raise HTTPException(
+            status_code=400, detail=message or "Failed to edit document"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error editing document: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal error editing document: {str(e)}"
+        )
+
+
+@router.post("/chat", response_model=dict)
+async def chat_with_document_agent(
+    request: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Chat with the document agent for assistance."""
+    logger.info(f"Chat request from user {current_user.id}")
+
+    try:
+        # Get or create document agent
+
+        if not document_agent:
+            raise HTTPException(status_code=503, detail="Document agent not available")
+
+        message = request.get("message", "")
+        context_document_id = request.get("context_document_id")
+
+        # Get response from agent
+        response = await document_agent.chat_with_user(
+            message=message, context_document_id=context_document_id
+        )
+
+        return {"response": response, "timestamp": datetime.now().isoformat()}
+
+    except Exception as e:
+        logger.error(f"Error in chat: {e}")
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")

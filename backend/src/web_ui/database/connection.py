@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
-from chromadb import PersistentClient
-from chromadb.config import Settings
+from chromadb import PersistentClient  # type: ignore
+from chromadb.config import Settings  # type: ignore
 
 from ..utils.logging_config import get_logger
 
@@ -17,7 +18,7 @@ class ChromaConnection:
     """Singleton class for managing ChromaDB connections."""
 
     _instance: ChromaConnection | None = None
-    _client: PersistentClient | None = None
+    _client: Any | None = None  # ChromaDB PersistentClient
 
     def __new__(cls) -> ChromaConnection:
         if cls._instance is None:
@@ -33,7 +34,10 @@ class ChromaConnection:
         """Initialize the ChromaDB client with proper configuration."""
         try:
             # Get database path from environment or use default
-            db_path = os.getenv("CHROMA_DB_PATH", "./data/chroma_db")
+            from .config import get_project_root
+
+            default_db_path = str(get_project_root() / "data" / "chroma_db")
+            db_path = os.getenv("CHROMA_DB_PATH", default_db_path)
             db_path = Path(db_path).resolve()
 
             # Ensure the directory exists
@@ -94,8 +98,11 @@ def close_chroma_connection() -> None:
 # Environment variable configuration
 def get_db_config() -> dict:
     """Get database configuration from environment variables."""
+    from .config import get_project_root
+
+    default_db_path = str(get_project_root() / "data" / "chroma_db")
     return {
-        "db_path": os.getenv("CHROMA_DB_PATH", "./data/chroma_db"),
+        "db_path": os.getenv("CHROMA_DB_PATH", default_db_path),
         "collection_prefix": os.getenv("CHROMA_COLLECTION_PREFIX", "webui_"),
         "default_embedding_function": os.getenv("CHROMA_EMBEDDING_FUNCTION", "default"),
         "max_connections": int(os.getenv("CHROMA_MAX_CONNECTIONS", "10")),

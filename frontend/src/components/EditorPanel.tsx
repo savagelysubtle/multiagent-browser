@@ -28,10 +28,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange 
 
     if (!item) {
         return (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-white dark:bg-[#1e1e1e] text-gray-400 dark:text-gray-500">
-                <Icon name="edit" className="w-16 h-16 mb-4" />
+            <div className="w-full h-full flex flex-col items-center justify-center bg-[#1e1e1e] text-gray-500">
+                <Icon name="edit" className="w-16 h-16 mb-4 text-gray-700" />
                 <p>Select a file from the explorer to start editing.</p>
-                <p>Or upload a new file.</p>
+                <p className="text-sm">Or create a new file.</p>
             </div>
         );
     }
@@ -42,15 +42,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange 
 
     return (
         <div className="w-full h-full flex flex-col">
-            <div className="bg-gray-200 dark:bg-[#333333] px-4 py-2 text-sm border-b border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 flex justify-between items-center flex-shrink-0">
-                <span>{item.name}</span>
+            <div className="bg-[#2d2d30] px-4 py-2 text-sm border-b border-[#3e3e42] text-gray-300 flex justify-between items-center flex-shrink-0">
+                <span className="flex items-center gap-2">
+                    <Icon name="file" className="w-4 h-4 text-gray-400" />
+                    {item.name}
+                </span>
                  <button
                     onClick={handleDownload}
-                    className="p-1 rounded-md text-gray-500 hover:bg-gray-300 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                    className="p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-[#094771] transition-colors"
                     title={`Download ${item.name}`}
                     aria-label={`Download file ${item.name}`}
                 >
-                    <Icon name="download" className="w-5 h-5" />
+                    <Icon name="download" className="w-4 h-4" />
                 </button>
             </div>
             {isTextFile ? (
@@ -58,7 +61,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange 
                     value={item.content}
                     onChange={handleTextChange}
                     readOnly={isReadOnly}
-                    className={`flex-grow p-4 text-gray-800 dark:text-gray-200 font-mono text-sm leading-relaxed focus:outline-none resize-none ${isReadOnly ? 'bg-gray-100 dark:bg-[#2a2a2b] cursor-default' : 'bg-white dark:bg-[#1e1e1e]'}`}
+                    className={`flex-grow p-4 text-gray-200 font-mono text-sm leading-relaxed focus:outline-none resize-none ${
+                        isReadOnly ? 'bg-[#1e1e1e] cursor-default' : 'bg-[#1e1e1e]'
+                    }`}
                     placeholder="Start typing your document content here..."
                     spellCheck="false"
                 />
@@ -66,12 +71,12 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange 
                  <iframe
                     src={item.url}
                     title={item.name}
-                    className="w-full h-full border-none"
+                    className="w-full h-full border-none bg-white"
                 />
             ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-white dark:bg-[#1e1e1e] text-gray-500 dark:text-gray-500 p-4">
-                     <Icon name="file" className="w-16 h-16 mb-4" />
-                     <p className="font-bold text-gray-700 dark:text-gray-400">Preview not available</p>
+                <div className="w-full h-full flex flex-col items-center justify-center bg-[#1e1e1e] text-gray-500 p-4">
+                    <Icon name="file" className="w-16 h-16 mb-4 text-gray-700" />
+                    <p className="font-bold text-gray-400">Preview not available</p>
                      <p className="text-sm text-center">Cannot display file '{item.name}' ({item.file.type}).</p>
                      <p className="text-sm mt-2">You can still download it using the button above.</p>
                 </div>

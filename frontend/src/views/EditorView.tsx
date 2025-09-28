@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, Search, Save, Trash2 } from 'lucide-react';
+import { FileText, Search, Save, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { agentService } from '../services/agentService';
 import { useAppStore } from '../stores/useAppStore';
-import { Document } from '../types';
+import { Document, ChatMessage } from '../types';
+import { ChatPanel } from '../components/ChatPanel';
+import { EditorPanel } from '../components/EditorPanel';
 
 export default function EditorView() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
@@ -11,9 +13,58 @@ export default function EditorView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newDocumentTitle, setNewDocumentTitle] = useState('');
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(true);
+  const [explorerWidth, setExplorerWidth] = useState(256); // 16rem = 256px
+  const [chatWidth, setChatWidth] = useState(320); // 20rem = 320px
+  const [isResizingExplorer, setIsResizingExplorer] = useState(false);
+  const [isResizingChat, setIsResizingChat] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: '1',
+      sender: 'ai',
+      text: 'Hello! I can help you with document editing, web browsing, and research tasks. What would you like to do?',
+      timestamp: new Date().toISOString(),
+    },
+  ]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const { addTask } = useAppStore();
   const queryClient = useQueryClient();
+
+  // Handle mouse move for resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingExplorer && containerRef.current) {
+        const newWidth = e.clientX - containerRef.current.getBoundingClientRect().left;
+        setExplorerWidth(Math.max(200, Math.min(400, newWidth)));
+      } else if (isResizingChat && containerRef.current) {
+        const containerRight = containerRef.current.getBoundingClientRect().right;
+        const newWidth = containerRight - e.clientX;
+        setChatWidth(Math.max(280, Math.min(600, newWidth)));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingExplorer(false);
+      setIsResizingChat(false);
+    };
+
+    if (isResizingExplorer || isResizingChat) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingExplorer, isResizingChat]);
 
   // This would be replaced with actual document API calls
   const { data: documents, isLoading } = useQuery({
@@ -26,138 +77,215 @@ export default function EditorView() {
 
   const createDocumentMutation = useMutation({
     mutationFn: async (data: { title: string; content: string }) => {
-      return agentService.createDocument(
-        `${data.title}.md`,
-        data.content,
-        'markdown'
-      );
+      // Use the direct create endpoint
+      const response = await fetch('/api/documents/create-live', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          title: data.title,
+          content: data.content,
+          document_type: 'markdown',
+          metadata: {}
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create document');
+      }
+
+      return response.json();
     },
-    onSuccess: (result) => {
+    onSuccess: (document) => {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       setShowCreateModal(false);
       setNewDocumentTitle('');
-      // Add task to store for tracking
-      addTask({
-        id: result.task_id,
-        agent_type: 'document_editor',
-        action: 'create_document',
-        status: 'pending',
-        created_at: new Date().toISOString(),
-      });
-    },
-  });
 
-  const searchDocumentsMutation = useMutation({
-    mutationFn: (query: string) => {
-      return agentService.searchDocuments(query);
-    },
-    onSuccess: (result) => {
-      addTask({
-        id: result.task_id,
-        agent_type: 'document_editor',
-        action: 'search_documents',
-        status: 'pending',
-        created_at: new Date().toISOString(),
+      // Select the newly created document
+      setSelectedDocument({
+        id: document.id,
+        name: document.title,
+        title: document.title,
+        content: document.content,
+        created_at: document.created_at,
+        updated_at: document.updated_at,
+        user_id: document.owner_id || '',
+        url: '',
+        file: new File([document.content], document.title, { type: 'text/markdown' })
       });
+      setDocumentContent(document.content);
     },
-  });
-
-  const editDocumentMutation = useMutation({
-    mutationFn: (data: { documentId: string; instruction: string }) => {
-      return agentService.editDocument(data.documentId, data.instruction);
-    },
-    onSuccess: (result) => {
-      addTask({
-        id: result.task_id,
-        agent_type: 'document_editor',
-        action: 'edit_document',
-        status: 'pending',
-        created_at: new Date().toISOString(),
-      });
-    },
+    onError: (error: any) => {
+      console.error('Error creating document:', error);
+      // You could add a toast notification here
+    }
   });
 
   const handleCreateDocument = () => {
     if (newDocumentTitle.trim()) {
       createDocumentMutation.mutate({
         title: newDocumentTitle,
-        content: 'Welcome to your new document!\n\nStart writing here...',
+        content: `# ${newDocumentTitle}\n\nCreated on ${new Date().toLocaleDateString()}\n\n## Overview\n\nStart writing here...\n`,
       });
     }
   };
 
-  const handleSearchDocuments = () => {
-    if (searchQuery.trim()) {
-      searchDocumentsMutation.mutate(searchQuery);
+  const handleDocumentContentChange = async (id: string, content: string) => {
+    setDocumentContent(content);
+
+    // Auto-save functionality with debouncing
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/documents/edit-live/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({
+            content: content,
+            title: selectedDocument?.title,
+            metadata: {}
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save document');
+        }
+
+        // Update saved indicator (you could add UI feedback here)
+        console.log('Document saved');
+      } catch (error) {
+        console.error('Error saving document:', error);
+      }
+    }, 1000); // Save after 1 second of inactivity
   };
 
-  const handleEditDocument = () => {
-    if (selectedDocument && documentContent !== selectedDocument.content) {
-      const instruction = `Update the document content to: ${documentContent}`;
-      editDocumentMutation.mutate({
-        documentId: selectedDocument.id,
-        instruction,
+  // Add ref for save timeout
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleSendChatMessage = async (message: string) => {
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      sender: 'user',
+      text: message,
+      timestamp: new Date().toISOString(),
+    };
+    setChatMessages(prev => [...prev, userMessage]);
+    setIsChatLoading(true);
+
+    try {
+      // Use the document agent chat endpoint
+      const response = await fetch('/api/documents/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          message: message,
+          context_document_id: selectedDocument?.id || null
+        })
       });
+
+      if (response.ok) {
+        const data = await response.json();
+        const aiMessage: ChatMessage = {
+          id: Date.now().toString() + '_ai',
+          sender: 'ai',
+          text: data.response,
+          timestamp: new Date().toISOString(),
+        };
+        setChatMessages(prev => [...prev, aiMessage]);
+
+        // If the message was about editing and we have a document selected, refresh it
+        if (selectedDocument && message.toLowerCase().includes('edit')) {
+          // Refresh document content after a short delay
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ['documents'] });
+          }, 1000);
+        }
+      } else {
+        throw new Error('Chat request failed');
+      }
+    } catch (error) {
+      const aiMessage: ChatMessage = {
+        id: Date.now().toString() + '_ai',
+        sender: 'ai',
+        text: `I apologize, but I encountered an error. Please try again.`,
+        timestamp: new Date().toISOString(),
+      };
+      setChatMessages(prev => [...prev, aiMessage]);
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
   return (
-    <div className="h-full flex bg-gray-50 dark:bg-gray-900">
-      {/* Document List Sidebar */}
-      <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+    <div ref={containerRef} className="h-full flex bg-[#1e1e1e]">
+      {/* Left Section - Document List */}
+      <div
+        className="bg-[#252526] border-r border-[#3e3e42] flex flex-col flex-shrink-0 relative"
+        style={{ width: `${explorerWidth}px` }}
+      >
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Documents
+        <div className="p-3 border-b border-[#3e3e42]">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+              Explorer
             </h2>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="p-2 text-primary hover:bg-primary/10 rounded-md"
+              className="p-1 text-gray-400 hover:text-gray-200 hover:bg-[#2a2d2e] rounded"
               title="Create new document"
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-4 w-4" />
             </button>
           </div>
 
           {/* Search */}
-          <div className="flex space-x-2">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search documents..."
-                className="w-full px-3 py-2 pl-9 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearchDocuments()}
-              />
-              <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-            </div>
-            <button
-              onClick={handleSearchDocuments}
-              disabled={!searchQuery.trim() || searchDocumentsMutation.isPending}
-              className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm"
-            >
-              Search
-            </button>
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search files..."
+              className="w-full px-2 py-1 pl-7 bg-[#3c3c3c] border border-[#3e3e42] rounded text-xs text-gray-300 placeholder-gray-500 focus:outline-none focus:border-[#007acc]"
+            />
+            <Search className="h-3 w-3 text-gray-500 absolute left-2 top-1/2 transform -translate-y-1/2" />
           </div>
         </div>
 
         {/* Document List */}
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+            <div className="p-4 text-center text-gray-500 text-xs">
               Loading documents...
             </div>
           ) : !documents || documents.length === 0 ? (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-              <FileText className="h-12 w-12 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
-              <p>No documents yet</p>
-              <p className="text-xs">Create your first document!</p>
+            <div className="p-4 text-center text-gray-500">
+              <FileText className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+              <p className="text-xs">No documents yet</p>
             </div>
           ) : (
-            <div className="p-2">
+            <div className="p-1">
               {documents.map((doc) => (
                 <button
                   key={doc.id}
@@ -165,81 +293,56 @@ export default function EditorView() {
                     setSelectedDocument(doc);
                     setDocumentContent(doc.content);
                   }}
-                  className={`w-full text-left p-3 rounded-md mb-1 transition-colors ${
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
                     selectedDocument?.id === doc.id
-                      ? 'bg-primary/10 border border-primary/20'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-[#094771] text-white'
+                      : 'text-gray-300 hover:bg-[#2a2d2e]'
                   }`}
                 >
-                  <div className="flex items-start space-x-3">
-                    <FileText className="h-5 w-5 text-gray-400 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                        {doc.title || doc.name}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                        {doc.content.substring(0, 100)}...
-                      </p>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{doc.title || doc.name}</span>
                   </div>
                 </button>
               ))}
             </div>
           )}
         </div>
+
+        {/* Resize handle for explorer */}
+        <div
+          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-[#007acc] transition-colors"
+          onMouseDown={() => setIsResizingExplorer(true)}
+        />
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 flex flex-col">
+      {/* Main Editor Area */}
+      <div className="flex-1 flex flex-col bg-[#1e1e1e] relative">
         {selectedDocument ? (
-          <>
-            {/* Editor Header */}
-            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    {selectedDocument.title || selectedDocument.name}
-                  </h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Last modified: {new Date(selectedDocument.updated_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handleEditDocument}
-                    disabled={documentContent === selectedDocument.content || editDocumentMutation.isPending}
-                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {editDocumentMutation.isPending ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Editor Content */}
-            <div className="flex-1 p-4">
-              <textarea
-                value={documentContent}
-                onChange={(e) => setDocumentContent(e.target.value)}
-                className="w-full h-full p-4 border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono text-sm"
-                placeholder="Start writing your document..."
-              />
-            </div>
-          </>
+          <EditorPanel
+            item={{
+              ...selectedDocument,
+              type: 'document',
+              url: selectedDocument.url || '#',
+              file: selectedDocument.file || new File([selectedDocument.content], selectedDocument.name, {
+                type: 'text/plain'
+              })
+            }}
+            onContentChange={handleDocumentContentChange}
+          />
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
+          <div className="flex-1 flex items-center justify-center text-gray-500">
             <div className="text-center">
-              <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              <FileText className="h-16 w-16 text-gray-700 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-400 mb-2">
                 No document selected
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-4">
-                Choose a document from the sidebar to start editing
+              <p className="text-gray-500 mb-4 text-sm">
+                Choose a document from the explorer or create a new one
               </p>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                className="inline-flex items-center px-4 py-2 bg-[#0e639c] text-white rounded hover:bg-[#1177bb] text-sm"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create New Document
@@ -249,16 +352,62 @@ export default function EditorView() {
         )}
       </div>
 
+      {/* Chat Panel Toggle Button - Only show when collapsed */}
+      {!isChatPanelOpen && (
+        <button
+          onClick={() => setIsChatPanelOpen(true)}
+          className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-[#2a2d2e] hover:bg-[#3e3e42] text-gray-400 hover:text-gray-200 p-2 rounded-l-md border-l border-t border-b border-[#3e3e42] transition-all duration-200"
+          title="Show chat"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      )}
+
+      {/* Right Sidebar - Chat Panel */}
+      <div
+        className={`border-l border-[#3e3e42] flex-shrink-0 transition-all duration-300 ease-in-out relative ${
+          isChatPanelOpen ? '' : 'w-0'
+        }`}
+        style={{ width: isChatPanelOpen ? `${chatWidth}px` : '0' }}
+      >
+        {isChatPanelOpen && (
+          <>
+            {/* Close button inside chat panel */}
+            <button
+              onClick={() => setIsChatPanelOpen(false)}
+              className="absolute left-2 top-3 z-10 p-1 text-gray-400 hover:text-gray-200 hover:bg-[#2a2d2e] rounded"
+              title="Hide chat"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+
+            {/* Resize handle for chat */}
+            <div
+              className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-[#007acc] transition-colors"
+              onMouseDown={() => setIsResizingChat(true)}
+            />
+
+            <div className="h-full">
+              <ChatPanel
+                messages={chatMessages}
+                onSendMessage={handleSendChatMessage}
+                isLoading={isChatLoading}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Create Document Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          <div className="bg-[#252526] rounded-lg shadow-xl p-6 w-full max-w-md border border-[#3e3e42]">
+            <h3 className="text-lg font-semibold text-gray-200 mb-4">
               Create New Document
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-400 mb-2">
                   Document Title
                 </label>
                 <input
@@ -266,21 +415,21 @@ export default function EditorView() {
                   value={newDocumentTitle}
                   onChange={(e) => setNewDocumentTitle(e.target.value)}
                   placeholder="Enter document title..."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  className="w-full px-3 py-2 bg-[#3c3c3c] border border-[#3e3e42] rounded text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#007acc]"
                   onKeyPress={(e) => e.key === 'Enter' && handleCreateDocument()}
                 />
               </div>
               <div className="flex space-x-3 pt-4">
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className="flex-1 px-4 py-2 border border-[#3e3e42] text-gray-400 rounded hover:bg-[#2a2d2e]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateDocument}
                   disabled={!newDocumentTitle.trim() || createDocumentMutation.isPending}
-                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-[#0e639c] text-white rounded hover:bg-[#1177bb] disabled:opacity-50"
                 >
                   {createDocumentMutation.isPending ? 'Creating...' : 'Create'}
                 </button>

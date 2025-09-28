@@ -23,11 +23,10 @@ try:
     from langchain_ibm import ChatWatsonx
 
     WATSONX_AVAILABLE = True
-except (ImportError, TypeError) as e:
+except (ImportError, TypeError):
     WATSONX_AVAILABLE = False
-    import warnings
-
-    warnings.warn(f"IBM Watson integration disabled due to import error: {e}")
+    # Silent fail - IBM Watson is optional
+    pass
 
 from ..utils import config
 

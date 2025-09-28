@@ -3,7 +3,6 @@
 import asyncio
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from ..database.mcp_config_manager import MCPConfigManager
@@ -31,7 +30,9 @@ class MCPService:
         self.backup_interval = 3600  # 1 hour
 
         # File-based configuration
-        self.mcp_file_path = Path("./data/mcp.json")
+        from ..database.config import get_project_root
+
+        self.mcp_file_path = get_project_root() / "data" / "mcp.json"
         self.file_check_interval = 30  # Check file every 30 seconds
         self.last_file_mtime: float | None = None
 

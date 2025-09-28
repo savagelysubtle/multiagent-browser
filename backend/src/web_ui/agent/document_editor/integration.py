@@ -28,7 +28,7 @@ class DocumentEditorIntegration:
     async def initialize_agent(
         self,
         llm: Any | None = None,
-        mcp_config_path: str = "./data/mcp.json",
+        mcp_config_path: str | None = None,
         llm_provider_name: str | None = None,
         llm_model_name: str | None = None,
         llm_temperature: float = 0.3,
@@ -53,6 +53,12 @@ class DocumentEditorIntegration:
                 )
                 llm_api_key = llm_api_key or llm_settings.get("api_key")
                 llm_base_url = llm_base_url or llm_settings.get("base_url")
+
+            # Set default mcp_config_path if not provided
+            if mcp_config_path is None:
+                from ...database.config import get_project_root
+
+                mcp_config_path = str(get_project_root() / "data" / "mcp.json")
 
             self.agent = DocumentEditingAgent(
                 llm=llm,

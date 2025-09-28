@@ -11,10 +11,15 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from ...agent.orchestrator.simple_orchestrator import SimpleAgentOrchestrator
 from ...utils.logging_config import get_logger
+from ..auth.auth_service import User
 from ..auth.dependencies import get_current_user
 from ..dependencies import get_orchestrator
-from ..middleware.error_handler import AgentException, AppException
+from ..middleware.error_handler import AppException
+from ..models import TaskSubmissionResponse
+from ..models.agent import SimpleAgentOrchestrator
+from ..models.user import User
 
 logger = get_logger(__name__)
 
@@ -141,64 +146,45 @@ async def get_available_agents(user=Depends(get_current_user)):
 
 @router.post("/execute", response_model=TaskSubmissionResponse)
 async def execute_agent_task(
-    request: TaskSubmissionRequest, user=Depends(get_current_user)
+    request: TaskSubmissionRequest,
+    current_user: User = Depends(get_current_user),
+    orchestrator: SimpleAgentOrchestrator = Depends(get_orchestrator),
 ):
-    """
-    Submit a task to an agent for execution.
+    """Execute a task using the specified agent."""
+    logger.info(f"Executing task for agent: {request.agent_type}")
 
-    The task will be executed asynchronously and real-time updates
-    will be sent via WebSocket to the authenticated user.
-    """
-    try:
-        orchestrator = get_orchestrator()
-        if not orchestrator:
-            raise AppException(
-                "Agent orchestrator not initialized", "ORCHESTRATOR_ERROR"
-            )
-
-        # Validate agent type
-        available_agents = orchestrator.get_available_agents()
-        valid_agent_types = [agent["type"] for agent in available_agents]
-
-        if request.agent_type not in valid_agent_types:
-            raise ValueError(f"Unknown agent type: {request.agent_type}")
-
-        # Validate action for agent type
-        agent_info = next(
-            (a for a in available_agents if a["type"] == request.agent_type), None
+    # Validate agent type
+    if request.agent_type not in orchestrator.agents:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown agent type: {request.agent_type}"
         )
-        if agent_info:
-            valid_actions = [action["name"] for action in agent_info["actions"]]
-            if request.action not in valid_actions:
-                raise ValueError(
-                    f"Unknown action '{request.action}' for agent '{request.agent_type}'"
-                )
 
-        # Submit task to orchestrator
+    try:
+        # Submit task to orchestrator with updated signature
         task_id = await orchestrator.submit_task(
-            user_id=user.id,
             agent_type=request.agent_type,
             action=request.action,
             payload=request.payload,
+            user_id=current_user.id,
         )
+
+        # Get the task to check its status
+        task = orchestrator.get_task(task_id)
 
         return TaskSubmissionResponse(
             task_id=task_id,
-            status="submitted",
-            message=f"Task submitted to {request.agent_type}",
-            submitted_at=(
-                orchestrator.task_store[task_id].created_at.isoformat()
-                if task_id in orchestrator.task_store
-                and orchestrator.task_store[task_id].created_at
-                else ""
-            ),
+            status=task.status,
+            message=f"Task {task.status}: {request.action}"
+            if task
+            else "Task submitted",
         )
 
     except ValueError as e:
+        logger.warning(f"Invalid task request: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to submit task: {e}")
-        raise AgentException("Failed to submit agent task", request.agent_type)
+        logger.error(f"Error executing agent task: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to execute task: {str(e)}")
 
 
 @router.get("/tasks", response_model=TaskListResponse)

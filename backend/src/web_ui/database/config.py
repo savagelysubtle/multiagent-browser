@@ -10,6 +10,7 @@ def get_project_root() -> Path:
     """Get the project root directory."""
     current_file = Path(__file__)
     # Navigate up from backend/src/web_ui/database/config.py to project root
+    # config.py -> database -> web_ui -> src -> backend -> [project root]
     return current_file.parent.parent.parent.parent.parent
 
 

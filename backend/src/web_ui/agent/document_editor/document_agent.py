@@ -42,7 +42,7 @@ class DocumentEditingAgent:
     def __init__(
         self,
         llm: Any | None = None,
-        mcp_config_path: str = "./data/mcp.json",
+        mcp_config_path: str | None = None,
         working_directory: str = "./tmp/documents",
         llm_provider_name: str | None = None,
         llm_model_name: str | None = None,
@@ -203,6 +203,11 @@ class DocumentEditingAgent:
                 return active_config["config_data"]
 
             # Fallback to file-based config
+            if self.mcp_config_path is None:
+                from ...database.config import get_project_root
+
+                self.mcp_config_path = str(get_project_root() / "data" / "mcp.json")
+
             if os.path.exists(self.mcp_config_path):
                 with open(self.mcp_config_path) as f:
                     config_data = json.load(f)
