@@ -10,20 +10,18 @@ import json
 import logging
 import os
 import uuid
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple, AsyncGenerator
 from datetime import datetime
+from pathlib import Path
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from ...database import (
     ChromaManager,
-    DocumentPipeline,
     DatabaseUtils,
+    DocumentPipeline,
     MCPConfigManager,
-    DocumentModel
 )
+from ...utils import config, llm_provider
 from ...utils.mcp_client import setup_mcp_client_and_tools
-from ...utils import llm_provider
-from ...utils import config
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +48,7 @@ class DocumentEditingAgent:
         llm_temperature: float = 0.3,
         llm_api_key: Optional[str] = None,
         llm_base_url: Optional[str] = None,
-        **llm_kwargs
+        **llm_kwargs,
     ):
         """Initialize the Document Editing Agent."""
         self.llm = llm
@@ -94,7 +92,9 @@ class DocumentEditingAgent:
             # Load MCP configuration
             mcp_config = await self._load_mcp_config()
             if not mcp_config:
-                logger.warning("No MCP configuration found, running with basic database tools only")
+                logger.warning(
+                    "No MCP configuration found, running with basic database tools only"
+                )
                 return False
 
             # Setup MCP client with Chroma tools
@@ -102,9 +102,9 @@ class DocumentEditingAgent:
                 chroma_config = mcp_config["mcpServers"]["chroma"]
                 logger.info(f"Setting up ChromaDB MCP client: {chroma_config}")
 
-                self.mcp_client = await setup_mcp_client_and_tools({
-                    "chroma": chroma_config
-                })
+                self.mcp_client = await setup_mcp_client_and_tools(
+                    {"chroma": chroma_config}
+                )
 
                 if self.mcp_client:
                     self.mcp_tools = self.mcp_client.get_tools()
@@ -124,7 +124,7 @@ class DocumentEditingAgent:
         temperature: Optional[float] = None,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> bool:
         """Setup or reconfigure the LLM using the provider system."""
         try:
@@ -149,7 +149,7 @@ class DocumentEditingAgent:
                 "model_name": model,
                 "temperature": temp,
                 **self.llm_kwargs,
-                **kwargs
+                **kwargs,
             }
 
             if key:
@@ -174,11 +174,11 @@ class DocumentEditingAgent:
             logger.error(f"Error setting up LLM: {e}")
             return False
 
-    def get_available_providers(self) -> Dict[str, List[str]]:
+    def get_available_providers(self) -> Dict[str, Any]:
         """Get available LLM providers and their models."""
         return {
             "providers": list(config.PROVIDER_DISPLAY_NAMES.keys()),
-            "models_by_provider": config.model_names
+            "models_by_provider": config.model_names,
         }
 
     def get_current_llm_config(self) -> Dict[str, Any]:
@@ -189,7 +189,7 @@ class DocumentEditingAgent:
             "temperature": self.llm_temperature,
             "has_llm": self.llm is not None,
             "base_url": self.llm_base_url,
-            "api_key_set": bool(self.llm_api_key)
+            "api_key_set": bool(self.llm_api_key),
         }
 
     async def _load_mcp_config(self) -> Optional[Dict[str, Any]]:
@@ -203,9 +203,11 @@ class DocumentEditingAgent:
 
             # Fallback to file-based config
             if os.path.exists(self.mcp_config_path):
-                with open(self.mcp_config_path, 'r') as f:
+                with open(self.mcp_config_path, "r") as f:
                     config_data = json.load(f)
-                    logger.info(f"Loaded MCP configuration from file: {self.mcp_config_path}")
+                    logger.info(
+                        f"Loaded MCP configuration from file: {self.mcp_config_path}"
+                    )
                     return config_data
 
             return None
@@ -219,7 +221,7 @@ class DocumentEditingAgent:
         filename: str,
         content: str = "",
         document_type: str = "document",
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Tuple[bool, str, Optional[str]]:
         """Create a new document with database persistence."""
         try:
@@ -232,7 +234,7 @@ class DocumentEditingAgent:
                     "markdown": ".md",
                     "javascript": ".js",
                     "html": ".html",
-                    "json": ".json"
+                    "json": ".json",
                 }
                 filename += extension_map.get(document_type, ".txt")
                 file_path = os.path.join(self.working_directory, filename)
@@ -242,21 +244,23 @@ class DocumentEditingAgent:
                 content = await self._generate_template_content(document_type, filename)
 
             # Save file
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
             # Store in database
-            success, message, doc_model = self.document_pipeline.process_document_from_editor(
-                content=content,
-                file_path=file_path,
-                document_type=document_type,
-                metadata={
-                    **(metadata or {}),
-                    "created_by_agent": True,
-                    "agent_session": self.session_id,
-                    "llm_provider": self.llm_provider_name,
-                    "llm_model": self.llm_model_name
-                }
+            success, message, doc_model = (
+                self.document_pipeline.process_document_from_editor(
+                    content=content,
+                    file_path=file_path,
+                    document_type=document_type,
+                    metadata={
+                        **(metadata or {}),
+                        "created_by_agent": True,
+                        "agent_session": self.session_id,
+                        "llm_provider": self.llm_provider_name,
+                        "llm_model": self.llm_model_name,
+                    },
+                )
             )
 
             if success and doc_model:
@@ -271,10 +275,7 @@ class DocumentEditingAgent:
             return False, f"Error creating document: {str(e)}", None
 
     async def edit_document(
-        self,
-        document_id: str,
-        instruction: str,
-        use_llm: bool = True
+        self, document_id: str, instruction: str, use_llm: bool = True
     ) -> Tuple[bool, str, Optional[str]]:
         """Edit a document using AI assistance and MCP tools."""
         try:
@@ -290,7 +291,7 @@ class DocumentEditingAgent:
                 new_content = await self._llm_edit_document(
                     content=current_content,
                     instruction=instruction,
-                    document_metadata=document.metadata
+                    document_metadata=document.metadata,
                 )
             elif use_llm and not self.llm:
                 # Try to setup LLM if requested but not available
@@ -298,38 +299,53 @@ class DocumentEditingAgent:
                     new_content = await self._llm_edit_document(
                         content=current_content,
                         instruction=instruction,
-                        document_metadata=document.metadata
+                        document_metadata=document.metadata,
                     )
                 else:
-                    logger.warning("LLM requested but unavailable, using simple editing")
-                    new_content = await self._simple_edit_document(current_content, instruction)
+                    logger.warning(
+                        "LLM requested but unavailable, using simple editing"
+                    )
+                    new_content = await self._simple_edit_document(
+                        current_content, instruction
+                    )
             else:
                 # Simple instruction-based editing
-                new_content = await self._simple_edit_document(current_content, instruction)
+                new_content = await self._simple_edit_document(
+                    current_content, instruction
+                )
 
             if new_content and new_content != current_content:
                 # Update file on disk
                 file_path = document.metadata.get("file_path")
                 if file_path and os.path.exists(file_path):
-                    with open(file_path, 'w', encoding='utf-8') as f:
+                    with open(file_path, "w", encoding="utf-8") as f:
                         f.write(new_content)
 
                 # Update in database
-                success, message, doc_model = self.document_pipeline.process_document_from_editor(
-                    content=new_content,
-                    file_path=file_path or f"{self.working_directory}/updated_{document_id}.txt",
-                    document_type=document.metadata.get("document_type", "document"),
-                    metadata={
-                        **document.metadata,
-                        "last_edited_by_agent": True,
-                        "edit_instruction": instruction,
-                        "edit_timestamp": datetime.now().isoformat(),
-                        "llm_used": bool(self.llm and use_llm)
-                    }
+                success, message, doc_model = (
+                    self.document_pipeline.process_document_from_editor(
+                        content=new_content,
+                        file_path=file_path
+                        or f"{self.working_directory}/updated_{document_id}.txt",
+                        document_type=document.metadata.get(
+                            "document_type", "document"
+                        ),
+                        metadata={
+                            **document.metadata,
+                            "last_edited_by_agent": True,
+                            "edit_instruction": instruction,
+                            "edit_timestamp": datetime.now().isoformat(),
+                            "llm_used": bool(self.llm and use_llm),
+                        },
+                    )
                 )
 
                 if success:
-                    return True, "Document edited successfully", doc_model.id if doc_model else document_id
+                    return (
+                        True,
+                        "Document edited successfully",
+                        doc_model.id if doc_model else document_id,
+                    )
                 else:
                     return False, f"Failed to update document: {message}", None
             else:
@@ -340,10 +356,7 @@ class DocumentEditingAgent:
             return False, f"Error editing document: {str(e)}", None
 
     async def _llm_edit_document(
-        self,
-        content: str,
-        instruction: str,
-        document_metadata: Dict[str, Any]
+        self, content: str, instruction: str, document_metadata: Dict[str, Any]
     ) -> Optional[str]:
         """Use LLM to edit document content."""
         try:
@@ -375,22 +388,22 @@ Original content:
 
 Provide the edited content:"""
 
-            if hasattr(self.llm, 'ainvoke'):
+            if hasattr(self.llm, "ainvoke"):
                 response = await self.llm.ainvoke(system_prompt)
             else:
                 # Fallback for synchronous LLMs
                 response = self.llm.invoke(system_prompt)
 
-            if hasattr(response, 'content'):
+            if hasattr(response, "content"):
                 new_content = response.content.strip()
             else:
                 new_content = str(response).strip()
 
             # Clean up response (remove markdown code blocks if present)
-            if new_content.startswith('```'):
-                lines = new_content.split('\n')
+            if new_content.startswith("```"):
+                lines = new_content.split("\n")
                 if len(lines) > 2:
-                    new_content = '\n'.join(lines[1:-1])
+                    new_content = "\n".join(lines[1:-1])
 
             return new_content
 
@@ -407,10 +420,10 @@ Provide the edited content:"""
             return f"{content}\n\n# Note: {instruction}"
         elif "remove" in instruction_lower and "line" in instruction_lower:
             # Simple line removal (demonstration)
-            lines = content.split('\n')
+            lines = content.split("\n")
             if len(lines) > 1:
                 lines.pop()  # Remove last line
-                return '\n'.join(lines)
+                return "\n".join(lines)
         elif "append" in instruction_lower:
             return f"{content}\n\n{instruction.replace('append', '').strip()}"
 
@@ -421,7 +434,7 @@ Provide the edited content:"""
         query: str,
         collection_type: str = "documents",
         limit: int = 10,
-        use_mcp_tools: bool = True
+        use_mcp_tools: bool = True,
     ) -> List[Dict[str, Any]]:
         """Search documents using database and MCP tools."""
         try:
@@ -432,18 +445,20 @@ Provide the edited content:"""
                 query=query,
                 collection_type=collection_type,
                 include_relations=True,
-                limit=limit
+                limit=limit,
             )
 
             # Convert to dict format
             for result in search_results:
-                results.append({
-                    "id": result.id,
-                    "content": result.content,
-                    "metadata": result.metadata,
-                    "relevance_score": result.relevance_score,
-                    "source": "database"
-                })
+                results.append(
+                    {
+                        "id": result.id,
+                        "content": result.content,
+                        "metadata": result.metadata,
+                        "relevance_score": result.relevance_score,
+                        "source": "database",
+                    }
+                )
 
             # Use MCP tools for additional search if available
             if use_mcp_tools and self.mcp_tools:
@@ -459,13 +474,17 @@ Provide the edited content:"""
             logger.error(f"Error searching documents: {e}")
             return []
 
-    async def _search_with_mcp_tools(self, query: str, limit: int) -> List[Dict[str, Any]]:
+    async def _search_with_mcp_tools(
+        self, query: str, limit: int
+    ) -> List[Dict[str, Any]]:
         """Use MCP tools for document search."""
         try:
             results = []
 
             # Find search tools
-            search_tools = [tool for tool in self.mcp_tools if "search" in tool.name.lower()]
+            search_tools = [
+                tool for tool in self.mcp_tools if "search" in tool.name.lower()
+            ]
 
             for tool in search_tools:
                 try:
@@ -475,17 +494,21 @@ Provide the edited content:"""
                     # Process tool result
                     if isinstance(tool_result, list):
                         for item in tool_result:
-                            results.append({
-                                **item,
-                                "source": f"mcp_{tool.name}",
-                                "relevance_score": item.get("score", 0.5)
-                            })
+                            results.append(
+                                {
+                                    **item,
+                                    "source": f"mcp_{tool.name}",
+                                    "relevance_score": item.get("score", 0.5),
+                                }
+                            )
                     elif isinstance(tool_result, dict):
-                        results.append({
-                            **tool_result,
-                            "source": f"mcp_{tool.name}",
-                            "relevance_score": tool_result.get("score", 0.5)
-                        })
+                        results.append(
+                            {
+                                **tool_result,
+                                "source": f"mcp_{tool.name}",
+                                "relevance_score": tool_result.get("score", 0.5),
+                            }
+                        )
 
                 except Exception as tool_error:
                     logger.warning(f"MCP tool {tool.name} failed: {tool_error}")
@@ -498,16 +521,13 @@ Provide the edited content:"""
             return []
 
     async def get_document_suggestions(
-        self,
-        content: str,
-        document_type: str = "document"
+        self, content: str, document_type: str = "document"
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Get intelligent document suggestions."""
         try:
             # Get suggestions from database pipeline
             suggestions = self.document_pipeline.get_document_suggestions(
-                content=content,
-                document_type=document_type
+                content=content, document_type=document_type
             )
 
             # Convert search results to dict format
@@ -516,18 +536,24 @@ Provide the edited content:"""
                 formatted_suggestions[category] = [
                     {
                         "id": result.id,
-                        "title": result.metadata.get("title", result.metadata.get("filename", "Untitled")),
-                        "content_preview": result.content[:200] + "..." if len(result.content) > 200 else result.content,
+                        "title": result.metadata.get(
+                            "title", result.metadata.get("filename", "Untitled")
+                        ),
+                        "content_preview": result.content[:200] + "..."
+                        if len(result.content) > 200
+                        else result.content,
                         "relevance_score": result.relevance_score,
                         "metadata": result.metadata,
-                        "source": "database"
+                        "source": "database",
                     }
                     for result in results
                 ]
 
             # Add MCP-based suggestions if available
             if self.mcp_tools:
-                mcp_suggestions = await self._get_mcp_suggestions(content, document_type)
+                mcp_suggestions = await self._get_mcp_suggestions(
+                    content, document_type
+                )
                 if mcp_suggestions:
                     formatted_suggestions["mcp_suggestions"] = mcp_suggestions
 
@@ -537,23 +563,31 @@ Provide the edited content:"""
             logger.error(f"Error getting document suggestions: {e}")
             return {}
 
-    async def _get_mcp_suggestions(self, content: str, document_type: str) -> List[Dict[str, Any]]:
+    async def _get_mcp_suggestions(
+        self, content: str, document_type: str
+    ) -> List[Dict[str, Any]]:
         """Get suggestions using MCP tools."""
         try:
             suggestions = []
 
             # Find relevant MCP tools for suggestions
             suggestion_tools = [
-                tool for tool in self.mcp_tools
-                if any(keyword in tool.name.lower() for keyword in ["suggest", "recommend", "similar"])
+                tool
+                for tool in self.mcp_tools
+                if any(
+                    keyword in tool.name.lower()
+                    for keyword in ["suggest", "recommend", "similar"]
+                )
             ]
 
             for tool in suggestion_tools:
                 try:
-                    result = await tool.ainvoke({
-                        "content": content[:500],  # Limit content length
-                        "type": document_type
-                    })
+                    result = await tool.ainvoke(
+                        {
+                            "content": content[:500],  # Limit content length
+                            "type": document_type,
+                        }
+                    )
 
                     if isinstance(result, list):
                         suggestions.extend(result)
@@ -561,7 +595,9 @@ Provide the edited content:"""
                         suggestions.append(result)
 
                 except Exception as tool_error:
-                    logger.warning(f"MCP suggestion tool {tool.name} failed: {tool_error}")
+                    logger.warning(
+                        f"MCP suggestion tool {tool.name} failed: {tool_error}"
+                    )
                     continue
 
             return suggestions
@@ -575,7 +611,7 @@ Provide the edited content:"""
         document_id: str,
         policy_title: str,
         policy_type: str = "manual",
-        authority_level: str = "medium"
+        authority_level: str = "medium",
     ) -> Tuple[bool, str]:
         """Store document as a policy manual."""
         try:
@@ -595,8 +631,8 @@ Provide the edited content:"""
                     "created_by_agent": True,
                     "agent_session": self.session_id,
                     "llm_provider": self.llm_provider_name,
-                    "llm_model": self.llm_model_name
-                }
+                    "llm_model": self.llm_model_name,
+                },
             )
 
             return success, message
@@ -605,17 +641,26 @@ Provide the edited content:"""
             logger.error(f"Error storing policy: {e}")
             return False, f"Error storing policy: {str(e)}"
 
-    async def _generate_template_content(self, document_type: str, filename: str) -> str:
+    async def _generate_template_content(
+        self, document_type: str, filename: str
+    ) -> str:
         """Generate template content for new documents."""
         templates = {
-            "python": f"#!/usr/bin/env python3\n# -*- coding: utf-8 -*-\n\"\"\"\n{filename}\n\nCreated by DocumentEditingAgent\n\"\"\"\n\n",
+            "python": f'#!/usr/bin/env python3\n# -*- coding: utf-8 -*-\n"""\n{filename}\n\nCreated by DocumentEditingAgent\n"""\n\n',
             "markdown": f"# {Path(filename).stem.replace('_', ' ').title()}\n\nCreated: {datetime.now().strftime('%Y-%m-%d')}\n\n## Overview\n\n",
             "javascript": f"/**\n * {filename}\n * Created by DocumentEditingAgent\n * Date: {datetime.now().strftime('%Y-%m-%d')}\n */\n\n",
-            "html": f"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>{Path(filename).stem}</title>\n</head>\n<body>\n    <h1>{Path(filename).stem}</h1>\n    \n</body>\n</html>",
-            "json": "{\n    \"name\": \"" + Path(filename).stem + "\",\n    \"created\": \"" + datetime.now().isoformat() + "\"\n}"
+            "html": f'<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>{Path(filename).stem}</title>\n</head>\n<body>\n    <h1>{Path(filename).stem}</h1>\n    \n</body>\n</html>',
+            "json": '{\n    "name": "'
+            + Path(filename).stem
+            + '",\n    "created": "'
+            + datetime.now().isoformat()
+            + '"\n}',
         }
 
-        return templates.get(document_type, f"# {filename}\n\nCreated by DocumentEditingAgent on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        return templates.get(
+            document_type,
+            f"# {filename}\n\nCreated by DocumentEditingAgent on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n",
+        )
 
     async def get_database_stats(self) -> Dict[str, Any]:
         """Get comprehensive database statistics."""
@@ -637,68 +682,209 @@ Provide the edited content:"""
                 "current_document": self.current_document_id,
                 "mcp_tools_available": len(self.mcp_tools),
                 "llm_config": self.get_current_llm_config(),
-                "last_updated": datetime.now().isoformat()
+                "last_updated": datetime.now().isoformat(),
             }
 
         except Exception as e:
             logger.error(f"Error getting database stats: {e}")
             return {"error": str(e)}
 
+    async def chat_with_user(
+        self, message: str, context_document_id: Optional[str] = None
+    ) -> str:
+        """Chat with the user, optionally using a document as context."""
+        try:
+            if not self.llm:
+                return "I'm sorry, but I don't have an LLM configured. Please configure your AI settings first."
+
+            # Build context from current document if available
+            context = ""
+            if context_document_id:
+                document = self.chroma_manager.get_document(
+                    "documents", context_document_id
+                )
+                if document:
+                    context = f"\n\nCurrent Document ({document.metadata.get('filename', 'Untitled')}):\n{document.content[:1000]}"
+                    if len(document.content) > 1000:
+                        context += "\n... (content truncated)"
+
+            system_prompt = f"""You are an AI document assistant powered by {self.llm_provider_name}/{self.llm_model_name}.
+You help users with document editing, creation, and management tasks.
+You have access to advanced document management capabilities including search, editing, and policy management.
+
+Your capabilities include:
+- Creating and editing documents with AI assistance
+- Searching through documents and policies
+- Providing document suggestions and templates
+- Managing document organization and metadata
+- Helping with content generation and improvements
+
+Always be helpful, concise, and focused on document-related tasks.{context}"""
+
+            user_message = message
+
+            # Format messages based on LLM type
+            if hasattr(self.llm, "ainvoke"):
+                # For chat-based models, try to pass messages format first
+                try:
+                    response = await self.llm.ainvoke(
+                        [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_message},
+                        ]
+                    )
+                except:
+                    # Fallback to single string prompt
+                    full_prompt = (
+                        f"{system_prompt}\n\nUser: {user_message}\n\nAssistant:"
+                    )
+                    response = await self.llm.ainvoke(full_prompt)
+            else:
+                # Fallback for synchronous LLMs
+                try:
+                    response = self.llm.invoke(
+                        [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_message},
+                        ]
+                    )
+                except:
+                    # Fallback to single string prompt
+                    full_prompt = (
+                        f"{system_prompt}\n\nUser: {user_message}\n\nAssistant:"
+                    )
+                    response = self.llm.invoke(full_prompt)
+
+            if hasattr(response, "content"):
+                return response.content.strip()
+            else:
+                return str(response).strip()
+
+        except Exception as e:
+            logger.error(f"Error in chat: {e}")
+            return f"I apologize, but I encountered an error: {str(e)}"
+
+    async def chat_with_user_stream(
+        self, message: str, context_document_id: Optional[str] = None
+    ) -> AsyncGenerator[str, None]:
+        """Stream chat responses for real-time interaction."""
+        try:
+            if not self.llm:
+                yield "I'm sorry, but I don't have an LLM configured. Please configure your AI settings first."
+                return
+
+            # Build context from current document if available
+            context = ""
+            if context_document_id:
+                document = self.chroma_manager.get_document(
+                    "documents", context_document_id
+                )
+                if document:
+                    context = f"\n\nCurrent Document ({document.metadata.get('filename', 'Untitled')}):\n{document.content[:1000]}"
+                    if len(document.content) > 1000:
+                        context += "\n... (content truncated)"
+
+            system_prompt = f"""You are an AI document assistant powered by {self.llm_provider_name}/{self.llm_model_name}.
+You help users with document editing, creation, and management tasks.
+You have access to advanced document management capabilities including search, editing, and policy management.
+
+Your capabilities include:
+- Creating and editing documents with AI assistance
+- Searching through documents and policies
+- Providing document suggestions and templates
+- Managing document organization and metadata
+- Helping with content generation and improvements
+
+Always be helpful, concise, and focused on document-related tasks.{context}"""
+
+            # Check if LLM supports streaming
+            if hasattr(self.llm, "astream"):
+                try:
+                    # Try chat format first
+                    async for chunk in self.llm.astream(
+                        [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": message},
+                        ]
+                    ):
+                        if hasattr(chunk, "content"):
+                            yield chunk.content
+                        else:
+                            yield str(chunk)
+                except:
+                    # Fallback to single prompt streaming
+                    full_prompt = f"{system_prompt}\n\nUser: {message}\n\nAssistant:"
+                    async for chunk in self.llm.astream(full_prompt):
+                        if hasattr(chunk, "content"):
+                            yield chunk.content
+                        else:
+                            yield str(chunk)
+            else:
+                # Fallback to non-streaming response
+                response = await self.chat_with_user(message, context_document_id)
+                # Simulate streaming by yielding in chunks
+                words = response.split()
+                for i in range(0, len(words), 3):
+                    chunk = " ".join(words[i : i + 3])
+                    yield chunk + " "
+                    await asyncio.sleep(0.05)  # Small delay to simulate streaming
+
+        except Exception as e:
+            logger.error(f"Error in streaming chat: {e}")
+            yield f"I apologize, but I encountered an error: {str(e)}"
+
     async def process_batch_documents(
-        self,
-        file_paths: List[str],
-        document_type: str = "document"
+        self, file_paths: List[str], document_type: str = "document"
     ) -> Dict[str, Any]:
         """Process multiple documents in batch."""
         try:
-            results = {
-                "processed": [],
-                "failed": [],
-                "total": len(file_paths)
-            }
+            results = {"processed": [], "failed": [], "total": len(file_paths)}
 
             for file_path in file_paths:
                 try:
                     if os.path.exists(file_path):
-                        with open(file_path, 'r', encoding='utf-8') as f:
+                        with open(file_path, "r", encoding="utf-8") as f:
                             content = f.read()
 
-                        success, message, doc_model = self.document_pipeline.process_document_from_editor(
-                            content=content,
-                            file_path=file_path,
-                            document_type=document_type,
-                            metadata={
-                                "batch_processed": True,
-                                "agent_session": self.session_id,
-                                "processed_at": datetime.now().isoformat(),
-                                "llm_provider": self.llm_provider_name
-                            }
+                        success, message, doc_model = (
+                            self.document_pipeline.process_document_from_editor(
+                                content=content,
+                                file_path=file_path,
+                                document_type=document_type,
+                                metadata={
+                                    "batch_processed": True,
+                                    "agent_session": self.session_id,
+                                    "processed_at": datetime.now().isoformat(),
+                                    "llm_provider": self.llm_provider_name,
+                                },
+                            )
                         )
 
                         if success and doc_model:
-                            results["processed"].append({
-                                "file_path": file_path,
-                                "document_id": doc_model.id,
-                                "message": message
-                            })
+                            results["processed"].append(
+                                {
+                                    "file_path": file_path,
+                                    "document_id": doc_model.id,
+                                    "message": message,
+                                }
+                            )
                         else:
-                            results["failed"].append({
-                                "file_path": file_path,
-                                "error": message
-                            })
+                            results["failed"].append(
+                                {"file_path": file_path, "error": message}
+                            )
                     else:
-                        results["failed"].append({
-                            "file_path": file_path,
-                            "error": "File not found"
-                        })
+                        results["failed"].append(
+                            {"file_path": file_path, "error": "File not found"}
+                        )
 
                 except Exception as file_error:
-                    results["failed"].append({
-                        "file_path": file_path,
-                        "error": str(file_error)
-                    })
+                    results["failed"].append(
+                        {"file_path": file_path, "error": str(file_error)}
+                    )
 
-            logger.info(f"Batch processing completed: {len(results['processed'])} processed, {len(results['failed'])} failed")
+            logger.info(
+                f"Batch processing completed: {len(results['processed'])} processed, {len(results['failed'])} failed"
+            )
             return results
 
         except Exception as e:
@@ -707,7 +893,7 @@ Provide the edited content:"""
                 "processed": [],
                 "failed": file_paths,
                 "total": len(file_paths),
-                "error": str(e)
+                "error": str(e),
             }
 
     async def close(self):
@@ -724,6 +910,8 @@ Provide the edited content:"""
 
     def __del__(self):
         """Ensure cleanup on deletion."""
-        if hasattr(self, 'mcp_client') and self.mcp_client:
+        if hasattr(self, "mcp_client") and self.mcp_client:
             # Note: Can't use async in __del__, so log a warning
-            logger.warning(f"DocumentEditingAgent session {self.session_id} was not properly closed")
+            logger.warning(
+                f"DocumentEditingAgent session {self.session_id} was not properly closed"
+            )
