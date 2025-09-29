@@ -26,7 +26,7 @@ from ..agent.orchestrator.simple_orchestrator import (
     initialize_orchestrator,
 )
 from ..utils.logging_config import get_logger
-from .dependencies import set_document_agent, set_orchestrator
+from .dependencies import set_document_agent, set_orchestrator, get_document_agent
 from .middleware.error_handler import (
     AppException,
     app_exception_handler,
@@ -35,6 +35,7 @@ from .middleware.error_handler import (
     validation_exception_handler,
 )
 from .routes.agents import router as agents_router
+from .routes.logging import router as logging_router
 from .routes.auth import router as auth_router
 from .routes.documents import router as documents_router
 
@@ -126,6 +127,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(documents_router, prefix="/api/documents", tags=["Documents"])
 app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
+app.include_router(logging_router, prefix="/api/logs", tags=["Frontend Logging"])
 
 # --- Register Error Handlers ---
 app.add_exception_handler(AppException, app_exception_handler)

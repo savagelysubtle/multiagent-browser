@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastContainer } from 'react-toastify';
-import { useAppStore } from './stores/useAppStore';
-import { authService } from './services/authService';
+import { setupFrontendLogging, getFrontendLogger } from './utils/logging';
 
 // Pages
 import LoginPage from './pages/LoginPage';

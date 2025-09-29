@@ -17,9 +17,6 @@ from ..auth.auth_service import User
 from ..auth.dependencies import get_current_user
 from ..dependencies import get_orchestrator
 from ..middleware.error_handler import AppException
-from ..models.user import User
-from ..models import TaskSubmissionResponse
-from ..models.agent import SimpleAgentOrchestrator
 
 logger = get_logger(__name__)
 

@@ -1,0 +1,116 @@
+{
+  "timestamp": "2025-09-28T08:53:26.227307",
+  "backend_tests": {
+    "password_hashing": {
+      "status": "\u2705 WORKING",
+      "hash_length": 87,
+      "verification": true
+    },
+    "user_creation": {
+      "status": "\u2705 WORKING",
+      "user_id": "af34bc29-7ae5-4c65-98e4-119cfba42109",
+      "email": "debug-report@example.com",
+      "is_active": true
+    },
+    "authentication": {
+      "status": "\u2705 WORKING",
+      "user_match": true
+    },
+    "jwt_operations": {
+      "status": "\u2705 WORKING",
+      "token_length": 217,
+      "verification": true,
+      "token_sample": "eyJhbGciOiJIUzI1NiIsInR5cCI6Ik..."
+    },
+    "user_state": {
+      "status": "\u2705 WORKING",
+      "save_success": true,
+      "retrieval_success": true,
+      "state_match": true
+    }
+  },
+  "api_tests": {
+    "server_health": {
+      "status": "\u2705 AVAILABLE",
+      "response": {
+        "status": "healthy",
+        "agent_initialized": true,
+        "mcp_tools_available": 0
+      },
+      "agent_initialized": true,
+      "mcp_tools": 0
+    }
+  },
+  "endpoint_tests": {
+    "auth_status": {
+      "status": "\u2705 WORKING",
+      "status_code": 200,
+      "response": {
+        "status": "healthy",
+        "users": {
+          "total_users": 3,
+          "collection_name": "users",
+          "last_updated": "2025-09-28T08:53:27.213725"
+        },
+        "user_states": {
+          "name": "user_states",
+          "document_count": 3,
+          "metadata": {
+            "created_at": "2025-09-28T08:44:31.778461",
+            "description": "Per-user application state storage",
+            "type": "user_state",
+            "version": "1.0.0"
+          },
+          "collection_type": "user_states",
+          "manager": "UserStateManager"
+        },
+        "google_oauth": {
+          "enabled": false,
+          "configured": false,
+          "client_id_set": false,
+          "client_secret_set": false,
+          "redirect_uri": "http://localhost:8000/auth/google/callback"
+        },
+        "jwt_configured": false
+      }
+    },
+    "registration": {
+      "status": "\u2705 WORKING",
+      "status_code": 200,
+      "handles_duplicates": null,
+      "has_token": true,
+      "has_user": true,
+      "has_state": true
+    },
+    "login": {
+      "status": "\u274c FAILED",
+      "status_code": 401,
+      "response_preview": "{\"error\":{\"code\":\"HTTP_401\",\"message\":\"Authentication required\",\"timestamp\":\"2025-09-28T15:53:27.403167\",\"path\":\"/api/auth/login\"}}"
+    },
+    "invalid_credentials": {
+      "status": "\u2705 HANDLED",
+      "status_code": 401
+    },
+    "missing_auth_header": {
+      "status": "\u2705 HANDLED",
+      "status_code": 401
+    },
+    "invalid_token": {
+      "status": "\u2705 HANDLED",
+      "status_code": 401
+    }
+  },
+  "errors": [],
+  "warnings": [
+    "No MCP tools available - may affect functionality"
+  ],
+  "recommendations": [
+    "Fix authentication issues in: login"
+  ],
+  "summary": {
+    "backend_tests_passed": 5,
+    "endpoint_tests_passed": 5,
+    "total_errors": 0,
+    "overall_status": "\u2705 HEALTHY"
+  }
+}

@@ -23,7 +23,7 @@ class LoggingConfig:
     @classmethod
     def setup_logging(
         cls,
-        level: str = "INFO",
+        level: str = "DEBUG",
         log_dir: Path | None = None,
         log_file: str | None = None,
         force_reinit: bool = False,

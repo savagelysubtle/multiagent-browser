@@ -21,15 +21,21 @@ backend_root = Path(__file__).parent.parent.parent  # Navigate up to backend/
 sys.path.insert(0, str(backend_root))
 sys.path.insert(0, str(backend_root / "src"))
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 # Import centralized logging configuration
-from web_ui.utils.logging_config import LoggingConfig, get_logger
+# from web_ui.utils.logging_config import LoggingConfig, get_logger
 
 # Project root is the backend directory
 project_root = backend_root
+
+# Import environment loader before other imports to ensure proper loading
+# Environment variables must be loaded early before any modules that depend on them
+from web_ui.utils.env import load_environment_variables
+
+# Load environment variables with intelligent file detection and precedence
+env_loaded = load_environment_variables(project_root=project_root, verbose=True)
+
+# Import centralized logging configuration
+from web_ui.utils.logging_config import LoggingConfig, get_logger
 
 logger = get_logger(__name__)
 
