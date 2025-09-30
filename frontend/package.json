@@ -29,7 +29,10 @@
     "react-toastify": "^10.0.5",
     "tailwind-merge": "^2.5.2",
     "uuid": "^13.0.0",
-    "zustand": "^4.5.4"
+    "zustand": "^4.5.4",
+    "@ag-ui/client": "0.0.37",
+    "@ag-ui/core": "0.0.39",
+    "rxjs": "^7.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

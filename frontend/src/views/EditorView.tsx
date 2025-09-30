@@ -6,6 +6,8 @@ import { useAppStore } from '../stores/useAppStore';
 import { Document, ChatMessage } from '../types';
 import { ChatPanel } from '../components/ChatPanel';
 import { EditorPanel } from '../components/EditorPanel';
+import { agUiService } from '../services/agUiService';
+import { AgentSubscriber } from '@ag-ui/client';
 
 export default function EditorView() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
@@ -180,8 +182,14 @@ export default function EditorView() {
     };
   }, []);
 
+import { agUiService } from '../services/agUiService';
+import { AgentSubscriber } from "@ag-ui/client";
+
+// ... (imports)
+
+// ... (component)
+
   const handleSendChatMessage = async (message: string) => {
-    // Add user message
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
@@ -191,50 +199,59 @@ export default function EditorView() {
     setChatMessages(prev => [...prev, userMessage]);
     setIsChatLoading(true);
 
-    try {
-      // Use the document agent chat endpoint
-      const response = await fetch('/api/documents/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify({
-          message: message,
-          agent_type: 'document_editor',
-          context_document_id: selectedDocument?.id || null
-        })
-      });
+    const agent = agUiService.getAgent();
+    agent.addMessage({
+      id: userMessage.id,
+      role: 'user',
+      content: message,
+    });
 
-      if (response.ok) {
-        const data = await response.json();
+    let assistantMessageId: string | null = null;
+
+    const subscriber: AgentSubscriber = {
+      onTextMessageStartEvent: ({ event }) => {
+        assistantMessageId = event.messageId;
         const aiMessage: ChatMessage = {
-          id: Date.now().toString() + '_ai',
+          id: event.messageId,
           sender: 'ai',
-          text: data.response,
+          text: '',
           timestamp: new Date().toISOString(),
         };
         setChatMessages(prev => [...prev, aiMessage]);
-
-        // If the message was about editing and we have a document selected, refresh it
-        if (selectedDocument && message.toLowerCase().includes('edit')) {
-          // Refresh document content after a short delay
-          setTimeout(() => {
-            queryClient.invalidateQueries({ queryKey: ['documents'] });
-          }, 1000);
-        }
-      } else {
-        throw new Error('Chat request failed');
+      },
+      onTextMessageContentEvent: ({ event }) => {
+        setChatMessages(prev => prev.map(m => 
+          m.id === assistantMessageId 
+            ? { ...m, text: m.text + event.delta } 
+            : m
+        ));
+      },
+      onRunFinishedEvent: () => {
+        setIsChatLoading(false);
+      },
+      onRunErrorEvent: ({ event }) => {
+        const aiMessage: ChatMessage = {
+          id: Date.now().toString() + '_ai',
+          sender: 'ai',
+          text: `I apologize, but I encountered an error: ${event.message}`,
+          timestamp: new Date().toISOString(),
+        };
+        setChatMessages(prev => [...prev, aiMessage]);
+        setIsChatLoading(false);
       }
+    }
+
+    try {
+      await agent.runAgent({}, subscriber);
     } catch (error) {
+      console.error("Agent run failed:", error);
       const aiMessage: ChatMessage = {
         id: Date.now().toString() + '_ai',
         sender: 'ai',
-        text: `I apologize, but I encountered an error. Please try again.`,
+        text: `I apologize, but I encountered a critical error.`,
         timestamp: new Date().toISOString(),
       };
       setChatMessages(prev => [...prev, aiMessage]);
-    } finally {
       setIsChatLoading(false);
     }
   };

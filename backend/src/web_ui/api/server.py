@@ -38,6 +38,7 @@ from .routes.agents import router as agents_router
 from .routes.logging import router as logging_router
 from .routes.auth import router as auth_router
 from .routes.documents import router as documents_router
+from .routes.ag_ui import router as ag_ui_router
 
 logger = get_logger(__name__)
 
@@ -128,6 +129,7 @@ app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(documents_router, prefix="/api/documents", tags=["Documents"])
 app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
 app.include_router(logging_router, prefix="/api/logs", tags=["Frontend Logging"])
+app.include_router(ag_ui_router, prefix="/api/ag_ui", tags=["AG-UI"])
 
 # --- Register Error Handlers ---
 app.add_exception_handler(AppException, app_exception_handler)
