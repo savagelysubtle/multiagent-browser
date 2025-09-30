@@ -8,10 +8,20 @@ from fastapi import HTTPException
 
 from ..agent.document_editor import DocumentEditingAgent
 from ..agent.orchestrator.simple_orchestrator import SimpleAgentOrchestrator
+from ..database.user_db import UserDatabase
 
 # Global references to singleton instances, managed by the server's lifespan
 _orchestrator: SimpleAgentOrchestrator | None = None
 _document_agent: DocumentEditingAgent | None = None
+_user_db: UserDatabase | None = None
+
+
+def get_user_db() -> UserDatabase:
+    """Dependency to get the current user database instance."""
+    global _user_db
+    if _user_db is None:
+        _user_db = UserDatabase()
+    return _user_db
 
 
 def set_orchestrator(orchestrator: SimpleAgentOrchestrator) -> None:

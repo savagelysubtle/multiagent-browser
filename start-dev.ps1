@@ -84,8 +84,9 @@ try {
     Write-Host "🐍 Starting Python backend server..." -ForegroundColor Blue
     $backendJob = Start-Job -ScriptBlock {
         param($LogFile)
+        $env:LOG_TO_CONSOLE = "true"
         Set-Location $using:PWD
-        uv run python -m web_ui.main --api-only --reload *>> $LogFile
+        uv run python -m web_ui.main --api-only 2>&1 | Tee-Object -FilePath $LogFile -Append
     } -Name "Backend" -ArgumentList $LogFile
 
     # Wait a moment for backend to initialize
@@ -96,7 +97,7 @@ try {
     $frontendJob = Start-Job -ScriptBlock {
         param($LogFile)
         Set-Location $using:PWD/frontend
-        npm run dev *>> $LogFile
+        npm run dev 2>&1 | Tee-Object -FilePath $LogFile -Append
     } -Name "Frontend" -ArgumentList $LogFile
 
     # Wait a moment for frontend to initialize

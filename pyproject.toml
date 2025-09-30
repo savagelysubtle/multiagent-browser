@@ -27,6 +27,10 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "bcrypt>=4.0.0",
     "ag-ui-protocol<=0.1.9",
+    "langchain-anthropic",
+    "langchain-google-genai",
+    "langchain-ollama",
+    "langchain-openai",
 ]
 description = "Web UI application"
 license = { file = "LICENSE" }

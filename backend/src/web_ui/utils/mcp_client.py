@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 from enum import Enum
 from typing import Any, Optional, Union, get_type_hints
 
-from browser_use.controller.registry.views import ActionModel
+from browser_use.agent.views import ActionModel
 from langchain.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from pydantic import BaseModel, Field, create_model
