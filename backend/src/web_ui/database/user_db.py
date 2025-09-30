@@ -257,6 +257,21 @@ class UserDatabase:
             cursor.execute("SELECT COUNT(*) FROM users")
             return cursor.fetchone()[0]
 
+    def clear_all_users(self) -> int:
+        """Delete all users from the database."""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM users")
+                conn.commit()
+                deleted_count = cursor.rowcount
+                logger.info(f"Cleared {deleted_count} users from the database.")
+                return deleted_count
+        except Exception as e:
+            logger.error(f"Error clearing users from the database: {e}")
+            return 0
+
+
     def _row_to_user_dict(self, row) -> dict[str, Any]:
         """Convert database row to user dictionary."""
         user_dict = {

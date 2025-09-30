@@ -70,6 +70,30 @@ export default function LoginPage() {
     }
   };
 
+  const handleClearUsers = async () => {
+    if (process.env.NODE_ENV !== 'development') {
+      toast.error('This feature is only available in development mode.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/dev/clear-users', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message);
+      } else {
+        const text = await response.text();
+        throw new Error(`Server responded with ${response.status}: ${text}`);
+      }
+    } catch (error: any) {
+      console.error('Clear users error:', error);
+      toast.error(error.message || 'An unexpected error occurred.');
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -164,6 +188,18 @@ export default function LoginPage() {
             </p>
           </div>
         </form>
+
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={handleClearUsers}
+              className="btn btn-danger btn-sm w-full"
+            >
+              Clear Users (Dev only)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
