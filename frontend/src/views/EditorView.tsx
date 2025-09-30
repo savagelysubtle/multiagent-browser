@@ -182,13 +182,6 @@ export default function EditorView() {
     };
   }, []);
 
-import { agUiService } from '../services/agUiService';
-import { AgentSubscriber } from "@ag-ui/client";
-
-// ... (imports)
-
-// ... (component)
-
   const handleSendChatMessage = async (message: string) => {
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -311,11 +304,9 @@ import { AgentSubscriber } from "@ag-ui/client";
                     setSelectedDocument(doc);
                     setDocumentContent(doc.content);
                   }}
-                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                    selectedDocument?.id === doc.id
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${selectedDocument?.id === doc.id
                       ? 'bg-[#094771] text-white'
-                      : 'text-gray-300 hover:bg-[#2a2d2e]'
-                  }`}
+                      : 'text-gray-300 hover:bg-[#2a2d2e]'}`}
                 >
                   <div className="flex items-center space-x-2">
                     <FileText className="h-3 w-3 flex-shrink-0" />
@@ -383,9 +374,7 @@ import { AgentSubscriber } from "@ag-ui/client";
 
       {/* Right Sidebar - Chat Panel */}
       <div
-        className={`border-l border-[#3e3e42] flex-shrink-0 transition-all duration-300 ease-in-out relative ${
-          isChatPanelOpen ? '' : 'w-0'
-        }`}
+        className={`border-l border-[#3e3e42] flex-shrink-0 transition-all duration-300 ease-in-out relative ${isChatPanelOpen ? '' : 'w-0'}`}
         style={{ width: isChatPanelOpen ? `${chatWidth}px` : '0' }}
       >
         {isChatPanelOpen && (
