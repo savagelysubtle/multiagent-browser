@@ -139,3 +139,4 @@ __pycache__
 # Gemini Code Assist settings
 .gemini/**/*
 .gemini/
+.gemini/settings.json
