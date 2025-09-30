@@ -3,11 +3,13 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastContainer } from 'react-toastify';
 import { setupFrontendLogging, getFrontendLogger } from './utils/logging';
+import { useAppStore } from './stores/useAppStore';
 
 // Pages
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import LoadingScreen from './components/ui/LoadingScreen';
+import { authService } from './services/authService';
 
 // Styles
 import 'react-toastify/dist/ReactToastify.css';

@@ -59,6 +59,19 @@ class BatchProcessRequest(BaseModel):
     document_type: str = "document"
 
 
+class ChatRequest(BaseModel):
+    """Request model for chat messages."""
+
+    message: str
+    context_document_id: str | None = None
+
+
+class ChatResponse(BaseModel):
+    """Response model for chat messages."""
+
+    response: str
+
+
 # --- Document Management Endpoints ---
 
 
@@ -283,4 +296,23 @@ async def list_documents(
         logger.error(f"Error listing documents: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, detail=f"Error listing documents: {str(e)}"
+        )
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat_with_document_agent(
+    request: ChatRequest,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
+):
+    """Chat with the document agent."""
+    try:
+        response = await agent.chat_with_user(
+            message=request.message,
+            context_document_id=request.context_document_id,
+        )
+        return ChatResponse(response=response)
+    except Exception as e:
+        logger.error(f"Error in document chat endpoint: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="Failed to get chat response"
         )

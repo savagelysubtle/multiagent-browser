@@ -498,6 +498,37 @@ async def google_oauth_status():
     return get_google_oauth_status()
 
 
+@router.delete("/user/{email}", response_model=MessageResponse)
+async def delete_user_by_email_endpoint(email: EmailStr):
+    """
+    Delete a user by email.
+
+    This is a development-only endpoint to facilitate account management.
+    """
+    env = os.getenv("ENV", "production")
+    if env != "development":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Endpoint not available in production",
+        )
+
+    try:
+        success = await auth_service.delete_user_by_email(email)
+        if success:
+            return MessageResponse(message=f"User {email} deleted successfully")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User {email} not found",
+            )
+    except Exception as e:
+        logger.error(f"Error deleting user {email}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete user {email}",
+        )
+
+
 # System endpoints
 
 

@@ -89,6 +89,21 @@ class AvailableAgentsResponse(BaseModel):
     total_agents: int
 
 
+class ChatRequest(BaseModel):
+    """Request model for chat messages."""
+
+    message: str
+    agent_type: str = "document_editor"
+    context_document_id: str | None = None
+
+
+class ChatResponse(BaseModel):
+    """Response model for chat messages."""
+
+    response: str
+    task_id: str
+
+
 # Route Handlers
 @router.get("/available", response_model=AvailableAgentsResponse)
 async def get_available_agents(user=Depends(get_current_user)):
@@ -404,3 +419,46 @@ async def health_check():
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return {"status": "unhealthy", "error": str(e), "timestamp": None}
+
+@router.get("/hello")
+async def hello_agent():
+    return {"message": "Hello from the agents router!"}
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat_with_agent(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user),
+    orchestrator: SimpleAgentOrchestrator = Depends(get_orchestrator),
+):
+    """Send a message to an agent and get a response."""
+    try:
+        task_id = await orchestrator.submit_task(
+            agent_type=request.agent_type,
+            action="chat",
+            payload={
+                "message": request.message,
+                "context_document_id": request.context_document_id,
+            },
+            user_id=current_user.id,
+        )
+
+        # Since the document_editor chat action is currently synchronous within the orchestrator,
+        # the task should be completed immediately.
+        task = orchestrator.task_store.get(task_id)
+        if task and task.status == "completed":
+            return ChatResponse(
+                response=task.result.get("response", ""),
+                task_id=task_id,
+            )
+        elif task:
+            return ChatResponse(
+                response="Task is processing...",
+                task_id=task_id,
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Task failed to create")
+
+    except Exception as e:
+        logger.error(f"Error in chat endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get chat response")

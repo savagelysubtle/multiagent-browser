@@ -197,10 +197,11 @@ export default function EditorView() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
         },
         body: JSON.stringify({
           message: message,
+          agent_type: 'document_editor',
           context_document_id: selectedDocument?.id || null
         })
       });

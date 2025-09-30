@@ -81,7 +81,7 @@ async def receive_frontend_logs(
 
 
 @router.get("/frontend/status")
-async def get_frontend_logging_status(current_user = Depends(get_current_user_optional)):
+async def get_frontend_logging_status(current_user = Depends(get_optional_user)):
     """
     Get status information about frontend logging.
 
