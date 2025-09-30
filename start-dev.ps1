@@ -80,54 +80,22 @@ $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Clea
 
 # --- Main Execution ---
 try {
-    # Start Python backend
-    Write-Host "🐍 Starting Python backend server..." -ForegroundColor Blue
-    $backendJob = Start-Job -ScriptBlock {
-        param($LogFile)
-        $env:LOG_TO_CONSOLE = "true"
-        Set-Location $using:PWD
-        uv run python -m web_ui.main --api-only 2>&1 | Tee-Object -FilePath $LogFile -Append
-    } -Name "Backend" -ArgumentList $LogFile
+# Start the frontend
+Write-Host "Starting frontend..."
+Push-Location -Path "d:\Coding\web-ui\frontend"
+Start-Process "npm" -ArgumentList "run", "dev" -NoNewWindow
+Pop-Location
 
-    # Wait a moment for backend to initialize
-    Start-Sleep -Seconds 3
+# Start the backend
+Write-Host "Starting backend..."
+Push-Location -Path "d:\Coding\web-ui"
+$backendProcess = Start-Process "uv" -ArgumentList "run", "backend" -NoNewWindow -PassThru
+Pop-Location
 
-    # Start React frontend
-    Write-Host "⚛️ Starting React frontend server..." -ForegroundColor Blue
-    $frontendJob = Start-Job -ScriptBlock {
-        param($LogFile)
-        Set-Location $using:PWD/frontend
-        npm run dev 2>&1 | Tee-Object -FilePath $LogFile -Append
-    } -Name "Frontend" -ArgumentList $LogFile
+Write-Host "Both frontend and backend have been started."
+Write-Host "Backend process ID: $($backendProcess.Id)"
 
-    # Wait a moment for frontend to initialize
-    Start-Sleep -Seconds 5
-
-    Write-Host "`n🎉 Both servers are starting up!" -ForegroundColor Green
-    Write-Host "   - Frontend: http://localhost:$frontendPort" -ForegroundColor Cyan
-    Write-Host "   - Backend:  http://localhost:$backendPort" -ForegroundColor Cyan
-    Write-Host "`n🔔 Press Ctrl+C to stop both servers" -ForegroundColor Yellow
-    Write-Host "================================================" -ForegroundColor Cyan
-
-    # --- Job Monitoring ---
-    while ($true) {
-        $backendJobState = $backendJob.State
-        $frontendJobState = $frontendJob.State
-
-        if ($backendJobState -ne 'Running' -or $frontendJobState -ne 'Running') {
-            Write-Host "`n🔥 A server has stopped unexpectedly:" -ForegroundColor Red
-            $backendColor = if ($backendJobState -eq 'Running') { 'Green' } else { 'Red' }
-            $frontendColor = if ($frontendJobState -eq 'Running') { 'Green' } else { 'Red' }
-            Write-Host "   - Backend: $backendJobState" -ForegroundColor $backendColor
-            Write-Host "   - Frontend: $frontendJobState" -ForegroundColor $frontendColor
-            Write-Host "`n📜 Check the log file for details: $LogFile" -ForegroundColor Yellow
-            break
-        }
-
-        # Display a live heartbeat, logs are in the file
-        Write-Host -NoNewline "."
-        Start-Sleep -Seconds 2
-    }
+Wait-Process -Id $backendProcess.Id
 }
 catch {
     Write-Host "`n❌ An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
