@@ -1,86 +1,32 @@
 {
-  "description": "Gemini CLI settings for the web-ui project. This file configures project-specific settings, logging, and the MCP (Model Context Protocol) servers used by the Gemini CLI.",
-  "project": {
-    "description": "Project-specific settings.",
-    "root": "D:\\Coding\\web-ui",
-    "env": {
-      "description": "Default environment variables for the project.",
-      "NODE_ENV": "development",
-      "LOG_LEVEL": "DEBUG"
-    },
-    "exclude": [".git", "node_modules", "*.log"]
-  },
-  "logging": {
-    "description": "Logging settings for the Gemini CLI.",
-    "level": "DEBUG",
-    "path": "./logs/gemini/gemini.log"
-  },
   "mcpServers": {
-    "description": "Configuration for MCP (Model Context Protocol) servers.",
     "Python": {
-      "description": "Generic Python MCP server.",
       "command": "D:\\Coding\\AiChemistCodex\\AiChemistForge\\ToolRack\\Python\\start_mcp_server.bat",
       "type": "stdio",
-      "cwd": "D:\\Coding\\AiChemistCodex\\AiChemistForge\\ToolRack\\Python",
+      "cwd": "D:\\Coding\\web-ui",
       "env": {
         "LOG_LEVEL": "INFO"
-      },
-      "enabled": true
+      }
+    },
+    "aichemist-typescript": {
+      "command": "D:\\Coding\\AiChemistCodex\\AiChemistForge\\ToolRack\\TypeScript\\start_mcp_server.bat",
+      "type": "stdio",
+      "cwd": "D:\\Coding\\web-ui",
+      "env": {
+        "NODE_ENV": "production",
+        "LOG_LEVEL": "INFO",
+        "BRAVE_API_KEY": "BSAZAYXacIJesn8f49flwne2vedGLbH"
+      }
     },
     "Rust": {
-      "description": "Generic Rust MCP server.",
-      "command": "D:\\Coding\\AiChemistCodex\\AiChemistForge\\ToolRack\\Rust\\start_mcp_server.bat",
-      "type": "stdio",
-      "cwd": "D:\\Coding\\AiChemistCodex\\AiChemistForge\\ToolRack\\Rust",
-      "env": {
-        "RUST_LOG": "debug"
-      },
-      "enabled": false
+      "type": "tcp",
+      "host": "127.0.0.1",
+      "port": 8080
     },
-    "brave-search": {
-      "description": "MCP server for Brave Search.",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@smithery/cli@latest",
-        "run",
-        "@smithery-ai/brave-search",
-        "--key",
-        "2474ef32-eec0-4dab-83cb-e91625c7f5b1",
-        "--profile",
-        "compact-skunk-4CLCEK"
-      ],
-      "type": "stdio",
-      "enabled": true
-    },
-    "playwright": {
-      "description": "MCP server for Playwright browser automation.",
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"],
-      "type": "stdio",
-      "enabled": true
-    },
-    "context7": {
-      "description": "MCP server for Context7 documentation.",
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp@latest"],
-      "type": "stdio",
-      "enabled": true
-    },
-    "chroma": {
-      "description": "MCP server for ChromaDB.",
-      "command": "uvx",
-      "args": [
-        "chroma-mcp",
-        "--client-type",
-        "persistent",
-        "--data-dir",
-        "D:\\Coding\\AI_Dev_Hub\\AiResearchAgent\\data\\chroma_db"
-      ],
-      "type": "stdio",
-      "enabled": true
+    "obsidiangraph": {
+      "type": "tcp",
+      "host": "127.0.0.1",
+      "port": 8081
     }
   }
 }

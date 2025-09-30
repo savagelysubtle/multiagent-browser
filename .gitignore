@@ -136,3 +136,6 @@ frontend_backup/
 .coverage
 .venv
 __pycache__
+# Gemini Code Assist settings
+.gemini/**/*
+.gemini/
