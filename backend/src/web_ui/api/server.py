@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
         llm_provider_name = os.getenv("LLM_PROVIDER", "ollama")
         llm_model_name = os.getenv("LLM_MODEL", "llama3.2")
         llm_temperature = float(os.getenv("LLM_TEMPERATURE", "0.3"))
-        llm_api_key = os.getenv("LLM_API_KEY")
+        llm_api_key = os.getenv("GOOGLE_API_KEY")
         llm_base_url = os.getenv("LLM_BASE_URL")
 
         logger.debug(f"LLM_PROVIDER in server.py before agent init: {llm_provider_name}")

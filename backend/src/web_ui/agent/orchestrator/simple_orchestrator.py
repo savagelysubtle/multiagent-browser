@@ -186,33 +186,6 @@ class SimpleAgentOrchestrator:
 
         logger.debug(f"Extracted message: '{message_content}', inferred agent_type: '{agent_type}', inferred action: '{action}'")
 
-        # Basic inference if not provided in metadata
-        if not agent_type:
-            lower_message = message_content.lower()
-            if "browse" in lower_message or "website" in lower_message:
-                agent_type = "browser_use"
-                action = "browse" # Default action for browser
-            elif "research" in lower_message or "topic" in lower_message:
-                agent_type = "deep_research"
-                action = "research" # Default action for research
-            elif "document" in lower_message or "edit" in lower_message or "create" in lower_message:
-                agent_type = "document_editor"
-                action = "chat" # Default chat action for document editor
-            else:
-                agent_type = "document_editor" # Default fallback
-                action = "chat" # Default chat action
-
-        if not action:
-            # Fallback action if agent_type was inferred but action wasn't
-            if agent_type == "browser_use":
-                action = "browse"
-            elif agent_type == "deep_research":
-                action = "research"
-            else:
-                action = "chat" # Default chat action
-
-        logger.debug(f"Extracted message: '{message_content}', inferred agent_type: '{agent_type}', inferred action: '{action}'")
-
         # Create a task for the orchestrator
         task = AgentTask(
             id=input_data.run_id,
@@ -226,6 +199,7 @@ class SimpleAgentOrchestrator:
             created_at=datetime.utcnow(),
         )
         self.task_store[task.id] = task
+        logger.debug(f"Created AgentTask object: {task}")
         logger.info(f"Created AgentTask {task.id} for AG-UI chat input.")
 
         # Execute the task and stream AG-UI events
@@ -268,6 +242,7 @@ class SimpleAgentOrchestrator:
     async def _execute_agent_action(self, task: AgentTask, is_ag_ui_stream: bool = True):
         """Execute a task with comprehensive error handling and optional AG-UI event streaming."""
         logger.info(f"Executing agent action for task {task.id}: agent_type={task.agent_type}, action={task.action}")
+        logger.debug(f"Task object at start of _execute_agent_action: {task}")
         message_id = str(uuid.uuid4())
         if is_ag_ui_stream:
             logger.debug(f"Yielding TextMessageStartEvent for task {task.id}")
@@ -287,6 +262,7 @@ class SimpleAgentOrchestrator:
 
             # Get agent
             agent = self.agents.get(task.agent_type)
+            logger.debug(f"Retrieved agent: {agent}")
             if not agent:
                 logger.error(f"Agent {task.agent_type} not found for task {task.id}")
                 raise ValueError(f"Agent {task.agent_type} not available")
@@ -305,7 +281,7 @@ class SimpleAgentOrchestrator:
 
             # Execute the action with timeout
             method = getattr(agent, task.action)
-            logger.debug(f"Calling agent method {task.agent_type}.{task.action} for task {task.id} with payload: {task.payload}")
+            logger.debug(f"Calling agent method: {method.__name__} of agent {task.agent_type} for task {task.id} with payload: {task.payload}")
 
             # Create progress callback for long-running tasks
             async def progress_callback(percentage: int, message: str):
@@ -491,7 +467,7 @@ class SimpleAgentOrchestrator:
             asyncio_task.cancel()
 
             # Status will be updated in the _execute_task finally block
-            logger.info(f"Cancelled running task {task_id}")
+            logger.info(f"Cancelled running task {task.id}")
             return True
 
         return False
