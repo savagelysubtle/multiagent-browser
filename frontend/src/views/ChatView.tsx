@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bot, Send, Loader2 } from 'lucide-react';
 import { agentService } from '../services/agentService';
 import { useAppStore } from '../stores/useAppStore';
 import { ChatMessage } from '../types';
+import { agUiService } from '../services/agUiService';
+import { RunAgentInput, EventType, TextMessageContentEvent, TextMessageEndEvent, TextMessageStartEvent, RunFinishedEvent } from '@ag-ui/client';
 
 export default function ChatView() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -17,6 +19,7 @@ export default function ChatView() {
   const [inputMessage, setInputMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState('document_editor');
+  const messageIdRef = useRef<string | null>(null);
 
   const { addTask } = useAppStore();
 
@@ -26,8 +29,67 @@ export default function ChatView() {
     queryFn: () => agentService.getAvailableAgents(),
   });
 
+  useEffect(() => {
+    const agent = agUiService.getAgent();
+    console.log('ChatView: AG-UI Agent initialized', agent);
+
+    const handleEvent = (event: any) => {
+      console.log('ChatView: Received AG-UI event:', event);
+      switch (event.type) {
+        case EventType.RUN_STARTED:
+          console.log('ChatView: RUN_STARTED event', event);
+          setIsProcessing(true);
+          break;
+        case EventType.TEXT_MESSAGE_START:
+          console.log('ChatView: TEXT_MESSAGE_START event', event);
+          messageIdRef.current = event.message_id;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: event.message_id,
+              sender: 'ai',
+              text: '',
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+          break;
+        case EventType.TEXT_MESSAGE_CONTENT:
+          console.log('ChatView: TEXT_MESSAGE_CONTENT event', event);
+          if (messageIdRef.current === event.message_id) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === event.message_id ? { ...msg, text: msg.text + event.delta } : msg
+              )
+            );
+          }
+          break;
+        case EventType.TEXT_MESSAGE_END:
+          console.log('ChatView: TEXT_MESSAGE_END event', event);
+          messageIdRef.current = null;
+          break;
+        case EventType.RUN_FINISHED:
+          console.log('ChatView: RUN_FINISHED event', event);
+          setIsProcessing(false);
+          break;
+        default:
+          console.warn('ChatView: Unhandled AG-UI event type:', event.type, event);
+          break;
+      }
+    };
+
+    agent.onEvent(handleEvent);
+
+    return () => {
+      console.log('ChatView: Cleaning up AG-UI event listener');
+      agent.offEvent(handleEvent);
+    };
+  }, []);
+
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isProcessing) return;
+    if (!inputMessage.trim() || isProcessing) {
+      console.log('ChatView: Message empty or processing, not sending.');
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -39,91 +101,28 @@ export default function ChatView() {
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage('');
     setIsProcessing(true);
+    console.log('ChatView: User message added, processing started.');
 
     try {
-      // Check if we should use direct document operations
-      const lowerMessage = inputMessage.toLowerCase();
-
-      if (lowerMessage.includes('create') && lowerMessage.includes('document')) {
-        // Extract title from message
-        const titleMatch = inputMessage.match(/["']([^"']+)["']/) ||
-                          inputMessage.match(/called\s+(\S+)/) ||
-                          inputMessage.match(/named\s+(\S+)/);
-        const title = titleMatch ? titleMatch[1] : 'New Document';
-
-        // Create document directly
-        const response = await fetch('/api/documents/create-live', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      const agent = agUiService.getAgent();
+      const runAgentInput: RunAgentInput = {
+        thread_id: agent.threadId,
+        run_id: userMessage.id, // Use user message ID as run_id for now
+        messages: [
+          {
+            role: 'user',
+            content: inputMessage,
+            message_id: userMessage.id,
           },
-          body: JSON.stringify({
-            title: title + '.md',
-            content: `# ${title}\n\nCreated from chat on ${new Date().toLocaleDateString()}\n\n`,
-            document_type: 'markdown',
-            metadata: {}
-          })
-        });
-
-        if (response.ok) {
-          const doc = await response.json();
-          const aiMessage: ChatMessage = {
-            id: Date.now().toString() + '_ai',
-            sender: 'ai',
-            text: `✅ I've created a new document called "${doc.title}"! The document is now available in your document list. You can start editing it right away.`,
-            timestamp: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, aiMessage]);
-        } else {
-          throw new Error('Failed to create document');
-        }
-
-      } else if (lowerMessage.includes('search') || lowerMessage.includes('find')) {
-        // Use the existing search endpoint via agent
-        const response = await agentService.executeTask({
-          agent_type: 'document_editor',
-          action: 'search_documents',
-          payload: { query: inputMessage, limit: 10 }
-        });
-
-        const aiMessage: ChatMessage = {
-          id: Date.now().toString() + '_ai',
-          sender: 'ai',
-          text: `🔍 I've started searching for documents matching your query. Task ID: ${response.task_id}. Check the Tasks view for results.`,
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, aiMessage]);
-
-      } else {
-        // Use the chat endpoint for general conversation
-        const response = await fetch('/api/documents/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify({
-            message: inputMessage,
-            context_document_id: null
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const aiMessage: ChatMessage = {
-            id: Date.now().toString() + '_ai',
-            sender: 'ai',
-            text: data.response,
-            timestamp: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, aiMessage]);
-        } else {
-          throw new Error('Chat request failed');
-        }
-      }
+        ],
+        metadata: { selectedAgent: selectedAgent }, // Include selectedAgent in metadata
+      };
+      console.log('ChatView: Sending RunAgentInput:', runAgentInput);
+      await agent.run(runAgentInput);
+      console.log('ChatView: RunAgentInput sent successfully.');
 
     } catch (error: any) {
+      console.error('ChatView: Error sending RunAgentInput:', error);
       const errorMessage: ChatMessage = {
         id: Date.now().toString() + '_error',
         sender: 'ai',
@@ -132,7 +131,6 @@ export default function ChatView() {
       };
 
       setMessages((prev) => [...prev, errorMessage]);
-    } finally {
       setIsProcessing(false);
     }
   };

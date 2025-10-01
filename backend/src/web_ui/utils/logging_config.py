@@ -42,14 +42,22 @@ class LoggingConfig:
         if cls._initialized and not force_reinit:
             return
 
-        # Set custom paths if provided
-        if log_dir:
-            cls._log_dir = Path(log_dir)
-        if log_file:
-            cls._log_file = log_file
+        # Determine log file path from environment or use defaults
+        log_file_path_env = os.getenv("WEBUI_LOG_FILE")
+        if log_file_path_env:
+            log_file_path = Path(log_file_path_env).resolve()
+            # Ensure the directory exists
+            log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            # Set custom paths if provided
+            if log_dir:
+                cls._log_dir = Path(log_dir)
+            if log_file:
+                cls._log_file = log_file
 
-        # Ensure log directory exists
-        cls._log_dir.mkdir(parents=True, exist_ok=True)
+            # Ensure log directory exists
+            cls._log_dir.mkdir(parents=True, exist_ok=True)
+            log_file_path = cls._log_dir / cls._log_file
 
         # Get the root logger
         root_logger = logging.getLogger()

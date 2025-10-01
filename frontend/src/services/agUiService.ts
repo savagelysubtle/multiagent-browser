@@ -7,11 +7,13 @@ class AgUiService {
   private agent: HttpAgent;
 
   constructor() {
+    console.log(`AgUiService: Initializing HttpAgent with URL: ${AGENT_URL}`);
     this.agent = new HttpAgent({
       url: AGENT_URL,
       agentId: "web-ui-agent",
       threadId: "main-thread",
     });
+    console.log("AgUiService: HttpAgent initialized.", this.agent);
   }
 
   getAgent() {

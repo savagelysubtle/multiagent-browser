@@ -74,6 +74,9 @@ async def lifespan(app: FastAPI):
         llm_api_key = os.getenv("LLM_API_KEY")
         llm_base_url = os.getenv("LLM_BASE_URL")
 
+        logger.debug(f"LLM_PROVIDER in server.py before agent init: {llm_provider_name}")
+        logger.info(f"Resolved LLM Config: Provider={llm_provider_name}, Model={llm_model_name}, BaseURL={llm_base_url}, APIKeySet={bool(llm_api_key)}")
+
         document_agent = DocumentEditingAgent(
             llm_provider_name=llm_provider_name,
             llm_model_name=llm_model_name,

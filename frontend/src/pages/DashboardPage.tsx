@@ -10,6 +10,7 @@ import Header from '../components/layout/Header';
 import EditorView from '../views/EditorView';
 import TasksView from '../views/TasksView';
 import SettingsView from '../views/SettingsView';
+import ChatView from '../views/ChatView'; // Import ChatView
 
 export default function DashboardPage() {
   const { isConnected } = useWebSocket();
@@ -31,6 +32,7 @@ export default function DashboardPage() {
             <Route path="/editor" element={<EditorView />} />
             <Route path="/tasks" element={<TasksView />} />
             <Route path="/settings" element={<SettingsView />} />
+            <Route path="/chat" element={<ChatView />} /> {/* Add route for ChatView */}
           </Routes>
         </main>
       </div>

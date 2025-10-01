@@ -15,6 +15,7 @@ import argparse
 import asyncio
 import sys
 from pathlib import Path
+import os
 
 # Add the backend src to path for imports
 backend_root = Path(__file__).parent.parent.parent  # Navigate up to backend/
@@ -29,15 +30,22 @@ project_root = backend_root
 
 # Import environment loader before other imports to ensure proper loading
 # Environment variables must be loaded early before any modules that depend on them
-from web_ui.utils.env import load_environment_variables
-
-# Load environment variables with intelligent file detection and precedence
-env_loaded = load_environment_variables(project_root=project_root, verbose=True)
+from dotenv import load_dotenv
 
 # Import centralized logging configuration
 from web_ui.utils.logging_config import LoggingConfig, get_logger
 
 logger = get_logger(__name__)
+
+# Load environment variables with intelligent file detection and precedence
+# Explicitly specify the .env file path to ensure it's found and loaded correctly.
+# The project root is two levels up from this file (backend/src/web_ui -> backend -> project_root)
+dotenv_path = Path(__file__).resolve().parents[3] / '.env.development'
+if not dotenv_path.exists():
+    dotenv_path = Path(__file__).resolve().parents[3] / '.env'
+
+load_dotenv(dotenv_path=dotenv_path, override=True)
+logger.debug(f"LLM_PROVIDER after load_dotenv in main.py: {os.environ.get('LLM_PROVIDER')}")
 
 
 def setup_logging(level: str = "INFO") -> None:

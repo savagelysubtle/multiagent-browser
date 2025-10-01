@@ -695,80 +695,39 @@ Provide the edited content:"""
             logger.error(f"Error getting database stats: {e}")
             return {"error": str(e)}
 
-    async def chat_with_user(
-        self, message: str, context_document_id: str | None = None
-    ) -> str:
-        """Chat with the user, optionally using a document as context."""
+    async def chat(self, message: str, context_document_id: str | None = None) -> str:
+        """Handles general chat messages using the LLM."""
+        logger.info(f"DocumentEditingAgent received chat message: {message}")
+        prompt = f"You are an AI assistant specialized in document editing and research. Respond concisely and helpfully.\n\nUser: {message}"
+
+        if context_document_id:
+            # In a real scenario, fetch document content and add to prompt
+            logger.debug(f"Chat with context_document_id: {context_document_id}")
+            prompt = f"You are an AI assistant specialized in document editing and research. Respond concisely and helpfully, using the following document context if relevant.\n\nDocument Context: [Document content for {context_document_id}]\n\nUser: {message}"
+
+        response = await self._get_llm_response(prompt)
+        logger.info(f"DocumentEditingAgent chat response: {response[:100]}...")
+        return response
+
+    async def _get_llm_response(self, prompt: str) -> str:
+        """Invokes the LLM with the given prompt and returns the response."""
         try:
             if not self.llm:
+                logger.warning("LLM not available for _get_llm_response")
                 return "I'm sorry, but I don't have an LLM configured. Please configure your AI settings first."
 
-            # Build context from current document if available
-            context = ""
-            if context_document_id:
-                document = self.chroma_manager.get_document(
-                    "documents", context_document_id
-                )
-                if document:
-                    context = f"\n\nCurrent Document ({document.metadata.get('filename', 'Untitled')}):\n{document.content[:1000]}"
-                    if len(document.content) > 1000:
-                        context += "\n... (content truncated)"
-
-            system_prompt = f"""You are an AI document assistant powered by {self.llm_provider_name}/{self.llm_model_name}.
-You help users with document editing, creation, and management tasks.
-You have access to advanced document management capabilities including search, editing, and policy management.
-
-Your capabilities include:
-- Creating and editing documents with AI assistance
-- Searching through documents and policies
-- Providing document suggestions and templates
-- Managing document organization and metadata
-- Helping with content generation and improvements
-
-Always be helpful, concise, and focused on document-related tasks.{context}"""
-
-            user_message = message
-
-            # Format messages based on LLM type
             if hasattr(self.llm, "ainvoke"):
-                # For chat-based models, try to pass messages format first
-                try:
-                    response = await self.llm.ainvoke(
-                        [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_message},
-                        ]
-                    )
-                except:
-                    # Fallback to single string prompt
-                    full_prompt = (
-                        f"{system_prompt}\n\nUser: {user_message}\n\nAssistant:"
-                    )
-                    response = await self.llm.ainvoke(full_prompt)
+                response = await self.llm.ainvoke(prompt)
             else:
-                # Fallback for synchronous LLMs
-                try:
-                    response = self.llm.invoke(
-                        [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_message},
-                        ]
-                    )
-                except:
-                    # Fallback to single string prompt
-                    full_prompt = (
-                        f"{system_prompt}\n\nUser: {user_message}\n\nAssistant:"
-                    )
-                    response = self.llm.invoke(full_prompt)
+                response = self.llm.invoke(prompt)
 
             if hasattr(response, "content"):
                 return response.content.strip()
             else:
                 return str(response).strip()
-
         except Exception as e:
-            logger.error(f"Error in chat: {e}")
-            return f"I apologize, but I encountered an error: {str(e)}"
+            logger.error(f"Error invoking LLM: {e}")
+            return f"I apologize, but I encountered an error while processing your request: {str(e)}"
 
     async def chat_with_user_stream(
         self, message: str, context_document_id: str | None = None

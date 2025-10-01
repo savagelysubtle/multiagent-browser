@@ -5,18 +5,21 @@
 .DESCRIPTION
     This script starts the React frontend and the Python backend concurrently for a seamless development experience.
     It includes port checking, dependency validation, and consolidated logging.
+    Updated to use background jobs for robust process management and graceful shutdown on error.
 .PARAMETER LogFile
     The path to the log file where the output of both servers will be written.
 .EXAMPLE
-    .\start-dev.ps1 -LogFile .\logs\web-ui.log
+    .\start-dev.ps1
 #>
 
 param(
-    [string]$LogFile = "d:\Coding\web-ui\logs\web-ui.log"
+    [string]$LogFile = "d:\Coding\web-ui\logs\web-ui-dev.log"
 )
 
+$ErrorActionPreference = "Stop"
+
 Write-Host "🚀 Starting Web-UI Development Environment..." -ForegroundColor Green
-Write-Host "================================================" -ForegroundColor Cyan
+Write-Host "=================================================" -ForegroundColor Cyan
 
 # --- Pre-flight Checks ---
 
@@ -65,41 +68,81 @@ Write-Host "✅ Pre-flight checks passed." -ForegroundColor Green
 if (-not (Test-Path (Split-Path $LogFile -Parent))) {
     New-Item -ItemType Directory -Path (Split-Path $LogFile -Parent) | Out-Null
 }
-Clear-Content $LogFile
-Write-Host "📝 Logging output to: $LogFile" -ForegroundColor Cyan
+Set-Content -Path $LogFile -Value $null
+Write-Host "📝 Logging combined output to: $LogFile" -ForegroundColor Cyan
 
 # --- Cleanup Function ---
 function Cleanup {
     Write-Host "`n🛑 Shutting down servers..." -ForegroundColor Yellow
-    Get-Job | Stop-Job -PassThru | Remove-Job
-    Write-Host "✅ Cleanup complete. Goodbye!" -ForegroundColor Green
+    $runningJobs = Get-Job | Where-Object { $_.State -eq 'Running' }
+    if ($runningJobs) {
+        $runningJobs | Stop-Job -PassThru | Remove-Job
+        Write-Host "✅ All background jobs stopped." -ForegroundColor Green
+    } else {
+        Write-Host "✅ No running jobs to stop." -ForegroundColor Green
+    }
+    Write-Host "Goodbye!" -ForegroundColor Green
 }
 
-# Register cleanup function for Ctrl+C
+# Register cleanup for script exit and Ctrl+C
 $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Cleanup }
 
 # --- Main Execution ---
 try {
-# Start the frontend
-Write-Host "Starting frontend..."
-Push-Location -Path "d:\Coding\web-ui\frontend"
-Start-Process "npm" -ArgumentList "run", "dev" -NoNewWindow
-Pop-Location
+    # Start Backend Server as a Job
+    Write-Host "Starting Backend server (uv run backend)..."
+    $backendJob = Start-Job -ScriptBlock {
+        param($projectRoot, $logFilePath)
+        $env:WEBUI_LOG_FILE = $logFilePath
+        $env:LOG_TO_CONSOLE = "false" # Explicitly force logging to file
+        Set-Location -Path $projectRoot
+        uv run backend 2>&1
+    } -ArgumentList $PWD.Path, $LogFile -Name "Backend"
 
-# Start the backend
-Write-Host "Starting backend..."
-Push-Location -Path "d:\Coding\web-ui"
-$backendProcess = Start-Process "uv" -ArgumentList "run", "backend" -NoNewWindow -PassThru
-Pop-Location
+    # Start Frontend Server as a Job
+    Write-Host "Starting Frontend server (npm run dev)..."
+    $frontendJob = Start-Job -ScriptBlock {
+        param($frontendDir)
+        Set-Location -Path $frontendDir
+        npm run dev 2>&1
+    } -ArgumentList (Join-Path $PWD.Path "frontend") -Name "Frontend"
 
-Write-Host "Both frontend and backend have been started."
-Write-Host "Backend process ID: $($backendProcess.Id)"
+    Write-Host "✅ Both servers started as background jobs." -ForegroundColor Green
+    Write-Host "   - Backend Job ID: $($backendJob.Id)"
+    Write-Host "   - Frontend Job ID: $($frontendJob.Id)"
 
-Wait-Process -Id $backendProcess.Id
-}
-catch {
-    Write-Host "`n❌ An unexpected error occurred: $($_.Exception.Message)" -ForegroundColor Red
-}
-finally {
+    # Wait for frontend to start and check port
+    Write-Host "Waiting for frontend server to start..."
+    Start-Sleep -Seconds 5 # Give Vite some time to start
+    if (-not (Test-Port $frontendPort)) { # Test-Port returns true if port is available, so -not means it's in use
+        Write-Host "✅ Frontend available at: http://localhost:$frontendPort" -ForegroundColor Green
+    } else {
+        Write-Host "❌ Frontend server did not start on port $frontendPort." -ForegroundColor Red
+    }
+
+    Write-Host "Monitoring server logs. Press Ctrl+C to shut down."
+
+    # Continuously pipe job output to the log file
+    while ($backendJob.State -eq 'Running' -and $frontendJob.State -eq 'Running') {
+        Receive-Job -Job $backendJob | Out-File -FilePath $LogFile -Append
+        Receive-Job -Job $frontendJob | Out-File -FilePath $LogFile -Append
+        Start-Sleep -Seconds 2
+    }
+
+    # Determine which job failed
+    if ($backendJob.State -ne 'Running') {
+        Write-Host "❌ Backend server has stopped unexpectedly." -ForegroundColor Red
+        Receive-Job -Job $backendJob # Display final output
+    }
+    if ($frontendJob.State -ne 'Running') {
+        Write-Host "❌ Frontend server has stopped unexpectedly." -ForegroundColor Red
+        Receive-Job -Job $frontendJob # Display final output
+    }
+
+} catch {
+    Write-Host "`n❌ An unexpected error occurred in the startup script: $($_.Exception.Message)" -ForegroundColor Red
+} finally {
+    # Cleanup will be triggered by the PowerShell.Exiting event
+    Write-Host "Initiating cleanup..."
     Cleanup
 }

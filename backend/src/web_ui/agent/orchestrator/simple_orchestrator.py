@@ -11,6 +11,16 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from ag_ui.core import (
+    RunAgentInput,
+    EventType,
+    RunStartedEvent,
+    RunFinishedEvent,
+    TextMessageStartEvent,
+    TextMessageContentEvent,
+    TextMessageEndEvent,
+)
+
 from ...utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -122,6 +132,106 @@ class SimpleAgentOrchestrator:
             },
         ]
 
+    async def handle_ag_ui_chat_input(
+        self,
+        input_data: RunAgentInput,
+        user_id: str,
+    ):
+        """Handle incoming AG-UI chat input and stream events."""
+        logger.info(f"Orchestrator received AG-UI chat input for run_id: {input_data.run_id}, user_id: {user_id}")
+        logger.debug(f"AG-UI input_data: {input_data.model_dump_json()}")
+
+        message_content = ""
+        for message in input_data.messages:
+            if message.role == "user" and message.content:
+                message_content = message.content
+                break
+
+        message_content = ""
+        for message in input_data.messages:
+            if message.role == "user" and message.content:
+                message_content = message.content
+                break
+
+        # Safely access metadata
+        metadata = input_data.metadata if hasattr(input_data, "metadata") and input_data.metadata is not None else {}
+
+        agent_type = metadata.get("selectedAgent") # Use 'selectedAgent' from frontend
+        action = metadata.get("action")
+
+        # Basic inference if not provided in metadata
+        if not agent_type:
+            lower_message = message_content.lower()
+            if "browse" in lower_message or "website" in lower_message:
+                agent_type = "browser_use"
+                action = "browse" # Default action for browser
+            elif "research" in lower_message or "topic" in lower_message:
+                agent_type = "deep_research"
+                action = "research" # Default action for research
+            elif "document" in lower_message or "edit" in lower_message or "create" in lower_message:
+                agent_type = "document_editor"
+                action = "chat" # Default chat action for document editor
+            else:
+                agent_type = "document_editor" # Default fallback
+                action = "chat" # Default chat action
+
+        if not action:
+            # Fallback action if agent_type was inferred but action wasn't
+            if agent_type == "browser_use":
+                action = "browse"
+            elif agent_type == "deep_research":
+                action = "research"
+            else:
+                action = "chat" # Default chat action
+
+        logger.debug(f"Extracted message: '{message_content}', inferred agent_type: '{agent_type}', inferred action: '{action}'")
+
+        # Basic inference if not provided in metadata
+        if not agent_type:
+            lower_message = message_content.lower()
+            if "browse" in lower_message or "website" in lower_message:
+                agent_type = "browser_use"
+                action = "browse" # Default action for browser
+            elif "research" in lower_message or "topic" in lower_message:
+                agent_type = "deep_research"
+                action = "research" # Default action for research
+            elif "document" in lower_message or "edit" in lower_message or "create" in lower_message:
+                agent_type = "document_editor"
+                action = "chat" # Default chat action for document editor
+            else:
+                agent_type = "document_editor" # Default fallback
+                action = "chat" # Default chat action
+
+        if not action:
+            # Fallback action if agent_type was inferred but action wasn't
+            if agent_type == "browser_use":
+                action = "browse"
+            elif agent_type == "deep_research":
+                action = "research"
+            else:
+                action = "chat" # Default chat action
+
+        logger.debug(f"Extracted message: '{message_content}', inferred agent_type: '{agent_type}', inferred action: '{action}'")
+
+        # Create a task for the orchestrator
+        task = AgentTask(
+            id=input_data.run_id,
+            user_id=user_id,
+            agent_type=agent_type,
+            action=action,
+            payload={
+                "message": message_content,
+                "context_document_id": None, # Placeholder for now
+            },
+            created_at=datetime.utcnow(),
+        )
+        self.task_store[task.id] = task
+        logger.info(f"Created AgentTask {task.id} for AG-UI chat input.")
+
+        # Execute the task and stream AG-UI events
+        async for event in self._execute_agent_action(task):
+            yield event
+
     async def submit_task(
         self,
         agent_type: str,
@@ -130,7 +240,9 @@ class SimpleAgentOrchestrator:
         user_id: str | None = None,
     ) -> str:
         """Submit a task to an agent and return task ID."""
+        logger.info(f"Submit_task called for agent_type: {agent_type}, action: {action}, user_id: {user_id}")
         if agent_type not in self.agents:
+            logger.error(f"Unknown agent type: {agent_type} for task submission.")
             raise ValueError(f"Unknown agent type: {agent_type}")
 
         # Create task object
@@ -144,135 +256,179 @@ class SimpleAgentOrchestrator:
         )
 
         self.task_store[task.id] = task
+        logger.info(f"Created AgentTask {task.id} for submission.")
 
-        # Handle document_editor actions directly
-        if agent_type == "document_editor":
-            agent = self.agents[agent_type]
-
-            try:
-                if action == "create_document":
-                    # Extract parameters
-                    filename = payload.get("filename", "untitled.md")
-                    content = payload.get("content", "")
-                    document_type = payload.get("document_type", "markdown")
-                    metadata = payload.get("metadata", {})
-
-                    # Call document agent method
-                    success, message, document_id = await agent.create_document(
-                        filename=filename,
-                        content=content,
-                        document_type=document_type,
-                        metadata=metadata,
-                    )
-
-                    # Update task
-                    task.status = "completed" if success else "failed"
-                    task.result = {
-                        "success": success,
-                        "message": message,
-                        "document_id": document_id,
-                    }
-
-                elif action == "edit_document":
-                    # Extract parameters
-                    document_id = payload.get("document_id")
-                    instruction = payload.get("instruction", "")
-                    use_llm = payload.get("use_llm", True)
-
-                    if not document_id:
-                        raise ValueError(
-                            "document_id is required for edit_document action"
-                        )
-
-                    # Call document agent method
-                    success, message, updated_id = await agent.edit_document(
-                        document_id=document_id,
-                        instruction=instruction,
-                        use_llm=use_llm,
-                    )
-
-                    # Update task
-                    task.status = "completed" if success else "failed"
-                    task.result = {
-                        "success": success,
-                        "message": message,
-                        "document_id": updated_id,
-                    }
-
-                elif action == "search_documents":
-                    # Extract parameters
-                    query = payload.get("query", "")
-                    collection_type = payload.get("collection_type", "documents")
-                    limit = payload.get("limit", 10)
-
-                    # Call document agent method
-                    results = await agent.search_documents(
-                        query=query, collection_type=collection_type, limit=limit
-                    )
-
-                    # Update task
-                    task.status = "completed"
-                    task.result = {
-                        "success": True,
-                        "documents": results,
-                        "count": len(results),
-                    }
-
-                elif action == "chat":
-                    # Extract parameters
-                    message = payload.get("message", "")
-                    context_document_id = payload.get("context_document_id")
-
-                    # Call document agent chat method
-                    response = await agent.chat_with_user(
-                        message=message, context_document_id=context_document_id
-                    )
-
-                    # Update task
-                    task.status = "completed"
-                    task.result = {"success": True, "response": response}
-
-                else:
-                    # Unknown action
-                    task.status = "failed"
-                    task.error = f"Unknown action for document_editor: {action}"
-
-            except Exception as e:
-                logger.error(f"Error executing document_editor task: {e}")
-                task.status = "failed"
-                task.error = str(e)
-
-            # Update completed_at time
-            task.completed_at = datetime.utcnow()
-
-            # Send WebSocket update if available
-            if self.ws_manager:
-                await self.ws_manager.send_task_update(
-                    task_id=task.id,
-                    status=task.status,
-                    data={
-                        "task_id": task.id,
-                        "agent_type": task.agent_type,
-                        "action": task.action,
-                        "status": task.status,
-                        "result": task.result,
-                        "error": task.error,
-                        "created_at": task.created_at.isoformat(),
-                        "completed_at": task.completed_at.isoformat()
-                        if task.completed_at is not None
-                        else None,
-                    },
-                )
-
-        else:
-            # For other agents, queue the task for processing
-            # TODO: Implement async processing for other agent types
-            task.status = "queued"
-            logger.info(f"Task {task.id} queued for {agent_type} agent")
+        # For now, directly execute the task. In future, this might queue it.
+        # The _execute_agent_action will handle streaming AG-UI events if applicable.
+        # For submit_task, we don't stream events back directly, but update task status.
+        asyncio.create_task(self._execute_agent_action(task, is_ag_ui_stream=False))
 
         return task.id
 
-    async def _execute_task(self, task: AgentTask):
+    async def _execute_agent_action(self, task: AgentTask, is_ag_ui_stream: bool = True):
+        """Execute a task with comprehensive error handling and optional AG-UI event streaming."""
+        logger.info(f"Executing agent action for task {task.id}: agent_type={task.agent_type}, action={task.action}")
+        message_id = str(uuid.uuid4())
+        if is_ag_ui_stream:
+            logger.debug(f"Yielding TextMessageStartEvent for task {task.id}")
+            yield TextMessageStartEvent(
+                type=EventType.TEXT_MESSAGE_START,
+                message_id=message_id,
+                role="assistant",
+            )
+
+        try:
+            # Update status to running
+            task.status = "running"
+            task.started_at = datetime.utcnow()
+            task.progress = {"percentage": 10, "message": "Starting agent..."}
+            await self._notify_task_status(task)
+            logger.debug(f"Task {task.id} status updated to running.")
+
+            # Get agent
+            agent = self.agents.get(task.agent_type)
+            if not agent:
+                logger.error(f"Agent {task.agent_type} not found for task {task.id}")
+                raise ValueError(f"Agent {task.agent_type} not available")
+
+            # Check if agent has the requested action
+            if not hasattr(agent, task.action):
+                logger.error(f"Agent {task.agent_type} has no action {task.action} for task {task.id}")
+                raise AttributeError(
+                    f"Agent {task.agent_type} has no action {task.action}"
+                )
+
+            # Update progress
+            task.progress = {"percentage": 25, "message": "Executing task..."}
+            await self._notify_task_status(task)
+            logger.debug(f"Task {task.id} progress updated to executing.")
+
+            # Execute the action with timeout
+            method = getattr(agent, task.action)
+            logger.debug(f"Calling agent method {task.agent_type}.{task.action} for task {task.id} with payload: {task.payload}")
+
+            # Create progress callback for long-running tasks
+            async def progress_callback(percentage: int, message: str):
+                task.progress = {
+                    "percentage": max(25, min(95, percentage)),
+                    "message": message,
+                }
+                await self._notify_task_status(task)
+                logger.debug(f"Task {task.id} progress callback: {percentage}% - {message}")
+
+            # Add progress callback to payload if agent supports it
+            if "progress_callback" in method.__code__.co_varnames:
+                task.payload["progress_callback"] = progress_callback
+
+            # Execute with timeout
+            # If the agent method is a generator, iterate and yield AG-UI events
+            result = None
+            agent_response = await asyncio.wait_for(
+                method(**task.payload), timeout=self.task_timeout
+            )
+            logger.debug(f"Agent {task.agent_type}.{task.action} for task {task.id} returned: {agent_response}")
+
+            if isinstance(agent_response, str):
+                # Simple string response, send as one message
+                if is_ag_ui_stream:
+                    logger.debug(f"Yielding TextMessageContentEvent (string) for task {task.id}")
+                    yield TextMessageContentEvent(
+                        type=EventType.TEXT_MESSAGE_CONTENT,
+                        message_id=message_id,
+                        delta=agent_response,
+                    )
+                result = {"response": agent_response}
+            elif isinstance(agent_response, dict) and "response" in agent_response:
+                # Dictionary with a 'response' key
+                if is_ag_ui_stream:
+                    logger.debug(f"Yielding TextMessageContentEvent (dict) for task {task.id}")
+                    yield TextMessageContentEvent(
+                        type=EventType.TEXT_MESSAGE_CONTENT,
+                        message_id=message_id,
+                        delta=agent_response["response"],
+                    )
+                result = agent_response
+            else:
+                # Assume it's a more complex object or already handled by agent
+                result = agent_response
+                if is_ag_ui_stream:
+                    logger.debug(f"Yielding TextMessageContentEvent (complex object) for task {task.id}")
+                    yield TextMessageContentEvent(
+                        type=EventType.TEXT_MESSAGE_CONTENT,
+                        message_id=message_id,
+                        delta=f"Agent returned: {str(agent_response)}",
+                    )
+
+            # Task completed successfully
+            task.status = "completed"
+            task.result = result
+            task.completed_at = datetime.utcnow()
+            task.progress = {
+                "percentage": 100,
+                "message": "Task completed successfully",
+            }
+
+            logger.info(f"Task {task.id} completed successfully")
+
+        except TimeoutError:
+            logger.error(f"Task {task.id} timed out after {self.task_timeout} seconds")
+            task.status = "failed"
+            task.error = f"Task timed out after {self.task_timeout} seconds"
+            task.completed_at = datetime.utcnow()
+            task.progress = {"percentage": 100, "message": "Task timed out"}
+            if is_ag_ui_stream:
+                yield TextMessageContentEvent(
+                    type=EventType.TEXT_MESSAGE_CONTENT,
+                    message_id=message_id,
+                    delta=f"Error: Task timed out after {self.task_timeout} seconds",
+                )
+
+        except asyncio.CancelledError:
+            logger.info(f"Task {task.id} was cancelled")
+            task.status = "cancelled"
+            task.completed_at = datetime.utcnow()
+            task.progress = {"percentage": 100, "message": "Task was cancelled"}
+            if is_ag_ui_stream:
+                yield TextMessageContentEvent(
+                    type=EventType.TEXT_MESSAGE_CONTENT,
+                    message_id=message_id,
+                    delta="Error: Task was cancelled",
+                )
+
+        except Exception as e:
+            logger.error(f"Task {task.id} failed: {e}", exc_info=True)
+            task.status = "failed"
+            task.error = str(e)
+            task.completed_at = datetime.utcnow()
+            task.progress = {
+                "percentage": 100,
+                "message": f"Task failed: {str(e)[:100]}",
+            }
+            if is_ag_ui_stream:
+                yield TextMessageContentEvent(
+                    type=EventType.TEXT_MESSAGE_CONTENT,
+                    message_id=message_id,
+                    delta=f"Error: {str(e)}",
+                )
+
+        finally:
+            # Clean up
+            if task.id in self.running_tasks:
+                del self.running_tasks[task.id]
+
+            # Final notification
+            await self._notify_task_status(task)
+
+            if is_ag_ui_stream:
+                logger.debug(f"Yielding TextMessageEndEvent for task {task.id}")
+                yield TextMessageEndEvent(
+                    type=EventType.TEXT_MESSAGE_END,
+                    message_id=message_id,
+                )
+
+    async def _notify_task_status(
+        self, task: AgentTask, custom_message: dict | None = None
+    ):
         """Execute a task with comprehensive error handling."""
         try:
             # Update status to running
