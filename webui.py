@@ -9,6 +9,8 @@ Follows the orchestrator pattern: keep entry point minimal (< 50 lines).
 import sys
 from pathlib import Path
 
+import os
+
 # Ensure we can import from backend/src
 backend_src = Path(__file__).parent / "backend" / "src"
 sys.path.insert(0, str(backend_src))

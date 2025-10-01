@@ -83,22 +83,8 @@ class LoggingConfig:
         console_handler.setFormatter(formatter)
         root_logger.addHandler(console_handler)
 
-        # Create and configure file handler with rotation if not logging to console
         logger = logging.getLogger(__name__)
-        if os.getenv("LOG_TO_CONSOLE", "false").lower() != "true":
-            log_file_path = cls._log_dir / cls._log_file
-            file_handler = logging.handlers.RotatingFileHandler(
-                log_file_path,
-                maxBytes=10 * 1024 * 1024,  # 10MB
-                backupCount=5,
-                encoding="utf-8",
-            )
-            file_handler.setLevel(getattr(logging, level.upper()))
-            file_handler.setFormatter(formatter)
-            root_logger.addHandler(file_handler)
-            logger.info(f"Logging initialized - Level: {level}, File: {log_file_path}")
-        else:
-            logger.info(f"Logging initialized - Level: {level}, Output: Console")
+        logger.info(f"Logging initialized - Level: {level}, Output: Console")
 
         # Mark as initialized
         cls._initialized = True

@@ -45,7 +45,9 @@ if not dotenv_path.exists():
     dotenv_path = Path(__file__).resolve().parents[3] / '.env'
 
 load_dotenv(dotenv_path=dotenv_path, override=True)
+logger.debug(f"Dotenv path: {dotenv_path}, exists: {dotenv_path.exists()}")
 logger.debug(f"LLM_PROVIDER after load_dotenv in main.py: {os.environ.get('LLM_PROVIDER')}")
+logger.debug(f"LLM_MODEL after load_dotenv in main.py: {os.environ.get('LLM_MODEL')}")
 
 
 def setup_logging(level: str = "INFO") -> None:

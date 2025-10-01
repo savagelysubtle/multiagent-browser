@@ -20,7 +20,7 @@ from ..middleware.error_handler import AppException
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/api/agents", tags=["agents"])
+router = APIRouter(tags=["agents"])
 
 
 # Request/Response Models

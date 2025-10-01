@@ -81,6 +81,11 @@ function Cleanup {
     } else {
         Write-Host "✅ No running jobs to stop." -ForegroundColor Green
     }
+
+    # Explicitly kill any remaining uvicorn processes
+    Get-Process -Name "python" | Where-Object { $_.CommandLine -like "*uvicorn*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Write-Host "✅ Cleaned up any lingering uvicorn processes." -ForegroundColor Green
+
     Write-Host "Goodbye!" -ForegroundColor Green
 }
 
@@ -96,7 +101,7 @@ try {
         $env:WEBUI_LOG_FILE = $logFilePath
         $env:LOG_TO_CONSOLE = "false" # Explicitly force logging to file
         Set-Location -Path $projectRoot
-        uv run backend 2>&1
+        uv run backend --reload 2>&1
     } -ArgumentList $PWD.Path, $LogFile -Name "Backend"
 
     # Start Frontend Server as a Job
