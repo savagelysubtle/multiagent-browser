@@ -81,7 +81,8 @@ class DocumentEditingAgent:
         # Ensure working directory exists
         os.makedirs(working_directory, exist_ok=True)
 
-        logger.info(f"DocumentEditingAgent initialized with session: {self.session_id}")
+        self.logger = get_logger(__name__)
+        self.logger.info(f"DocumentEditingAgent initialized with session: {self.session_id}")
 
     async def initialize(self) -> bool:
         """Initialize MCP client, tools, and LLM if needed."""
@@ -93,7 +94,7 @@ class DocumentEditingAgent:
             # Load MCP configuration
             mcp_config = await self._load_mcp_config()
             if not mcp_config:
-                logger.warning(
+                self.logger.warning(
                     "No MCP configuration found, running with basic database tools only"
                 )
                 return False
@@ -101,7 +102,7 @@ class DocumentEditingAgent:
             # Setup MCP client with Chroma tools
             if "chroma" in mcp_config.get("mcpServers", {}):
                 chroma_config = mcp_config["mcpServers"]["chroma"]
-                logger.info(f"Setting up ChromaDB MCP client: {chroma_config}")
+                self.logger.info(f"Setting up ChromaDB MCP client: {chroma_config}")
 
                 self.mcp_client = await setup_mcp_client_and_tools(
                     {"chroma": chroma_config}
@@ -109,13 +110,13 @@ class DocumentEditingAgent:
 
                 if self.mcp_client:
                     self.mcp_tools = self.mcp_client.get_tools()
-                    logger.info(f"Loaded {len(self.mcp_tools)} MCP tools")
+                    self.logger.info(f"Loaded {len(self.mcp_tools)} MCP tools")
                     return True
 
             return False
 
         except Exception as e:
-            logger.error(f"Failed to initialize MCP client: {e}")
+            self.logger.error(f"Failed to initialize MCP client: {e}")
             return False
 
     async def setup_llm(
@@ -137,7 +138,7 @@ class DocumentEditingAgent:
             url = base_url or self.llm_base_url
 
             if not provider:
-                logger.warning("No LLM provider specified")
+                self.logger.warning("No LLM provider specified")
                 return False
 
             if not model:
@@ -168,11 +169,11 @@ class DocumentEditingAgent:
             self.llm_api_key = key
             self.llm_base_url = url
 
-            logger.info(f"LLM configured: {provider}/{model}")
+            self.logger.info(f"LLM configured: {provider}/{model}")
             return True
 
         except Exception as e:
-            logger.error(f"Error setting up LLM: {e}")
+            self.logger.error(f"Error setting up LLM: {e}")
             return False
 
     def get_available_providers(self) -> dict[str, Any]:
@@ -199,7 +200,7 @@ class DocumentEditingAgent:
             # First try to get active config from database
             active_config = await self.mcp_config_manager.get_active_config()
             if active_config:
-                logger.info("Using active MCP configuration from database")
+                self.logger.info("Using active MCP configuration from database")
                 return active_config["config_data"]
 
             # Fallback to file-based config
@@ -211,7 +212,7 @@ class DocumentEditingAgent:
             if os.path.exists(self.mcp_config_path):
                 with open(self.mcp_config_path) as f:
                     config_data = json.load(f)
-                    logger.info(
+                    self.logger.info(
                         f"Loaded MCP configuration from file: {self.mcp_config_path}"
                     )
                     return config_data
@@ -219,7 +220,7 @@ class DocumentEditingAgent:
             return None
 
         except Exception as e:
-            logger.error(f"Error loading MCP configuration: {e}")
+            self.logger.error(f"Error loading MCP configuration: {e}")
             return None
 
     async def create_document(
@@ -271,13 +272,13 @@ class DocumentEditingAgent:
 
             if success and doc_model:
                 self.current_document_id = doc_model.id
-                logger.info(f"Document created successfully: {filename}")
+                self.logger.info(f"Document created successfully: {filename}")
                 return True, f"Document created: {filename}", doc_model.id
             else:
                 return False, f"Failed to store document: {message}", None
 
         except Exception as e:
-            logger.error(f"Error creating document: {e}")
+            self.logger.error(f"Error creating document: {e}")
             return False, f"Error creating document: {str(e)}", None
 
     async def edit_document(
@@ -308,7 +309,7 @@ class DocumentEditingAgent:
                         document_metadata=document.metadata,
                     )
                 else:
-                    logger.warning(
+                    self.logger.warning(
                         "LLM requested but unavailable, using simple editing"
                     )
                     new_content = await self._simple_edit_document(
@@ -358,7 +359,7 @@ class DocumentEditingAgent:
                 return False, "No changes made to document", document_id
 
         except Exception as e:
-            logger.error(f"Error editing document: {e}")
+            self.logger.error(f"Error editing document: {e}")
             return False, f"Error editing document: {str(e)}", None
 
     async def _llm_edit_document(
@@ -367,7 +368,7 @@ class DocumentEditingAgent:
         """Use LLM to edit document content."""
         try:
             if not self.llm:
-                logger.warning("LLM not available for document editing")
+                self.logger.warning("LLM not available for document editing")
                 return None
 
             document_type = document_metadata.get("language", "text")
@@ -414,7 +415,7 @@ Provide the edited content:"""
             return new_content
 
         except Exception as e:
-            logger.error(f"Error in LLM document editing: {e}")
+            self.logger.error(f"Error in LLM document editing: {e}")
             return None
 
     async def _simple_edit_document(self, content: str, instruction: str) -> str:
@@ -477,7 +478,7 @@ Provide the edited content:"""
             return results[:limit]
 
         except Exception as e:
-            logger.error(f"Error searching documents: {e}")
+            self.logger.error(f"Error searching documents: {e}")
             return []
 
     async def _search_with_mcp_tools(
@@ -517,13 +518,13 @@ Provide the edited content:"""
                         )
 
                 except Exception as tool_error:
-                    logger.warning(f"MCP tool {tool.name} failed: {tool_error}")
+                    self.logger.warning(f"MCP tool {tool.name} failed: {tool_error}")
                     continue
 
             return results
 
         except Exception as e:
-            logger.error(f"Error using MCP tools for search: {e}")
+            self.logger.error(f"Error using MCP tools for search: {e}")
             return []
 
     async def get_document_suggestions(
@@ -566,7 +567,7 @@ Provide the edited content:"""
             return formatted_suggestions
 
         except Exception as e:
-            logger.error(f"Error getting document suggestions: {e}")
+            self.logger.error(f"Error getting document suggestions: {e}")
             return {}
 
     async def _get_mcp_suggestions(
@@ -601,7 +602,7 @@ Provide the edited content:"""
                         suggestions.append(result)
 
                 except Exception as tool_error:
-                    logger.warning(
+                    self.logger.warning(
                         f"MCP suggestion tool {tool.name} failed: {tool_error}"
                     )
                     continue
@@ -609,7 +610,7 @@ Provide the edited content:"""
             return suggestions
 
         except Exception as e:
-            logger.error(f"Error getting MCP suggestions: {e}")
+            self.logger.error(f"Error getting MCP suggestions: {e}")
             return []
 
     async def store_as_policy(
@@ -644,7 +645,7 @@ Provide the edited content:"""
             return success, message
 
         except Exception as e:
-            logger.error(f"Error storing policy: {e}")
+            self.logger.error(f"Error storing policy: {e}")
             return False, f"Error storing policy: {str(e)}"
 
     async def _generate_template_content(
@@ -692,28 +693,28 @@ Provide the edited content:"""
             }
 
         except Exception as e:
-            logger.error(f"Error getting database stats: {e}")
+            self.logger.error(f"Error getting database stats: {e}")
             return {"error": str(e)}
 
     async def chat(self, message: str, context_document_id: str | None = None) -> str:
         """Handles general chat messages using the LLM."""
-        logger.info(f"DocumentEditingAgent received chat message: {message}")
+        self.logger.info(f"DocumentEditingAgent received chat message: {message}")
         prompt = f"You are an AI assistant specialized in document editing and research. Respond concisely and helpfully.\n\nUser: {message}"
 
         if context_document_id:
             # In a real scenario, fetch document content and add to prompt
-            logger.debug(f"Chat with context_document_id: {context_document_id}")
+            self.logger.debug(f"Chat with context_document_id: {context_document_id}")
             prompt = f"You are an AI assistant specialized in document editing and research. Respond concisely and helpfully, using the following document context if relevant.\n\nDocument Context: [Document content for {context_document_id}]\n\nUser: {message}"
 
         response = await self._get_llm_response(prompt)
-        logger.info(f"DocumentEditingAgent chat response: {response[:100]}...")
+        self.logger.info(f"DocumentEditingAgent chat response: {response[:100]}...")
         return response
 
     async def _get_llm_response(self, prompt: str) -> str:
         """Invokes the LLM with the given prompt and returns the response."""
         try:
             if not self.llm:
-                logger.warning("LLM not available for _get_llm_response")
+                self.logger.warning("LLM not available for _get_llm_response")
                 return "I'm sorry, but I don't have an LLM configured. Please configure your AI settings first."
 
             if hasattr(self.llm, "ainvoke"):
@@ -726,7 +727,7 @@ Provide the edited content:"""
             else:
                 return str(response).strip()
         except Exception as e:
-            logger.error(f"Error invoking LLM: {e}")
+            self.logger.error(f"Error invoking LLM: {e}")
             return f"I apologize, but I encountered an error while processing your request: {str(e)}"
 
     async def chat_with_user_stream(
@@ -795,7 +796,7 @@ Always be helpful, concise, and focused on document-related tasks.{context}"""
                     await asyncio.sleep(0.05)  # Small delay to simulate streaming
 
         except Exception as e:
-            logger.error(f"Error in streaming chat: {e}")
+            self.logger.error(f"Error in streaming chat: {e}")
             yield f"I apologize, but I encountered an error: {str(e)}"
 
     async def process_batch_documents(
@@ -847,13 +848,13 @@ Always be helpful, concise, and focused on document-related tasks.{context}"""
                         {"file_path": file_path, "error": str(file_error)}
                     )
 
-            logger.info(
+            self.logger.info(
                 f"Batch processing completed: {len(results['processed'])} processed, {len(results['failed'])} failed"
             )
             return results
 
         except Exception as e:
-            logger.error(f"Error in batch processing: {e}")
+            self.logger.error(f"Error in batch processing: {e}")
             return {
                 "processed": [],
                 "failed": file_paths,
@@ -868,15 +869,15 @@ Always be helpful, concise, and focused on document-related tasks.{context}"""
                 await self.mcp_client.__aexit__(None, None, None)
                 self.mcp_client = None
 
-            logger.info(f"DocumentEditingAgent session {self.session_id} closed")
+            self.logger.info(f"DocumentEditingAgent session {self.session_id} closed")
 
         except Exception as e:
-            logger.error(f"Error closing DocumentEditingAgent: {e}")
+            self.logger.error(f"Error closing DocumentEditingAgent: {e}")
 
     def __del__(self):
         """Ensure cleanup on deletion."""
         if hasattr(self, "mcp_client") and self.mcp_client:
             # Note: Can't use async in __del__, so log a warning
-            logger.warning(
+            self.logger.warning(
                 f"DocumentEditingAgent session {self.session_id} was not properly closed"
             )

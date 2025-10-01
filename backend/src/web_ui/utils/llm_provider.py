@@ -133,6 +133,7 @@ def get_llm_model(provider: str, **kwargs):
     if provider not in ["ollama", "bedrock"]:
         env_var = f"{provider.upper()}_API_KEY"
         api_key = kwargs.get("api_key", "") or os.getenv(env_var, "")
+        logger.debug(f"In get_llm_model: provider={provider}, env_var={env_var}, api_key_from_kwargs={kwargs.get("api_key", "")}, api_key_from_env={os.getenv(env_var, "")}, final_api_key_status={bool(api_key)}")
         if not api_key:
             provider_display = config.PROVIDER_DISPLAY_NAMES.get(
                 provider, provider.upper()
