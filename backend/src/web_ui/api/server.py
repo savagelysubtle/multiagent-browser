@@ -157,7 +157,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
     app.include_router(copilotkit_router, prefix="/api/copilotkit", tags=["copilotkit"])
     app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
-    app.include_router(a2a_router, prefix="/api/a2a", tags=["agent-to-agent"])
+    app.include_router(a2a_router)
     app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
     app.include_router(logging_router, prefix="/api/logs", tags=["Frontend Logging"])
     app.include_router(ag_ui_router, prefix="/api/ag_ui", tags=["AG-UI"])

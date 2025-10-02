@@ -1,8 +1,8 @@
 """
 Document management API routes for React frontend.
 
-Provides CRUD operations for documents with ChromaDB integration
-and DocumentEditingAgent support.
+Provides CRUD operations for documents with ChromaDB integration,
+DocumentEditingAgent support, and UserDocumentService integration.
 """
 
 from typing import Any
@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ...agent.document_editor import DocumentEditingAgent
+from ...services.user_document_service import UserDocumentService
 from ...utils.logging_config import get_logger
 from ..dependencies import get_document_agent
 
@@ -21,6 +22,9 @@ logger = get_logger(__name__)
 
 # Create router
 router = APIRouter()
+
+# Initialize user document service
+user_document_service = UserDocumentService()
 
 # --- Enhanced Pydantic Models for Document API Requests/Responses ---
 
@@ -330,6 +334,45 @@ async def export_document(
         raise HTTPException(status_code=500, detail=f"Error exporting document: {str(e)}")
 
 
+@router.post("/export-from-db")
+async def export_document_from_database(
+    request: DocumentExportRequest,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
+):
+    """Export document directly from database using user document service."""
+    try:
+        # Get document from database
+        document = agent.chroma_manager.get_document("documents", request.document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Use the user document service for export
+        export_result = await user_document_service.export_document(
+            content=document.content,
+            format=request.format,
+            title=document.metadata.get("title", document.metadata.get("filename", "document"))
+        )
+
+        if not export_result.get("success"):
+            raise HTTPException(status_code=400, detail=export_result.get("error", "Export failed"))
+
+        # Return as streaming response
+        def generate():
+            yield export_result["data"]
+
+        return StreamingResponse(
+            generate(),
+            media_type=export_result["mime_type"],
+            headers={"Content-Disposition": f"attachment; filename={export_result['filename']}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting document from database: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error exporting document: {str(e)}")
+
+
 @router.get("/types")
 async def get_supported_document_types():
     """Get list of supported document types and their configurations."""
@@ -440,6 +483,63 @@ async def upload_document(
     except Exception as e:
         logger.error(f"Error uploading document: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error uploading document: {str(e)}")
+
+
+@router.post("/import-with-user-service")
+async def import_document_with_user_service(
+    file: UploadFile = File(...),
+    agent: DocumentEditingAgent = Depends(get_document_agent),
+):
+    """Import document using user document service and store in main database."""
+    try:
+        # Save uploaded file temporarily
+        import tempfile
+        from pathlib import Path
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+
+        try:
+            # Import using user document service
+            import_result = await user_document_service.import_document(temp_file_path)
+            
+            if not import_result.get("success"):
+                raise HTTPException(status_code=400, detail=import_result.get("error", "Import failed"))
+
+            # Store in main documents collection
+            success, message, document_id = await agent.create_document(
+                filename=file.filename or "imported_document",
+                content=import_result["document"]["content"],
+                document_type="markdown",  # User service converts to markdown
+                metadata={
+                    **import_result["document"],
+                    "imported_via_user_service": True,
+                    "original_filename": file.filename,
+                    "original_format": import_result["document"].get("original_format"),
+                }
+            )
+
+            if success:
+                return {
+                    "success": True,
+                    "document_id": document_id,
+                    "message": message,
+                    "import_result": import_result
+                }
+            else:
+                raise HTTPException(status_code=400, detail=message)
+
+        finally:
+            # Clean up temporary file
+            Path(temp_file_path).unlink(missing_ok=True)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error importing document with user service: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error importing document: {str(e)}")
 
 
 @router.get("/{document_id}/versions")

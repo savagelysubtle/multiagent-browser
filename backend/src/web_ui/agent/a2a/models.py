@@ -2,7 +2,7 @@
 
 These models intentionally cover the portion of the specification that the
 current implementation needs: JSON-RPC envelopes, messages, tasks, and
-identifiers used by the , , and 
+identifiers used by the ``message/send``, ``tasks/get``, and ``tasks/cancel``
 procedures.
 """
 

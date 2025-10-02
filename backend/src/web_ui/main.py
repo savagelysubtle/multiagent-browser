@@ -61,6 +61,17 @@ def start_api_server(args: argparse.Namespace) -> None:
 
     try:
         from web_ui.api.server import run_api_server
+        from fastapi import FastAPI
+        from fastapi.middleware.cors import CORSMiddleware
+        from fastapi.staticfiles import StaticFiles
+
+        # Import API routers
+        from .api.user_documents import router as user_documents_router
+
+        app = FastAPI()
+
+        # Include API routes
+        app.include_router(user_documents_router)
 
         run_api_server(
             host=args.api_host,

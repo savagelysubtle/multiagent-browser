@@ -139,10 +139,55 @@ export default function EditorView() {
     },
   });
 
-  // Create document mutation
+  // Create document mutation using user document service
   const createDocumentMutation = useMutation({
     mutationFn: async (data: { title: string; content: string; type: DocumentType }) => {
       const token = localStorage.getItem('token');
+      
+      // First try the new user document service
+      const userDocResponse = await fetch('http://127.0.0.1:8000/api/user-documents/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          template_id: 'blank_document',
+          title: data.title
+        })
+      });
+
+      if (userDocResponse.ok) {
+        const userDocResult = await userDocResponse.json();
+        if (userDocResult.success) {
+          // Now store in the main documents collection
+          const response = await fetch('http://127.0.0.1:8000/api/documents/create-live', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token ? `Bearer ${token}` : '',
+            },
+            body: JSON.stringify({
+              title: data.title,
+              content: userDocResult.document.content,
+              document_type: data.type,
+              metadata: {
+                created_from_template: userDocResult.document.template_used,
+                user_document_service: true
+              }
+            })
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to create document');
+          }
+
+          return response.json();
+        }
+      }
+
+      // Fallback to original method
       const response = await fetch('http://127.0.0.1:8000/api/documents/create-live', {
         method: 'POST',
         headers: {

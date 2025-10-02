@@ -144,28 +144,45 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange 
         const content = monacoRef.current.getValue();
 
         try {
-            const response = await fetch('/api/documents/export', {
+            // Use the new user document service API for export
+            const response = await fetch('/api/user-documents/export', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
                 body: JSON.stringify({
-                    document_id: item.id,
                     content,
                     format,
-                    document_type: documentType,
+                    title: item.title || item.name
                 }),
             });
 
             if (response.ok) {
+                // Handle blob response for file download
                 const blob = await response.blob();
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `${item.name.split('.')[0]}.${format}`;
+                
+                // Get filename from Content-Disposition header or generate one
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `${item.title || item.name}.${format}`;
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                
+                link.download = filename;
+                document.body.appendChild(link);
                 link.click();
+                document.body.removeChild(link);
                 URL.revokeObjectURL(url);
+            } else {
+                const errorData = await response.json();
+                console.error('Export failed:', errorData);
             }
         } catch (error) {
             console.error('Export failed:', error);
