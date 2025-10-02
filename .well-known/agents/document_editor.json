@@ -1,220 +1,99 @@
 {
   "name": "Document Editor Agent",
-  "description": "AI-powered document creation and editing agent with ChromaDB integration. Provides document management, AI-assisted editing, and knowledge base search capabilities.",
+  "description": "AI-powered document creation and editing agent with ChromaDB integration.",
+  "url": "https://webui.example.com/a2a/agents/document_editor",
   "version": "1.0.0",
-  "agent_id": "document_editor_agent",
-  "endpoint": "https://webui.example.com/a2a/agents/document_editor",
-  "protocols": ["a2a-v1"],
+  "provider": {
+    "name": "web-ui",
+    "contact": "simpleflowworks@gmail.com",
+    "url": "https://github.com/savagelysubtle/web-ui"
+  },
+  "documentationUrl": "https://github.com/savagelysubtle/web-ui/blob/main/backend/src/web_ui/agent/A2A_AGENT_CARDS.md#document-editor-agent",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "defaultInputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "application/json",
+    "text/plain"
+  ],
   "skills": [
     {
-      "name": "create_document",
-      "description": "Create a new document with AI assistance",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "filename": {
-            "type": "string",
-            "description": "Name of the document file"
-          },
-          "content": {
-            "type": "string",
-            "description": "Initial content of the document",
-            "default": ""
-          },
-          "document_type": {
-            "type": "string",
-            "enum": [
-              "markdown",
-              "text",
-              "html",
-              "json",
-              "python",
-              "javascript"
-            ],
-            "description": "Type of document to create",
-            "default": "markdown"
-          }
-        },
-        "required": ["filename"]
-      },
-      "output_schema": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "description": "Whether the document was created successfully"
-          },
-          "document_id": {
-            "type": "string",
-            "description": "Unique identifier for the created document"
-          },
-          "filename": {
-            "type": "string",
-            "description": "Name of the created document"
-          },
-          "message": {
-            "type": "string",
-            "description": "Status message"
-          }
-        }
-      }
+      "id": "create_document",
+      "name": "Create Document",
+      "description": "Create a new document with optional starter content and format guidance.",
+      "tags": ["documents", "creation"],
+      "examples": [
+        "Create a markdown outline for a quarterly report",
+        "create_document:{\"filename\":\"notes.md\",\"document_type\":\"markdown\"}"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     },
     {
-      "name": "edit_document",
-      "description": "Edit an existing document using AI assistance",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "document_id": {
-            "type": "string",
-            "description": "ID of the document to edit"
-          },
-          "instruction": {
-            "type": "string",
-            "description": "Natural language instruction for the edit"
-          }
-        },
-        "required": ["document_id", "instruction"]
-      },
-      "output_schema": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "description": "Whether the edit was successful"
-          },
-          "changes_applied": {
-            "type": "boolean",
-            "description": "Whether changes were applied to the document"
-          },
-          "message": {
-            "type": "string",
-            "description": "Status message"
-          }
-        }
-      }
+      "id": "edit_document",
+      "name": "Edit Document",
+      "description": "Apply editorial changes to an existing document using natural language instructions.",
+      "tags": ["documents", "editing"],
+      "examples": [
+        "Edit the requirements doc to add an accessibility section",
+        "edit_document:{\"document_id\":\"doc-123\",\"instruction\":\"Summarise key findings\"}"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     },
     {
-      "name": "search_documents",
-      "description": "Search through the document knowledge base",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Search query"
-          },
-          "limit": {
-            "type": "integer",
-            "description": "Maximum number of results",
-            "default": 10,
-            "minimum": 1,
-            "maximum": 100
-          }
-        },
-        "required": ["query"]
-      },
-      "output_schema": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "total_results": {
-            "type": "integer",
-            "description": "Number of results found"
-          },
-          "results": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": { "type": "string" },
-                "content": { "type": "string" },
-                "metadata": { "type": "object" },
-                "relevance_score": { "type": "number" }
-              }
-            }
-          }
-        }
-      }
+      "id": "search_documents",
+      "name": "Search Documents",
+      "description": "Search the managed knowledge base for relevant documents or passages.",
+      "tags": ["documents", "search"],
+      "examples": [
+        "Search project docs for \"OAuth rollout\"",
+        "search_documents:{\"query\":\"architecture\",\"limit\":5}"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     },
     {
-      "name": "chat",
-      "description": "Conversational interaction with the document editor agent",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "User message"
-          },
-          "session_id": {
-            "type": "string",
-            "description": "Session identifier for conversation context",
-            "default": "default"
-          },
-          "context_document_id": {
-            "type": "string",
-            "description": "Optional document ID for context"
-          }
-        },
-        "required": ["message"]
-      },
-      "output_schema": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "response": {
-            "type": "string",
-            "description": "Agent's response"
-          }
-        }
-      }
+      "id": "chat",
+      "name": "Chat",
+      "description": "Hold a conversational session with the document editor for guidance or lightweight edits.",
+      "tags": ["documents", "chat"],
+      "examples": [
+        "chat:{\"message\":\"Summarise the attached meeting notes\"}"
+      ],
+      "inputModes": [
+        "application/json",
+        "text/plain"
+      ],
+      "outputModes": [
+        "application/json",
+        "text/plain"
+      ]
     }
   ],
-  "supported_modalities": ["text", "files"],
-  "collaboration_patterns": [
-    {
-      "name": "save_research",
-      "description": "Save research results from other agents as documents",
-      "input_format": "structured",
-      "example": {
-        "type": "save_research",
-        "filename": "research_results.md",
-        "content": "Research findings..."
-      }
-    },
-    {
-      "name": "document_assistance",
-      "description": "Provide document templates and suggestions to other agents",
-      "input_format": "structured",
-      "example": {
-        "type": "document_assistance",
-        "request": "Need template for technical report",
-        "context": "AI research documentation"
-      }
-    }
-  ],
+  "securitySchemes": {},
+  "security": [],
   "metadata": {
-    "organization": "web-ui",
-    "contact": "simpleflowworks@gmail.com",
-    "documentation": "https://github.com/savagelysubtle/web-ui/blob/main/backend/src/web_ui/agent/A2A_AGENT_CARDS.md",
-    "status": "production",
-    "implementation_version": "0.1.0",
-    "langchain_compatible": true,
-    "database_backend": "ChromaDB",
-    "mcp_integration": true,
-    "max_content_size_bytes": 10485760,
-    "supported_formats": [
-      "markdown",
-      "text",
-      "html",
-      "json",
-      "python",
-      "javascript"
-    ]
+    "workingDirectory": "./tmp/documents",
+    "mcpIntegration": true,
+    "maxContentSizeBytes": 10485760
   }
 }

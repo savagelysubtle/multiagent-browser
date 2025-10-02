@@ -35,6 +35,7 @@ from .middleware.error_handler import (
     validation_exception_handler,
 )
 from .routes.agents import router as agents_router
+from .routes.a2a import router as a2a_router
 from .routes.logging import router as logging_router
 from .routes.auth import router as auth_router
 from .routes.documents import router as documents_router
@@ -123,7 +124,13 @@ app = FastAPI(
 # Add CORS middleware for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -137,6 +144,7 @@ app.include_router(logging_router, prefix="/api/logs", tags=["Frontend Logging"]
 app.include_router(ag_ui_router, prefix="/api/ag_ui", tags=["AG-UI"])
 app.include_router(dev_router, prefix="/api", tags=["Development"])
 app.include_router(copilotkit_router, prefix="/api/copilotkit", tags=["CopilotKit"])
+app.include_router(a2a_router)
 
 # --- Register Error Handlers ---
 app.add_exception_handler(AppException, app_exception_handler)

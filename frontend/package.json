@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "public/electron.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -13,7 +14,13 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "type-check": "tsc --noEmit",
     "check-all": "npm run type-check && npm run lint && npm run format:check",
-    "fix-all": "npm run lint:fix && npm run format"
+    "fix-all": "npm run lint:fix && npm run format",
+    "start": "concurrently -k \"npm:react\" \"npm:electron-dev\"",
+    "react": "vite dev --port 5173",
+    "electron-dev": "cross-env ELECTRON_START_URL=http://localhost:5173 electron .",
+    "build:web": "vite build",
+    "dist": "npm run build:web && electron-builder",
+    "dist:all": "npm run build:web && electron-builder -mwl"
   },
   "dependencies": {
     "@ag-ui/client": "0.0.37",
@@ -34,7 +41,16 @@
     "rxjs": "^7.8.1",
     "tailwind-merge": "^2.5.2",
     "uuid": "^13.0.0",
-    "zustand": "^4.5.4"
+    "zustand": "^4.5.4",
+    "@monaco-editor/react": "^4.6.0",
+    "monaco-editor": "^0.45.0",
+    "marked": "^12.0.0",
+    "dompurify": "^3.0.8",
+    "@types/dompurify": "^3.0.5",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "rehype-highlight": "^7.0.0",
+    "prismjs": "^1.29.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -54,6 +70,41 @@
     "prettier": "^3.2.5",
     "tailwindcss": "^3.4.6",
     "typescript": "^5.5.3",
-    "vite": "^5.3.4"
+    "vite": "^5.3.4",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "electron-updater": "^6.1.7",
+    "@types/marked": "^6.0.0",
+    "@types/prismjs": "^1.26.3"
+  },
+  "build": {
+    "appId": "com.webui.app",
+    "productName": "Web-UI Agent Dashboard",
+    "files": [
+      "dist/**",
+      "public/electron.js",
+      "public/preload.cjs"
+    ],
+    "directories": {
+      "output": "dist-electron"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Development"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

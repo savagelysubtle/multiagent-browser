@@ -200,12 +200,9 @@ function Write-ColoredLog {
 
 function Open-Browser {
     param([string]$Url)
-    try {
-        Start-Process $Url
-        Write-Host "✅ Opened $Url in default browser" -ForegroundColor Green
-    } catch {
-        Write-Host "⚠️ Failed to open browser automatically" -ForegroundColor Yellow
-    }
+    # For Electron development, we don't need to open browser
+    # The Electron app will open automatically
+    Write-Host "✅ Electron desktop app will open automatically" -ForegroundColor Green
 }
 
 function Monitor-ProcessResources {
@@ -213,14 +210,22 @@ function Monitor-ProcessResources {
         [int]$WarningThresholdMB = 500
     )
 
-    $backendProcess = Get-Process -Name "python" | Where-Object { $_.CommandLine -like "*uvicorn*" }
-    $frontendProcess = Get-Process -Name "node" | Where-Object { $_.CommandLine -like "*vite*" }
+    try {
+        $backendProcess = Get-Process -Name "python" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*uvicorn*" }
+        $frontendProcess = Get-Process -Name "node" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*vite*" }
+        $electronProcess = Get-Process -Name "electron" -ErrorAction SilentlyContinue
 
-    if ($backendProcess.WorkingSet64/1MB -gt $WarningThresholdMB) {
-        Write-Host "⚠️ Backend memory usage: $([math]::Round($backendProcess.WorkingSet64/1MB,2)) MB" -ForegroundColor Yellow
-    }
-    if ($frontendProcess.WorkingSet64/1MB -gt $WarningThresholdMB) {
-        Write-Host "⚠️ Frontend memory usage: $([math]::Round($frontendProcess.WorkingSet64/1MB,2)) MB" -ForegroundColor Yellow
+        if ($backendProcess -and $backendProcess.WorkingSet64/1MB -gt $WarningThresholdMB) {
+            Write-Host "⚠️ Backend memory usage: $([math]::Round($backendProcess.WorkingSet64/1MB,2)) MB" -ForegroundColor Yellow
+        }
+        if ($frontendProcess -and $frontendProcess.WorkingSet64/1MB -gt $WarningThresholdMB) {
+            Write-Host "⚠️ Frontend memory usage: $([math]::Round($frontendProcess.WorkingSet64/1MB,2)) MB" -ForegroundColor Yellow
+        }
+        if ($electronProcess -and $electronProcess.WorkingSet64/1MB -gt $WarningThresholdMB) {
+            Write-Host "⚠️ Electron memory usage: $([math]::Round($electronProcess.WorkingSet64/1MB,2)) MB" -ForegroundColor Yellow
+        }
+    } catch {
+        # Silently ignore process monitoring errors
     }
 }
 
@@ -670,21 +675,21 @@ try {
     }
 
     # Continue with frontend startup...
-    Write-StatusMessage "Starting Frontend server (npm run dev)..." -Color Cyan
+    Write-StatusMessage "Starting Electron Desktop App..." -Color Cyan
 
-    # Update frontend job to use unique log file to prevent conflicts
-    $frontendLogFile = Join-Path (Split-Path $LogFile -Parent) "frontend.log"
+    # Update frontend job to start Electron instead of just React dev server
+    $frontendLogFile = Join-Path (Split-Path $LogFile -Parent) "electron.log"
     $frontendJob = Start-Job -ScriptBlock {
         param($frontendDir, $logFilePath, $frontendPort)
         Set-Location -Path $frontendDir
-        # Force Vite to use the specific port
-        npm run dev -- --port $frontendPort --host 0.0.0.0 2>&1 | Tee-Object -FilePath $logFilePath -Append
-    } -ArgumentList (Join-Path $PWD.Path "frontend"), $frontendLogFile, $script:frontendPort -Name "Frontend"
+        # Start Electron desktop app which will launch React dev server internally
+        npm run start 2>&1 | Tee-Object -FilePath $logFilePath -Append
+    } -ArgumentList (Join-Path $PWD.Path "frontend"), $frontendLogFile, $script:frontendPort -Name "ElectronApp"
 
     # Wait for frontend with similar improved detection
-    Write-Host "Waiting for frontend server to start..." -ForegroundColor Cyan
+    Write-Host "Waiting for Electron desktop app to start..." -ForegroundColor Cyan
     $frontendStartTime = Get-Date
-    $frontendTimeout = 30
+    $frontendTimeout = 45  # Increased timeout for Electron startup
     $frontendStarted = $false
 
     while ((Get-Date) - $frontendStartTime -lt [TimeSpan]::FromSeconds($frontendTimeout)) {
@@ -692,48 +697,56 @@ try {
 
         # Check if frontend job failed
         if ($frontendJob.State -eq 'Failed' -or $frontendJob.State -eq 'Completed') {
-            Write-Host "❌ Frontend process failed or completed unexpectedly" -ForegroundColor Red
+            Write-Host "❌ Electron process failed or completed unexpectedly" -ForegroundColor Red
             $frontendOutput = Receive-Job -Job $frontendJob
-            Write-Host "Frontend Output:" -ForegroundColor Yellow
+            Write-Host "Electron Output:" -ForegroundColor Yellow
             Write-Host $frontendOutput
             break
         }
 
-        # Check if frontend is running via HTTP
+        # Check if React dev server is running (Electron will connect to this)
         try {
             $response = Invoke-WebRequest -Uri "http://localhost:$script:frontendPort" -TimeoutSec 2 -ErrorAction SilentlyContinue
             if ($response.StatusCode -eq 200) {
-                Write-Host "✅ Frontend available at: http://localhost:$script:frontendPort" -ForegroundColor Green
-                $frontendStarted = $true
-                break
+                Write-Host "✅ React dev server ready at: http://localhost:$script:frontendPort" -ForegroundColor Green
+
+                # Also check if Electron process is running
+                $electronProcess = Get-Process -Name "electron" -ErrorAction SilentlyContinue
+                if ($electronProcess) {
+                    Write-Host "✅ Electron desktop app is running" -ForegroundColor Green
+                    $frontendStarted = $true
+                    break
+                }
             }
         } catch {
             # Continue waiting
         }
 
-        # Check job output for Vite ready messages (multiple patterns)
+        # Check job output for startup messages (both React and Electron)
         $frontendOutput = Receive-Job -Job $frontendJob
         if ($frontendOutput) {
             # Write output to log file immediately
             Add-Content -Path $LogFile -Value $frontendOutput
 
-            # Check for various Vite startup patterns
+            # Check for React dev server ready messages
             if ($frontendOutput -match "Local:.*localhost:$script:frontendPort|ready in.*ms|VITE.*ready") {
-                Write-Host "✅ Frontend startup detected in logs" -ForegroundColor Green
-                # Give Vite a moment to fully initialize
-                Start-Sleep -Seconds 2
+                Write-Host "✅ React dev server startup detected" -ForegroundColor Green
+                Start-Sleep -Seconds 3  # Give Electron time to connect
 
-                # Double-check with HTTP request
-                try {
-                    $response = Invoke-WebRequest -Uri "http://localhost:$script:frontendPort" -TimeoutSec 3 -ErrorAction SilentlyContinue
-                    if ($response.StatusCode -eq 200) {
-                        Write-Host "✅ Frontend confirmed available at: http://localhost:$script:frontendPort" -ForegroundColor Green
-                        $frontendStarted = $true
-                        break
-                    }
-                } catch {
-                    Write-Host "⚠️ Frontend detected in logs but not responding to HTTP requests yet, continuing to wait..." -ForegroundColor Yellow
+                # Check if Electron is also running
+                $electronProcess = Get-Process -Name "electron" -ErrorAction SilentlyContinue
+                if ($electronProcess) {
+                    Write-Host "✅ Electron desktop app opened successfully" -ForegroundColor Green
+                    $frontendStarted = $true
+                    break
                 }
+            }
+
+            # Check for Electron-specific startup messages
+            if ($frontendOutput -match "Electron.*started|Desktop app.*ready") {
+                Write-Host "✅ Electron desktop app startup detected" -ForegroundColor Green
+                $frontendStarted = $true
+                break
             }
         }
     }

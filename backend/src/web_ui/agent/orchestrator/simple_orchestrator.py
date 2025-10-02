@@ -1,9 +1,6 @@
-"""
-Simple Agent Orchestrator for per-user task management with A2A protocol support.
+"""Simple agent orchestrator with Google A2A protocol support."""
 
-This orchestrator manages agent tasks with real-time WebSocket updates,
-user isolation, A2A (Agent2Agent) protocol support, and comprehensive error handling.
-"""
+from __future__ import annotations
 
 import asyncio
 import uuid
@@ -12,556 +9,442 @@ from datetime import datetime
 from typing import Any
 
 from ...utils.logging_config import get_logger
+from ..a2a import (
+    Artifact,
+    Message,
+    MessageRole,
+    MessageSendParams,
+    Part,
+    PartKind,
+    Task,
+    TaskIdParams,
+    TaskQueryParams,
+    TaskState,
+    TaskStatus,
+)
 
 logger = get_logger(__name__)
 
 
 @dataclass
-class A2AMessage:
-    """Represents an A2A protocol message between agents, following Google A2A specification."""
-
-    message_id: str  # Changed from 'id' to match spec
-    sender_id: str   # Changed from 'sender_agent' to match spec
-    receiver_id: str # Changed from 'recipient_agent' to match spec
-    message_type: str  # 'request', 'response', 'notification', etc.
-    payload: dict[str, Any]
-    conversation_id: str | None = None  # Optional conversation grouping
-    timestamp: datetime = field(default_factory=datetime.utcnow)
-    metadata: dict[str, Any] | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert message to dictionary format matching A2A spec."""
-        return {
-            "message_id": self.message_id,
-            "message_type": self.message_type,
-            "sender_id": self.sender_id,
-            "receiver_id": self.receiver_id,
-            "conversation_id": self.conversation_id,
-            "payload": self.payload,
-            "timestamp": self.timestamp.isoformat(),
-            "metadata": self.metadata,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "A2AMessage":
-        """Create message from dictionary."""
-        message = cls(
-            message_id=data.get("message_id", ""),
-            sender_id=data["sender_id"],
-            receiver_id=data["receiver_id"],
-            message_type=data["message_type"],
-            payload=data["payload"],
-            conversation_id=data.get("conversation_id"),
-            metadata=data.get("metadata"),
-        )
-        if "timestamp" in data:
-            message.timestamp = datetime.fromisoformat(data["timestamp"])
-        return message
-
-
-@dataclass
 class AgentTask:
-    """Represents a task submitted to an agent with A2A support."""
+    """Internal representation of an agent task."""
 
     id: str
     user_id: str
     agent_type: str
     action: str
     payload: dict[str, Any]
-    status: str = "pending"  # pending, running, completed, failed, cancelled
-    result: Any | None = None
-    error: str | None = None
-    created_at: datetime | None = None
+    context_id: str
+    state: TaskState = TaskState.SUBMITTED
+    status_message: Message | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
     started_at: datetime | None = None
     completed_at: datetime | None = None
-    progress: dict[str, Any] | None = None
-    # A2A specific fields
-    conversation_id: str | None = None
-    parent_task_id: str | None = None
-    a2a_messages: list[A2AMessage] | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    progress: dict[str, Any] = field(
+        default_factory=lambda: {"percentage": 0, "message": "Pending"}
+    )
+    history: list[Message] = field(default_factory=list)
+    artifacts: list[Artifact] = field(default_factory=list)
+    metadata: dict[str, Any] | None = None
+    origin_message: Message | None = None
 
-    def __post_init__(self):
-        if self.created_at is None:
-            self.created_at = datetime.utcnow()
-        if self.progress is None:
-            self.progress = {"percentage": 0, "message": "Waiting to start"}
-        if self.a2a_messages is None:
-            self.a2a_messages = []
+    @property
+    def status(self) -> str:
+        mapping = {
+            TaskState.SUBMITTED: "pending",
+            TaskState.WORKING: "running",
+            TaskState.INPUT_REQUIRED: "input_required",
+            TaskState.COMPLETED: "completed",
+            TaskState.CANCELED: "canceled",
+            TaskState.FAILED: "failed",
+            TaskState.REJECTED: "rejected",
+            TaskState.AUTH_REQUIRED: "auth_required",
+            TaskState.UNKNOWN: "unknown",
+        }
+        return mapping.get(self.state, "unknown")
+
+    @property
+    def status_timestamp(self) -> str:
+        if self.completed_at:
+            return self.completed_at.isoformat()
+        if self.started_at:
+            return self.started_at.isoformat()
+        return self.created_at.isoformat()
+
+    def to_task(self, history_length: int | None = None) -> Task:
+        history: list[Message] | None = self.history
+        if history_length is not None and history:
+            history = history[-history_length:]
+        if history and not history:
+            history = None
+
+        return Task(
+            id=self.id,
+            contextId=self.context_id,
+            status=TaskStatus(
+                state=self.state,
+                message=self.status_message,
+                timestamp=self.status_timestamp,
+            ),
+            artifacts=self.artifacts or None,
+            history=history,
+            metadata=self.metadata,
+        )
 
 
 class SimpleAgentOrchestrator:
-    """
-    Simplified agent orchestration for per-user tasks with A2A protocol support.
-
-    Features:
-    - User-isolated task management
-    - Real-time WebSocket notifications
-    - Agent registration and discovery
-    - Task lifecycle management
-    - A2A (Agent2Agent) protocol support
-    - LangChain integration compatibility
-    - Error handling and recovery
-    """
+    """Coordinates agent execution and exposes Google A2A primitives."""
 
     def __init__(self, ws_manager=None):
-        self.agents = {}  # agent_type -> agent_instance
-        self.user_tasks: dict[str, list[str]] = {}  # user_id -> task_ids
-        self.task_store: dict[str, AgentTask] = {}  # task_id -> task
-        self.running_tasks: dict[str, asyncio.Task] = {}  # task_id -> asyncio.Task
+        self.agents: dict[str, Any] = {}
+        self.agent_capabilities: dict[str, dict[str, Any]] = {}
+        self.agent_endpoints: dict[str, str] = {}
+        self.task_store: dict[str, AgentTask] = {}
+        self.user_tasks: dict[str, list[str]] = {}
+        self.running_tasks: dict[str, asyncio.Task] = {}
         self.ws_manager = ws_manager
-        self.max_concurrent_tasks = 5
-        self.task_timeout = 300  # 5 minutes default timeout
 
-        # A2A protocol support
-        self.a2a_conversations: dict[
-            str, list[A2AMessage]
-        ] = {}  # conversation_id -> messages
-        self.agent_capabilities: dict[str, dict] = {}  # agent_type -> capabilities
-        self.a2a_endpoints: dict[str, str] = {}  # agent_type -> endpoint_url
-
+    # ---------------------------------------------------------------------
+    # Agent registration & discovery
+    # ---------------------------------------------------------------------
     def register_agent(
         self,
         agent_type: str,
         agent_instance,
-        capabilities: dict | None = None,
+        capabilities: dict[str, Any] | None = None,
         a2a_endpoint: str | None = None,
-    ):
-        """Register an agent for task execution with optional A2A capabilities."""
+    ) -> None:
+        """Register an agent implementation with optional metadata."""
+
         self.agents[agent_type] = agent_instance
-
-        # Auto-detect A2A capabilities from adapter if not provided
-        if capabilities is None and hasattr(agent_instance, "get_capabilities"):
-            capabilities = agent_instance.get_capabilities()
-
-        # Check if agent supports A2A protocol
-        if hasattr(agent_instance, "a2a_enabled"):
-            capabilities = capabilities or {}
-            capabilities["a2a_enabled"] = agent_instance.a2a_enabled
-            capabilities["agent_id"] = getattr(agent_instance, "agent_id", agent_type)
-
-        # Store A2A capabilities
         if capabilities:
             self.agent_capabilities[agent_type] = capabilities
-
         if a2a_endpoint:
-            self.a2a_endpoints[agent_type] = a2a_endpoint
+            self.agent_endpoints[agent_type] = a2a_endpoint
 
-        a2a_enabled = capabilities.get("a2a_enabled", False) if capabilities else False
-        logger.info(
-            f"Registered agent: {agent_type} | A2A: {a2a_enabled} | Endpoint: {a2a_endpoint or 'local'}"
-        )
+        logger.info("Registered agent %s", agent_type)
 
     def get_available_agents(self) -> list[dict[str, Any]]:
-        """Get list of available agents and their capabilities with A2A support."""
-        return [
-            {
-                "type": "document_editor",
-                "name": "Document Editor",
-                "description": "Create and edit documents with AI assistance",
-                "agent_id": "document_editor_agent",
-                "a2a_compatible": True,
-                "a2a_enabled": True,
-                "langchain_integration": True,
-                "a2a_features": {
-                    "message_types": [
-                        "task_request",
-                        "capability_query",
-                        "status_query",
-                        "document_query",
-                        "collaboration_request",
+        """Return capability summaries for registered agents."""
+
+        agents: list[dict[str, Any]] = []
+        for agent_type, instance in self.agents.items():
+            capabilities = self.agent_capabilities.get(agent_type, {})
+            actions = capabilities.get("actions")
+            if actions is None and hasattr(instance, "get_capabilities"):
+                try:
+                    capabilities = instance.get_capabilities()  # type: ignore[assignment]
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Capability probe failed for %s: %s", agent_type, exc)
+                    capabilities = {}
+            if "actions" not in capabilities:
+                inferred_actions = [
+                    name
+                    for name in dir(instance)
+                    if not name.startswith("_") and callable(getattr(instance, name))
+                ]
+                capabilities = {**capabilities, "actions": inferred_actions}
+
+            agents.append(
+                {
+                    "type": agent_type,
+                    "name": capabilities.get("name", agent_type.replace("_", " ").title()),
+                    "description": capabilities.get(
+                        "description", "Agent registered with orchestrator"
+                    ),
+                    "actions": [
+                        {
+                            "name": action,
+                            "description": "Action exposed by registered agent",
+                            "parameters": [],
+                        }
+                        for action in capabilities.get("actions", [])
                     ],
-                    "collaboration_types": ["document_assistance", "save_research"],
-                    "can_receive_a2a": True,
-                    "can_send_a2a": True,
-                },
-                "actions": [
-                    {
-                        "name": "create_document",
-                        "description": "Create a new document",
-                        "parameters": ["filename", "content", "document_type"],
-                        "a2a_supported": True,
-                        "a2a_action": "task_request",
-                    },
-                    {
-                        "name": "edit_document",
-                        "description": "Edit an existing document",
-                        "parameters": ["document_id", "instruction"],
-                        "a2a_supported": True,
-                        "a2a_action": "task_request",
-                    },
-                    {
-                        "name": "search_documents",
-                        "description": "Search through documents",
-                        "parameters": ["query", "limit"],
-                        "a2a_supported": True,
-                        "a2a_action": "task_request",
-                    },
-                    {
-                        "name": "chat",
-                        "description": "Chat with the document editor agent",
-                        "parameters": ["message", "session_id", "context_document_id"],
-                        "a2a_supported": True,
-                        "a2a_action": "task_request",
-                    },
-                ],
-                "collaboration_capabilities": [
-                    "Can save research results from other agents",
-                    "Provides document templates and suggestions",
-                    "Searches knowledge base on behalf of other agents",
-                ],
-            },
-            {
-                "type": "browser_use",
-                "name": "Browser Agent",
-                "description": "Browse the web and extract information",
-                "agent_id": "browser_use_agent",
-                "a2a_compatible": True,
-                "a2a_enabled": True,
-                "langchain_integration": True,
-                "a2a_features": {
-                    "message_types": [
-                        "task_request",
-                        "capability_query",
-                        "status_query",
-                    ],
-                    "collaboration_types": [],
-                    "can_receive_a2a": True,
-                    "can_send_a2a": True,
-                },
-                "actions": [
-                    {
-                        "name": "browse",
-                        "description": "Navigate to a URL and interact with it",
-                        "parameters": ["url", "instruction"],
-                        "a2a_supported": True,
-                        "a2a_action": "task_request",
-                    },
-                    {
-                        "name": "extract",
-                        "description": "Extract specific information from a webpage",
-                        "parameters": ["url", "selectors"],
-                        "a2a_supported": True,
-                        "a2a_action": "task_request",
-                    },
-                    {
-                        "name": "screenshot",
-                        "description": "Capture webpage screenshots",
-                        "parameters": ["url"],
-                        "a2a_supported": True,
-                        "a2a_action": "task_request",
-                    },
-                ],
-                "collaboration_capabilities": [
-                    "Can gather web data for other agents",
-                    "Provides web scraping and extraction services",
-                    "Can verify URLs and web content",
-                ],
-            },
-            {
-                "type": "deep_research",
-                "name": "Research Agent",
-                "description": "Conduct in-depth research on topics",
-                "agent_id": "deep_research_agent",
-                "a2a_compatible": True,
-                "a2a_enabled": True,
-                "langchain_integration": True,
-                "a2a_features": {
-                    "message_types": [
-                        "task_request",
-                        "capability_query",
-                        "status_query",
-                        "collaboration_request",
-                    ],
-                    "collaboration_types": ["research_assistance"],
-                    "can_receive_a2a": True,
-                    "can_send_a2a": True,
-                },
-                "actions": [
-                    {
-                        "name": "research",
-                        "description": "Research a topic comprehensively",
-                        "parameters": ["topic", "depth", "sources"],
-                        "a2a_supported": True,
-                        "a2a_action": "task_request",
-                    },
-                    {
-                        "name": "analyze_sources",
-                        "description": "Analyze and evaluate source credibility",
-                        "parameters": ["sources"],
-                        "a2a_supported": True,
-                        "a2a_action": "task_request",
-                    },
-                ],
-                "collaboration_capabilities": [
-                    "Provides research assistance to other agents",
-                    "Can analyze sources on behalf of other agents",
-                    "Synthesizes information from multiple sources",
-                ],
-            },
-            {
-                "type": "langchain_agent",
-                "name": "LangChain Agent",
-                "description": "LangChain-powered agent with tool access",
-                "agent_id": "langchain_agent",
-                "a2a_compatible": True,
-                "a2a_enabled": False,  # Not yet implemented
-                "langchain_integration": True,
-                "a2a_features": {
-                    "message_types": [],
-                    "collaboration_types": [],
-                    "can_receive_a2a": False,
-                    "can_send_a2a": False,
-                },
-                "actions": [
-                    {
-                        "name": "execute_chain",
-                        "description": "Execute a LangChain chain or workflow",
-                        "parameters": ["chain_config", "input_data"],
-                        "a2a_supported": False,
-                    },
-                    {
-                        "name": "tool_call",
-                        "description": "Call a specific LangChain tool",
-                        "parameters": ["tool_name", "tool_args"],
-                        "a2a_supported": False,
-                    },
-                ],
-                "collaboration_capabilities": [],
-            },
-        ]
-
-    async def send_a2a_message(
-        self,
-        sender_agent: str,
-        recipient_agent: str,
-        message_type: str,
-        payload: dict[str, Any],
-        conversation_id: str | None = None,
-    ) -> A2AMessage:
-        """Send an A2A protocol message between agents."""
-        if not conversation_id:
-            conversation_id = str(uuid.uuid4())
-
-        message = A2AMessage(
-            message_id=str(uuid.uuid4()),
-            sender_id=sender_agent,
-            receiver_id=recipient_agent,
-            message_type=message_type,
-            payload=payload,
-            conversation_id=conversation_id,
-            timestamp=datetime.utcnow(),
-        )
-
-        # Store message in conversation
-        if conversation_id not in self.a2a_conversations:
-            self.a2a_conversations[conversation_id] = []
-        self.a2a_conversations[conversation_id].append(message)
-
-        logger.info(
-            f"A2A message sent: {sender_agent} -> {recipient_agent} (type: {message_type})"
-        )
-
-        # If recipient is registered locally, deliver directly
-        if recipient_agent in self.agents:
-            await self._deliver_a2a_message(message)
-        else:
-            # Handle external A2A endpoint delivery
-            await self._send_external_a2a_message(message)
-
-        return message
-
-    async def _deliver_a2a_message(self, message: A2AMessage):
-        """Deliver A2A message to a local agent."""
-        agent = self.agents.get(message.receiver_id)
-        if not agent:
-            logger.error(
-                f"Cannot deliver A2A message: agent {message.receiver_id} not found"
-            )
-            return
-
-        # Check if agent supports A2A protocol
-        if hasattr(agent, "handle_a2a_message"):
-            try:
-                await agent.handle_a2a_message(message)
-                logger.debug(f"A2A message delivered to {message.receiver_id}")
-            except Exception as e:
-                logger.error(
-                    f"Error delivering A2A message to {message.receiver_id}: {e}"
-                )
-        else:
-            logger.warning(
-                f"Agent {message.receiver_id} does not support A2A protocol"
-            )
-
-    async def _send_external_a2a_message(self, message: A2AMessage):
-        """Send A2A message to external agent endpoint."""
-        endpoint = self.a2a_endpoints.get(message.receiver_id)
-        if not endpoint:
-            logger.error(f"No A2A endpoint found for agent {message.receiver_id}")
-            return
-
-        # Implementation would depend on the specific A2A transport mechanism
-        # This could be HTTP, WebSocket, gRPC, etc.
-        logger.info(f"Would send A2A message to external endpoint: {endpoint}")
-
-    async def request_agent_collaboration(
-        self,
-        requesting_agent: str,
-        target_agent: str,
-        collaboration_type: str,
-        payload: dict[str, Any],
-    ) -> dict[str, Any]:
-        """
-        Request collaboration between agents via A2A protocol.
-
-        Args:
-            requesting_agent: Agent requesting collaboration
-            target_agent: Agent being requested to collaborate
-            collaboration_type: Type of collaboration needed
-            payload: Collaboration details
-
-        Returns:
-            Collaboration response from target agent
-        """
-        try:
-            message = await self.send_a2a_message(
-                sender_agent=requesting_agent,
-                recipient_agent=target_agent,
-                message_type="collaboration_request",
-                payload={"type": collaboration_type, **payload},
-            )
-
-            logger.info(
-                f"Collaboration requested: {requesting_agent} -> {target_agent} ({collaboration_type})"
-            )
-            return {"success": True, "message_id": message.message_id}
-
-        except Exception as e:
-            logger.error(f"Collaboration request failed: {e}")
-            return {"success": False, "error": str(e)}
-
-    async def query_agent_capabilities(self, agent_type: str) -> dict[str, Any]:
-        """
-        Query an agent's capabilities via A2A protocol.
-
-        Args:
-            agent_type: Type of agent to query
-
-        Returns:
-            Agent capabilities
-        """
-        try:
-            # First check local cache
-            if agent_type in self.agent_capabilities:
-                return {
-                    "success": True,
-                    "capabilities": self.agent_capabilities[agent_type],
-                    "source": "cache",
                 }
+            )
+        return agents
 
-            # Query via A2A if not in cache
-            message = await self.send_a2a_message(
-                sender_agent="orchestrator",
-                recipient_agent=agent_type,
-                message_type="capability_query",
-                payload={"query": "full_capabilities"},
+    # ---------------------------------------------------------------------
+    # Task submission & lifecycle
+    # ---------------------------------------------------------------------
+    async def submit_task(
+        self,
+        agent_type: str,
+        action: str,
+        payload: dict[str, Any],
+        user_id: str,
+        context_id: str | None = None,
+        origin_message: Message | None = None,
+        blocking: bool = True,
+    ) -> str:
+        """Create a task and optionally execute it immediately."""
+
+        agent = self._resolve_agent(agent_type)
+        context = context_id or str(uuid.uuid4())
+        task_id = str(uuid.uuid4())
+
+        task = AgentTask(
+            id=task_id,
+            user_id=user_id,
+            agent_type=agent_type,
+            action=action,
+            payload=payload,
+            context_id=context,
+            origin_message=origin_message,
+        )
+        self.task_store[task_id] = task
+        self.user_tasks.setdefault(user_id, []).append(task_id)
+
+        if blocking:
+            await self._execute_task(agent, task)
+        else:
+            runner = asyncio.create_task(self._execute_task(agent, task))
+            self.running_tasks[task_id] = runner
+            runner.add_done_callback(lambda _: self.running_tasks.pop(task_id, None))
+
+        return task_id
+
+    async def _execute_task(self, agent_instance, task: AgentTask) -> None:
+        task.started_at = datetime.utcnow()
+        task.state = TaskState.WORKING
+        task.progress = {"percentage": 25, "message": "Running"}
+
+        self._ensure_origin_history(task)
+
+        try:
+            result = await self._run_agent_action(agent_instance, task)
+            task.result = result
+            task.state = TaskState.COMPLETED
+            task.completed_at = datetime.utcnow()
+            task.progress = {"percentage": 100, "message": "Completed"}
+            summary = self._summarise_result(result)
+            task.status_message = self._make_message(MessageRole.AGENT, summary, task)
+            task.history.append(task.status_message)
+            task.error = None
+
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Task %s failed", task.id)
+            task.error = str(exc)
+            task.state = TaskState.FAILED
+            task.completed_at = datetime.utcnow()
+            task.progress = {"percentage": 100, "message": "Failed"}
+            task.status_message = self._make_message(
+                MessageRole.AGENT, f"Error: {task.error}", task
+            )
+            task.history.append(task.status_message)
+            if task.result is None:
+                task.result = {"success": False, "error": task.error}
+
+    async def _run_agent_action(self, agent_instance, task: AgentTask) -> dict[str, Any]:
+        handler = getattr(agent_instance, task.action, None)
+        if handler is None or not callable(handler):
+            raise LookupError(
+                f"Agent '{task.agent_type}' does not support action '{task.action}'"
             )
 
-            return {"success": True, "message_id": message.message_id, "source": "a2a_query"}
+        result = await handler(**task.payload)
+        if isinstance(result, dict):
+            return result
+        return {"result": result}
 
-        except Exception as e:
-            logger.error(f"Failed to query agent capabilities: {e}")
-            return {"success": False, "error": str(e)}
-
-    async def broadcast_message(
+    # ------------------------------------------------------------------
+    # Task retrieval helpers
+    # ------------------------------------------------------------------
+    async def get_user_tasks(
         self,
-        sender_agent: str,
-        message_type: str,
-        payload: dict[str, Any],
-        target_agents: list[str] | None = None,
-    ) -> dict[str, list[str]]:
-        """
-        Broadcast an A2A message to multiple agents.
+        user_id: str,
+        limit: int = 50,
+        status_filter: str | None = None,
+    ) -> list[AgentTask]:
+        ids = self.user_tasks.get(user_id, [])
+        tasks = [self.task_store[task_id] for task_id in ids]
+        if status_filter:
+            tasks = [task for task in tasks if task.status == status_filter]
+        tasks.sort(key=lambda t: t.created_at, reverse=True)
+        return tasks[:limit]
 
-        Args:
-            sender_agent: Agent sending the broadcast
-            message_type: Type of message
-            payload: Message payload
-            target_agents: Specific agents to target (None = all agents)
+    async def get_task_by_id(self, user_id: str, task_id: str) -> AgentTask | None:
+        task = self.task_store.get(task_id)
+        if not task or task.user_id != user_id:
+            return None
+        return task
 
-        Returns:
-            Dict with successful and failed message IDs
-        """
-        targets = target_agents or list(self.agents.keys())
-        successful = []
-        failed = []
+    def get_task(self, task_id: str) -> AgentTask | None:
+        return self.task_store.get(task_id)
 
-        for target in targets:
-            if target == sender_agent:
-                continue  # Don't send to self
+    async def cancel_task(self, user_id: str | None, task_id: str) -> bool:
+        task = self.task_store.get(task_id)
+        if not task:
+            return False
+        if user_id and task.user_id != user_id:
+            return False
+        if task.state not in {TaskState.SUBMITTED, TaskState.WORKING}:
+            return False
 
-            try:
-                message = await self.send_a2a_message(
-                    sender_agent=sender_agent,
-                    recipient_agent=target,
-                    message_type=message_type,
-                    payload=payload,
-                )
-                successful.append(message.message_id)
-            except Exception as e:
-                logger.error(f"Failed to broadcast to {target}: {e}")
-                failed.append(target)
+        runner = self.running_tasks.pop(task_id, None)
+        if runner:
+            runner.cancel()
 
-        logger.info(
-            f"Broadcast from {sender_agent}: {len(successful)} successful, {len(failed)} failed"
+        task.state = TaskState.CANCELED
+        task.completed_at = datetime.utcnow()
+        task.progress = {"percentage": 100, "message": "Canceled"}
+        task.status_message = self._make_message(
+            MessageRole.AGENT, "Task was cancelled", task
         )
-        return {"successful": successful, "failed": failed}
+        task.history.append(task.status_message)
+        return True
 
-    def get_a2a_conversation(self, conversation_id: str) -> list[Any]:
-        """
-        Get A2A conversation history.
-
-        Args:
-            conversation_id: Conversation identifier
-
-        Returns:
-            List of A2A messages in conversation
-        """
-        return self.a2a_conversations.get(conversation_id, [])
+    def get_agent_stats(self) -> dict[str, Any]:
+        total = len(self.task_store)
+        completed = sum(1 for task in self.task_store.values() if task.state == TaskState.COMPLETED)
+        failed = sum(1 for task in self.task_store.values() if task.state == TaskState.FAILED)
+        running = sum(1 for task in self.task_store.values() if task.state == TaskState.WORKING)
+        return {
+            "total_tasks": total,
+            "completed_tasks": completed,
+            "failed_tasks": failed,
+            "running_tasks": running,
+        }
 
     def get_agent_status(self, agent_type: str) -> dict[str, Any]:
-        """
-        Get current status of a registered agent.
-
-        Args:
-            agent_type: Type of agent
-
-        Returns:
-            Agent status information
-        """
-        if agent_type not in self.agents:
-            return {
-                "registered": False,
-                "error": f"Agent type '{agent_type}' not registered",
-            }
-
-        agent = self.agents[agent_type]
+        agent = self.agents.get(agent_type)
+        if not agent:
+            return {"registered": False, "error": "Agent not registered"}
         return {
             "registered": True,
             "agent_type": agent_type,
-            "a2a_enabled": hasattr(agent, "a2a_enabled") and agent.a2a_enabled,
-            "has_handle_a2a": hasattr(agent, "handle_a2a_message"),
             "capabilities": self.agent_capabilities.get(agent_type, {}),
-            "a2a_endpoint": self.a2a_endpoints.get(agent_type, "local"),
+            "a2a_endpoint": self.agent_endpoints.get(agent_type),
         }
 
+    # ------------------------------------------------------------------
+    # Google A2A JSON-RPC helpers
+    # ------------------------------------------------------------------
+    async def handle_a2a_message_send(
+        self,
+        agent_type: str,
+        params: MessageSendParams,
+        request_id: Any,
+    ) -> Task:
+        agent = self._resolve_agent(agent_type)
+        action, payload = self._extract_action_and_payload(agent_type, params)
+        context_id = params.message.context_id or str(uuid.uuid4())
+        blocking = True
+        if params.configuration and params.configuration.blocking is not None:
+            blocking = params.configuration.blocking
 
-# Global orchestrator instance - will be initialized with WebSocket manager
+        task_id = await self.submit_task(
+            agent_type=agent_type,
+            action=action,
+            payload=payload,
+            user_id="a2a-client",
+            context_id=context_id,
+            origin_message=params.message,
+            blocking=blocking,
+        )
+
+        task = self.task_store[task_id]
+        if not blocking:
+            task.state = TaskState.SUBMITTED
+        return task.to_task()
+
+    async def handle_a2a_tasks_get(self, params: TaskQueryParams) -> Task:
+        task = self.task_store.get(params.id)
+        if not task:
+            raise LookupError(f"Task '{params.id}' not found")
+        return task.to_task(history_length=params.history_length)
+
+    async def handle_a2a_tasks_cancel(self, params: TaskIdParams) -> Task:
+        success = await self.cancel_task(user_id=None, task_id=params.id)
+        if not success:
+            raise LookupError(f"Task '{params.id}' cannot be cancelled")
+        task = self.task_store[params.id]
+        return task.to_task()
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _resolve_agent(self, agent_type: str):
+        agent = self.agents.get(agent_type)
+        if not agent:
+            raise LookupError(f"Agent '{agent_type}' is not registered")
+        return agent
+
+    def _ensure_origin_history(self, task: AgentTask) -> None:
+        if task.origin_message is None:
+            return
+        origin = task.origin_message
+        update_payload = {
+            "message_id": origin.message_id or str(uuid.uuid4()),
+            "context_id": task.context_id,
+            "task_id": task.id,
+        }
+        task.origin_message = origin.copy(update=update_payload)
+        task.history.append(task.origin_message)
+
+    def _make_message(
+        self, role: MessageRole, text: str, task: AgentTask
+    ) -> Message:
+        return Message(
+            role=role,
+            parts=[Part(kind=PartKind.TEXT, text=text)],
+            message_id=str(uuid.uuid4()),
+            context_id=task.context_id,
+            task_id=task.id,
+        )
+
+    def _summarise_result(self, result: dict[str, Any]) -> str:
+        for key in ("response", "message", "summary"):
+            value = result.get(key) if isinstance(result, dict) else None
+            if isinstance(value, str) and value.strip():
+                return value
+        return "Task completed successfully."
+
+    def _extract_action_and_payload(
+        self, agent_type: str, params: MessageSendParams
+    ) -> tuple[str, dict[str, Any]]:
+        message = params.message
+        action: str | None = None
+        payload: dict[str, Any] | None = None
+
+        if message.metadata:
+            action = message.metadata.get("action")
+            metadata_payload = message.metadata.get("payload")
+            if isinstance(metadata_payload, dict):
+                payload = metadata_payload
+
+        for part in message.parts:
+            if part.kind == PartKind.DATA and isinstance(part.data, dict):
+                action = part.data.get("action", action)
+                content_payload = part.data.get("payload")
+                if isinstance(content_payload, dict):
+                    payload = content_payload
+
+        if action is None:
+            action = "chat" if agent_type == "document_editor" else "chat"
+
+        if payload is None:
+            text = self._extract_text(message)
+            payload = {"message": text, "context_document_id": message.metadata.get("context_document_id") if message.metadata else None}
+
+        return action, payload
+
+    @staticmethod
+    def _extract_text(message: Message) -> str:
+        for part in message.parts:
+            if part.kind == PartKind.TEXT and part.text:
+                return part.text
+        return ""
+
+
+# Global instance helpers -------------------------------------------------
 orchestrator: SimpleAgentOrchestrator | None = None
 
 
 def initialize_orchestrator(ws_manager):
-    """Initialize the global orchestrator with WebSocket manager."""
     global orchestrator
     orchestrator = SimpleAgentOrchestrator(ws_manager)
     logger.info("Agent orchestrator initialized")

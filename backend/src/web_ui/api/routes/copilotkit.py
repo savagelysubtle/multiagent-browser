@@ -1,20 +1,53 @@
-import json
-import uuid
+"""
+CopilotKit integration endpoints for the Web-UI.
 
+Provides endpoints compatible with CopilotKit's agent protocol.
+"""
+
+import json
+import time
+import uuid
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+from ...agent.document_editor import DocumentEditingAgent
+from ...utils.logging_config import get_logger
+from ..dependencies import get_document_agent
+from ...agent.orchestrator.simple_orchestrator import SimpleAgentOrchestrator
+from ..dependencies import get_orchestrator
 from ag_ui.core import (
     RunAgentInput,
     TextMessageContentEvent,
     TextMessageEndEvent,
     TextMessageStartEvent,
 )
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
 
-from ..agent.orchestrator.simple_orchestrator import SimpleAgentOrchestrator
-from ..dependencies import get_orchestrator
+logger = get_logger(__name__)
 
+# Create router
 router = APIRouter()
 
+# --- CopilotKit Compatible Models ---
+
+class CopilotKitMessage(BaseModel):
+    """CopilotKit message format."""
+    id: Optional[str] = None
+    role: str
+    content: str
+    name: Optional[str] = None
+
+class CopilotKitRequest(BaseModel):
+    """CopilotKit request format."""
+    messages: List[CopilotKitMessage]
+    model: Optional[str] = "gpt-4"
+    stream: bool = True
+    tools: Optional[List[Dict[str, Any]]] = None
+    temperature: Optional[float] = 0.7
+
+# --- CopilotKit Endpoints ---
 
 @router.post("/info")
 async def copilotkit_info(
@@ -57,67 +90,149 @@ async def copilotkit_info(
     except Exception as e:
         return {"actions": [], "agents": [], "sdkVersion": "1.0.0", "error": str(e)}
 
-
-@router.post("")  # Changed from "/copilotkit" to "" to avoid redundant path
-async def copilotkit_endpoint(
-    request: Request, orchestrator: SimpleAgentOrchestrator = Depends(get_orchestrator)
+@router.post("/")
+async def copilotkit_chat(
+    request_data: dict,
+    agent: DocumentEditingAgent = Depends(get_document_agent),
 ):
-    """Endpoint for CopilotKit frontend to communicate with the backend LLM."""
-    raw_body = await request.json()
-    messages = raw_body.get("messages", [])
+    """
+    CopilotKit compatible chat endpoint.
 
-    user_message_content = ""
-    if messages:
+    This endpoint accepts CopilotKit format requests and returns streaming responses
+    compatible with the OpenAI chat completions API format that CopilotKit expects.
+    """
+    try:
+        if not agent:
+            raise HTTPException(status_code=503, detail="Document agent not available")
+
+        # Parse the request data
+        messages = request_data.get("messages", [])
+        stream = request_data.get("stream", True)
+        model = request_data.get("model", "gpt-4")
+
         # Get the last user message
-        for message in reversed(messages):
-            if message.get("role") == "user":
-                user_message_content = message.get("content", "")
-                break
+        user_message_content = ""
+        if messages:
+            for message in reversed(messages):
+                if message.get("role") == "user":
+                    user_message_content = message.get("content", "")
+                    break
 
-    if not user_message_content:
-        return StreamingResponse(
-            (
-                f"data: {json.dumps({'type': 'error', 'content': 'No user message found.'})}\n\n"
-            ),
-            media_type="text/event-stream",
-        )
+        if not user_message_content:
+            user_message_content = "Hello"
 
-    # For now, using a hardcoded user_id and generating thread_id/run_id
-    user_id = "copilotkit_user"
-    thread_id = "copilotkit_thread"
-    run_id = str(uuid.uuid4())
+        # If streaming is requested (default for CopilotKit)
+        if stream:
+            async def generate_response() -> AsyncGenerator[str, None]:
+                try:
+                    # Use the document agent's chat functionality
+                    response = await agent.chat_with_user(
+                        message=user_message_content,
+                        context_document_id=None
+                    )
 
-    # Extract selected agent from query parameters
-    selected_agent = request.query_params.get("agent", "document_editor")
+                    chunk_id = f"chatcmpl-{int(time.time())}"
 
-    run_agent_input = RunAgentInput(
-        thread_id=thread_id,
-        run_id=run_id,
-        messages=[
-            {
-                "role": "user",
-                "content": user_message_content,
-                "message_id": str(uuid.uuid4()),
+                    # Stream each word/token
+                    words = response.split()
+                    for i, word in enumerate(words):
+                        chunk = {
+                            "id": chunk_id,
+                            "object": "chat.completion.chunk",
+                            "created": int(time.time()),
+                            "model": model,
+                            "choices": [{
+                                "index": 0,
+                                "delta": {
+                                    "content": word + (" " if i < len(words) - 1 else "")
+                                },
+                                "finish_reason": None
+                            }]
+                        }
+
+                        yield f"data: {json.dumps(chunk)}\n\n"
+
+                    # Send final chunk
+                    final_chunk = {
+                        "id": chunk_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": model,
+                        "choices": [{
+                            "index": 0,
+                            "delta": {},
+                            "finish_reason": "stop"
+                        }]
+                    }
+
+                    yield f"data: {json.dumps(final_chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
+
+                except Exception as e:
+                    logger.error(f"Error in CopilotKit chat stream: {e}", exc_info=True)
+                    error_chunk = {
+                        "error": {
+                            "message": str(e),
+                            "type": "internal_error"
+                        }
+                    }
+                    yield f"data: {json.dumps(error_chunk)}\n\n"
+
+            return StreamingResponse(
+                generate_response(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Methods": "*",
+                }
+            )
+
+        else:
+            # Non-streaming response
+            response = await agent.chat_with_user(
+                message=user_message_content,
+                context_document_id=None
+            )
+
+            return {
+                "id": f"chatcmpl-{int(time.time())}",
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": model,
+                "choices": [{
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": response
+                    },
+                    "finish_reason": "stop"
+                }],
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0
+                }
             }
-        ],
-        metadata={
-            "selectedAgent": selected_agent,  # Use selected_agent from query params
-            "source": "copilotkit",
-        },
-    )
 
-    async def generate_response_stream():
-        async for event in orchestrator.handle_ag_ui_chat_input(
-            run_agent_input, user_id, session_id=thread_id
-        ):
-            if isinstance(event, TextMessageStartEvent):
-                yield f"data: {json.dumps({'type': 'start', 'content': ''})}\n\n"
-            elif isinstance(event, TextMessageContentEvent):
-                yield f"data: {json.dumps({'type': 'chunk', 'content': event.delta})}\n\n"
-            elif isinstance(event, TextMessageEndEvent):
-                yield f"data: {json.dumps({'type': 'end', 'content': ''})}\n\n"
-            else:
-                # Handle other event types if necessary, or log them
-                print(f"Unhandled event type: {event.type}")
+    except Exception as e:
+        logger.error(f"Error in CopilotKit chat endpoint: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
 
-    return StreamingResponse(generate_response_stream(), media_type="text/event-stream")
+@router.options("/")
+async def copilotkit_options():
+    """Handle CORS preflight requests for CopilotKit."""
+    return {
+        "message": "CORS preflight OK"
+    }
+
+@router.get("/health")
+async def copilotkit_health():
+    """Health check for CopilotKit integration."""
+    return {
+        "status": "healthy",
+        "service": "copilotkit-integration",
+        "timestamp": int(time.time())
+    }
