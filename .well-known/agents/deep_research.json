@@ -1,0 +1,172 @@
+{
+  "name": "Deep Research Agent",
+  "description": "Comprehensive research agent that conducts multi-source research, analyzes credibility, and synthesizes information. Powered by LangGraph for stateful research workflows.",
+  "version": "1.0.0",
+  "agent_id": "deep_research_agent",
+  "endpoint": "https://webui.example.com/a2a/agents/deep_research",
+  "protocols": ["a2a-v1"],
+  "skills": [
+    {
+      "name": "research",
+      "description": "Conduct comprehensive research on a topic with configurable depth",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "description": "The research topic or question"
+          },
+          "depth": {
+            "type": "string",
+            "enum": ["quick", "standard", "comprehensive"],
+            "description": "Research depth level",
+            "default": "standard"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Optional list of specific sources to use"
+          }
+        },
+        "required": ["topic"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "content": { "type": "string" },
+                "confidence": { "type": "number" },
+                "source": { "type": "string" }
+              }
+            }
+          },
+          "summary": {
+            "type": "string",
+            "description": "Comprehensive summary of research findings"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string" },
+                "url": { "type": "string" },
+                "type": { "type": "string" },
+                "relevance": { "type": "number" }
+              }
+            }
+          },
+          "confidence_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "analyze_sources",
+      "description": "Analyze and evaluate the credibility and relevance of research sources",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of source URLs or references to analyze"
+          }
+        },
+        "required": ["sources"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "total_sources_analyzed": {
+            "type": "integer"
+          },
+          "high_quality_sources": {
+            "type": "integer",
+            "description": "Number of high-quality sources found"
+          },
+          "average_credibility": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "source_analysis": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": { "type": "string" },
+                "credibility_score": { "type": "number" },
+                "relevance_score": { "type": "number" },
+                "type": { "type": "string" },
+                "accessible": { "type": "boolean" },
+                "bias_score": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "supported_modalities": ["text"],
+  "collaboration_patterns": [
+    {
+      "name": "research_assistance",
+      "description": "Provide research assistance to other agents",
+      "input_format": "structured",
+      "example": {
+        "type": "research_assistance",
+        "topic": "AI Ethics in Healthcare",
+        "context": "Expanding knowledge base"
+      }
+    }
+  ],
+  "metadata": {
+    "organization": "web-ui",
+    "contact": "simpleflowworks@gmail.com",
+    "documentation": "https://github.com/savagelysubtle/web-ui/blob/main/backend/src/web_ui/agent/A2A_AGENT_CARDS.md",
+    "status": "production",
+    "implementation_version": "0.1.0",
+    "langchain_compatible": true,
+    "langgraph_integration": true,
+    "features": [
+      "multi_source_research",
+      "fact_verification",
+      "source_credibility_analysis",
+      "comprehensive_reporting",
+      "citation_management"
+    ],
+    "estimated_times": {
+      "quick": "2-5 minutes",
+      "standard": "5-15 minutes",
+      "comprehensive": "15-30 minutes"
+    },
+    "max_parallel_browsers": 1,
+    "browser_integration": true
+  }
+}

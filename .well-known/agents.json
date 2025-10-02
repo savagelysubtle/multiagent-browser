@@ -1,0 +1,103 @@
+{
+  "registry_version": "1.0.0",
+  "protocol_version": "a2a-v1",
+  "organization": {
+    "name": "web-ui",
+    "contact": "simpleflowworks@gmail.com",
+    "website": "https://github.com/savagelysubtle/web-ui"
+  },
+  "implementation_status": "preparation",
+  "implementation_notes": "This is a preparation implementation (v0.1.0) for Google A2A protocol. Current implementation uses internal message passing rather than JSON-RPC 2.0 over HTTP(S). See A2A_PROTOCOL_COMPLIANCE.md for full compliance roadmap.",
+  "agents": [
+    {
+      "agent_id": "document_editor_agent",
+      "name": "Document Editor Agent",
+      "type": "document_editor",
+      "version": "1.0.0",
+      "status": "active",
+      "a2a_enabled": true,
+      "endpoint": "https://webui.example.com/a2a/agents/document_editor",
+      "card_url": ".well-known/agents/document_editor.json",
+      "skills": [
+        "create_document",
+        "edit_document",
+        "search_documents",
+        "chat"
+      ],
+      "collaboration_patterns": ["save_research", "document_assistance"],
+      "message_types": [
+        "task_request",
+        "capability_query",
+        "status_query",
+        "document_query",
+        "collaboration_request"
+      ]
+    },
+    {
+      "agent_id": "browser_use_agent",
+      "name": "Browser Use Agent",
+      "type": "browser_use",
+      "version": "1.0.0",
+      "status": "active",
+      "a2a_enabled": true,
+      "endpoint": "https://webui.example.com/a2a/agents/browser_use",
+      "card_url": ".well-known/agents/browser_use.json",
+      "skills": ["browse", "extract", "screenshot"],
+      "collaboration_patterns": ["web_data_gathering"],
+      "message_types": ["task_request", "capability_query", "status_query"]
+    },
+    {
+      "agent_id": "deep_research_agent",
+      "name": "Deep Research Agent",
+      "type": "deep_research",
+      "version": "1.0.0",
+      "status": "active",
+      "a2a_enabled": true,
+      "endpoint": "https://webui.example.com/a2a/agents/deep_research",
+      "card_url": ".well-known/agents/deep_research.json",
+      "skills": ["research", "analyze_sources"],
+      "collaboration_patterns": ["research_assistance"],
+      "message_types": [
+        "task_request",
+        "capability_query",
+        "status_query",
+        "collaboration_request"
+      ]
+    }
+  ],
+  "statistics": {
+    "total_agents": 3,
+    "a2a_enabled_agents": 3,
+    "total_skills": 9,
+    "supported_protocols": ["a2a-v1"],
+    "last_updated": "2025-10-01"
+  },
+  "capabilities": {
+    "agent_discovery": true,
+    "skill_discovery": true,
+    "collaboration_patterns": true,
+    "message_routing": true,
+    "conversation_tracking": true,
+    "langchain_integration": true,
+    "mcp_integration": true
+  },
+  "roadmap": {
+    "current_phase": "Phase 0: Preparation Implementation",
+    "next_phase": "Phase 1: Core Protocol Alignment",
+    "target_compliance": "Q2 2025",
+    "planned_features": [
+      "JSON-RPC 2.0 message format",
+      "HTTP(S) transport layer",
+      "Task lifecycle management",
+      "Async task handling",
+      "Multi-modal data support",
+      "Security and authentication"
+    ]
+  },
+  "documentation": {
+    "agent_cards": "https://github.com/savagelysubtle/web-ui/blob/main/backend/src/web_ui/agent/A2A_AGENT_CARDS.md",
+    "implementation_summary": "https://github.com/savagelysubtle/web-ui/blob/main/backend/src/web_ui/agent/A2A_IMPLEMENTATION_SUMMARY.md",
+    "integration_guide": "https://github.com/savagelysubtle/web-ui/blob/main/backend/src/web_ui/agent/A2A_INTEGRATION_GUIDE.md",
+    "protocol_compliance": "https://github.com/savagelysubtle/web-ui/blob/main/backend/src/web_ui/agent/A2A_PROTOCOL_COMPLIANCE.md"
+  }
+}

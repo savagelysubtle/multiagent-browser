@@ -1,0 +1,220 @@
+{
+  "name": "Document Editor Agent",
+  "description": "AI-powered document creation and editing agent with ChromaDB integration. Provides document management, AI-assisted editing, and knowledge base search capabilities.",
+  "version": "1.0.0",
+  "agent_id": "document_editor_agent",
+  "endpoint": "https://webui.example.com/a2a/agents/document_editor",
+  "protocols": ["a2a-v1"],
+  "skills": [
+    {
+      "name": "create_document",
+      "description": "Create a new document with AI assistance",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Name of the document file"
+          },
+          "content": {
+            "type": "string",
+            "description": "Initial content of the document",
+            "default": ""
+          },
+          "document_type": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "text",
+              "html",
+              "json",
+              "python",
+              "javascript"
+            ],
+            "description": "Type of document to create",
+            "default": "markdown"
+          }
+        },
+        "required": ["filename"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the document was created successfully"
+          },
+          "document_id": {
+            "type": "string",
+            "description": "Unique identifier for the created document"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Name of the created document"
+          },
+          "message": {
+            "type": "string",
+            "description": "Status message"
+          }
+        }
+      }
+    },
+    {
+      "name": "edit_document",
+      "description": "Edit an existing document using AI assistance",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "description": "ID of the document to edit"
+          },
+          "instruction": {
+            "type": "string",
+            "description": "Natural language instruction for the edit"
+          }
+        },
+        "required": ["document_id", "instruction"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the edit was successful"
+          },
+          "changes_applied": {
+            "type": "boolean",
+            "description": "Whether changes were applied to the document"
+          },
+          "message": {
+            "type": "string",
+            "description": "Status message"
+          }
+        }
+      }
+    },
+    {
+      "name": "search_documents",
+      "description": "Search through the document knowledge base",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of results",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": ["query"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "total_results": {
+            "type": "integer",
+            "description": "Number of results found"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "content": { "type": "string" },
+                "metadata": { "type": "object" },
+                "relevance_score": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "chat",
+      "description": "Conversational interaction with the document editor agent",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "User message"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Session identifier for conversation context",
+            "default": "default"
+          },
+          "context_document_id": {
+            "type": "string",
+            "description": "Optional document ID for context"
+          }
+        },
+        "required": ["message"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "response": {
+            "type": "string",
+            "description": "Agent's response"
+          }
+        }
+      }
+    }
+  ],
+  "supported_modalities": ["text", "files"],
+  "collaboration_patterns": [
+    {
+      "name": "save_research",
+      "description": "Save research results from other agents as documents",
+      "input_format": "structured",
+      "example": {
+        "type": "save_research",
+        "filename": "research_results.md",
+        "content": "Research findings..."
+      }
+    },
+    {
+      "name": "document_assistance",
+      "description": "Provide document templates and suggestions to other agents",
+      "input_format": "structured",
+      "example": {
+        "type": "document_assistance",
+        "request": "Need template for technical report",
+        "context": "AI research documentation"
+      }
+    }
+  ],
+  "metadata": {
+    "organization": "web-ui",
+    "contact": "simpleflowworks@gmail.com",
+    "documentation": "https://github.com/savagelysubtle/web-ui/blob/main/backend/src/web_ui/agent/A2A_AGENT_CARDS.md",
+    "status": "production",
+    "implementation_version": "0.1.0",
+    "langchain_compatible": true,
+    "database_backend": "ChromaDB",
+    "mcp_integration": true,
+    "max_content_size_bytes": 10485760,
+    "supported_formats": [
+      "markdown",
+      "text",
+      "html",
+      "json",
+      "python",
+      "javascript"
+    ]
+  }
+}

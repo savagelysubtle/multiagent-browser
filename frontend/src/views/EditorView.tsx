@@ -1,13 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Search, Save, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-import { agentService } from '../services/agentService';
-import { useAppStore } from '../stores/useAppStore';
-import { Document, ChatMessage } from '../types';
-import { ChatPanel } from '../components/ChatPanel';
+import { CopilotChat } from '@copilotkit/react-ui';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, FileText, Plus, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { EditorPanel } from '../components/EditorPanel';
-import { agUiService } from '../services/agUiService';
-import { AgentSubscriber } from '@ag-ui/client';
+import { useAppStore } from '../stores/useAppStore';
+import { Document } from '../types';
 
 export default function EditorView() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
@@ -22,17 +19,7 @@ export default function EditorView() {
   const [isResizingChat, setIsResizingChat] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      sender: 'ai',
-      text: 'Hello! I can help you with document editing, web browsing, and research tasks. What would you like to do?',
-      timestamp: new Date().toISOString(),
-    },
-  ]);
-  const [isChatLoading, setIsChatLoading] = useState(false);
-
-  const { addTask } = useAppStore();
+  const { } = useAppStore();
   const queryClient = useQueryClient();
 
   // Handle mouse move for resizing
@@ -80,7 +67,7 @@ export default function EditorView() {
   const createDocumentMutation = useMutation({
     mutationFn: async (data: { title: string; content: string }) => {
       // Use the direct create endpoint
-      const response = await fetch('/api/documents/create-live', {
+      const response = await fetch('http://127.0.0.1:3000/api/documents/create-live', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -145,7 +132,7 @@ export default function EditorView() {
 
     saveTimeoutRef.current = setTimeout(async () => {
       try {
-        const response = await fetch(`/api/documents/edit-live/${id}`, {
+        const response = await fetch(`http://127.0.0.1:3000/api/documents/edit-live/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -181,73 +168,6 @@ export default function EditorView() {
       }
     };
   }, []);
-
-  const handleSendChatMessage = async (message: string) => {
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      sender: 'user',
-      text: message,
-      timestamp: new Date().toISOString(),
-    };
-    setChatMessages(prev => [...prev, userMessage]);
-    setIsChatLoading(true);
-
-    const agent = agUiService.getAgent();
-    agent.addMessage({
-      id: userMessage.id,
-      role: 'user',
-      content: message,
-    });
-
-    let assistantMessageId: string | null = null;
-
-    const subscriber: AgentSubscriber = {
-      onTextMessageStartEvent: ({ event }) => {
-        assistantMessageId = event.messageId;
-        const aiMessage: ChatMessage = {
-          id: event.messageId,
-          sender: 'ai',
-          text: '',
-          timestamp: new Date().toISOString(),
-        };
-        setChatMessages(prev => [...prev, aiMessage]);
-      },
-      onTextMessageContentEvent: ({ event }) => {
-        setChatMessages(prev => prev.map(m => 
-          m.id === assistantMessageId 
-            ? { ...m, text: m.text + event.delta } 
-            : m
-        ));
-      },
-      onRunFinishedEvent: () => {
-        setIsChatLoading(false);
-      },
-      onRunErrorEvent: ({ event }) => {
-        const aiMessage: ChatMessage = {
-          id: Date.now().toString() + '_ai',
-          sender: 'ai',
-          text: `I apologize, but I encountered an error: ${event.message}`,
-          timestamp: new Date().toISOString(),
-        };
-        setChatMessages(prev => [...prev, aiMessage]);
-        setIsChatLoading(false);
-      }
-    }
-
-    try {
-      await agent.runAgent({}, subscriber);
-    } catch (error) {
-      console.error("Agent run failed:", error);
-      const aiMessage: ChatMessage = {
-        id: Date.now().toString() + '_ai',
-        sender: 'ai',
-        text: `I apologize, but I encountered a critical error.`,
-        timestamp: new Date().toISOString(),
-      };
-      setChatMessages(prev => [...prev, aiMessage]);
-      setIsChatLoading(false);
-    }
-  };
 
   return (
     <div ref={containerRef} className="h-full flex bg-[#1e1e1e]">
@@ -395,10 +315,11 @@ export default function EditorView() {
             />
 
             <div className="h-full">
-              <ChatPanel
-                messages={chatMessages}
-                onSendMessage={handleSendChatMessage}
-                isLoading={isChatLoading}
+              <CopilotChat
+                labels={{
+                  title: "AI Assistant",
+                  initialMessage: "Hello! I can help you with document editing, web browsing, and research tasks. What would you like to do?",
+                }}
               />
             </div>
           </>

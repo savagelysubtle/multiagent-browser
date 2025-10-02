@@ -29,6 +29,9 @@ except (ImportError, TypeError):
     pass
 
 from ..utils import config
+from ..utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class DeepSeekR1ChatOpenAI(ChatOpenAI):
@@ -218,7 +221,7 @@ def get_llm_model(provider: str, **kwargs):
         return ChatGoogleGenerativeAI(
             model=kwargs.get("model_name", "gemini-2.0-flash-exp"),
             temperature=kwargs.get("temperature", 0.0),
-            api_key=api_key,
+            google_api_key=api_key,
         )
     elif provider == "ollama":
         if not kwargs.get("base_url", ""):

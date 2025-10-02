@@ -1,0 +1,4166 @@
+# Repository Analysis
+
+## Summary
+
+Directory: d:\Coding\web-ui\frontend
+Files analyzed: 40
+
+Estimated tokens: 32.3k
+
+## Directory Structure
+
+Directory structure:
+└── frontend/
+    ├── README.md
+    ├── index.html
+    ├── index.tsx
+    ├── metadata.json
+    ├── package.json
+    ├── postcss.config.js
+    ├── tailwind.config.js
+    ├── tsconfig.json
+    ├── vite.config.ts
+    ├── .env.local
+    ├── .eslintrc.json
+    ├── .prettierignore
+    ├── .prettierrc
+    └── src/
+        ├── App.tsx
+        ├── main.tsx
+        ├── components/
+        │   ├── ChatPanel.tsx
+        │   ├── EditorPanel.tsx
+        │   ├── FileExplorer.tsx
+        │   ├── SettingsModal.tsx
+        │   ├── layout/
+        │   │   ├── Header.tsx
+        │   │   └── Sidebar.tsx
+        │   └── ui/
+        │       ├── Icon.tsx
+        │       └── LoadingScreen.tsx
+        ├── hooks/
+        │   └── useWebSocket.ts
+        ├── pages/
+        │   ├── DashboardPage.tsx
+        │   └── LoginPage.tsx
+        ├── services/
+        │   ├── agentService.ts
+        │   ├── agUiService.ts
+        │   ├── authService.ts
+        │   └── userStateService.ts
+        ├── stores/
+        │   └── useAppStore.ts
+        ├── styles/
+        │   └── globals.css
+        ├── types/
+        │   └── index.ts
+        ├── utils/
+        │   ├── api.ts
+        │   ├── cn.ts
+        │   └── logging.ts
+        └── views/
+            ├── ChatView.tsx
+            ├── EditorView.tsx
+            ├── SettingsView.tsx
+            └── TasksView.tsx
+
+
+## Files Content
+
+================================================
+FILE: README.md
+================================================
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/drive/1ablWiiZisFH8CVi4YfJh49083nvTRFB3
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
+
+
+
+================================================
+FILE: index.html
+================================================
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web-UI - Agent Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* For custom scrollbars to match the dark theme */
+      html.dark ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      html.dark ::-webkit-scrollbar-track {
+        background: #1e1e1e;
+      }
+      html.dark ::-webkit-scrollbar-thumb {
+        background-color: #4f4f52;
+        border-radius: 4px;
+      }
+      html.dark ::-webkit-scrollbar-thumb:hover {
+        background-color: #6a6a6f;
+      }
+       /* For custom scrollbars to match the light theme */
+      html.light ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      html.light ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+      html.light ::-webkit-scrollbar-thumb {
+        background-color: #a8a29e;
+        border-radius: 4px;
+      }
+      html.light ::-webkit-scrollbar-thumb:hover {
+        background-color: #78716c;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0",
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
+
+
+================================================
+FILE: index.tsx
+================================================
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './src/App';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+================================================
+FILE: metadata.json
+================================================
+{
+  "name": "Gemini Doc IDE",
+  "description": "An IDE-style document editor with a built-in AI chat assistant powered by Gemini. Upload, edit, and get AI-powered feedback on your documents in a developer-focused interface.",
+  "requestFramePermissions": []
+}
+
+
+================================================
+FILE: package.json
+================================================
+{
+  "name": "web-ui-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "type-check": "tsc --noEmit",
+    "check-all": "npm run type-check && npm run lint && npm run format:check",
+    "fix-all": "npm run lint:fix && npm run format"
+  },
+  "dependencies": {
+    "@ag-ui/client": "0.0.37",
+    "@ag-ui/core": "0.0.39",
+    "@copilotkit/react-core": "^1.10.5",
+    "@copilotkit/react-ui": "^1.10.5",
+    "@tanstack/react-query": "^5.51.0",
+    "@types/uuid": "^10.0.0",
+    "axios": "^1.7.2",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "loglevel": "^1.9.2",
+    "lucide-react": "^0.427.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.26.0",
+    "react-toastify": "^10.0.5",
+    "rxjs": "^7.8.1",
+    "tailwind-merge": "^2.5.2",
+    "uuid": "^13.0.0",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.15.0",
+    "@typescript-eslint/parser": "^7.15.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "postcss": "^8.4.40",
+    "prettier": "^3.2.5",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}
+
+
+
+================================================
+FILE: postcss.config.js
+================================================
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+
+================================================
+FILE: tailwind.config.js
+================================================
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+    "./*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          DEFAULT: '#3b82f6',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          foreground: '#ffffff',
+        },
+      },
+      animation: {
+        'spin-slow': 'spin 3s linear infinite',
+      }
+    },
+  },
+  plugins: [],
+}
+
+
+================================================
+FILE: tsconfig.json
+================================================
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
+}
+
+
+================================================
+FILE: vite.config.ts
+================================================
+import path from 'path';
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, '.', '');
+    return {
+      server: {
+        port: 3000,
+        host: '0.0.0.0',
+        proxy: {
+          '/api': {
+            target: 'http://localhost:8000',
+            changeOrigin: true,
+            // Removed rewrite rule as backend expects /api prefix
+          },
+        },
+      },
+      plugins: [react()],
+      define: {
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL)
+      },
+      resolve: {
+        alias: {
+          '@': path.resolve(__dirname, '.'),
+        }
+      }
+    };
+});
+
+
+
+================================================
+FILE: .env.local
+================================================
+VITE_API_URL=http://localhost:8000
+VITE_WS_URL=ws://localhost:8000/ws
+
+
+================================================
+FILE: .eslintrc.json
+================================================
+{
+  "env": {
+    "browser": true,
+    "es2020": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "@typescript-eslint/recommended",
+    "plugin:react-hooks/recommended",
+    "plugin:react/recommended",
+    "plugin:react/jsx-runtime",
+    "prettier"
+  ],
+  "ignorePatterns": [
+    "dist",
+    "build",
+    "node_modules",
+    "*.d.ts"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "plugins": [
+    "react-refresh",
+    "@typescript-eslint",
+    "prettier"
+  ],
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "rules": {
+    "react-refresh/only-export-components": [
+      "warn",
+      { "allowConstantExport": true }
+    ],
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_" }
+    ],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/prefer-const": "error",
+    "react/prop-types": "off",
+    "react/react-in-jsx-scope": "off",
+    "prettier/prettier": "error",
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "prefer-const": "error",
+    "no-var": "error"
+  }
+}
+
+
+================================================
+FILE: .prettierignore
+================================================
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production builds
+dist/
+build/
+*.tsbuildinfo
+
+# Environment and config files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Generated files
+*.d.ts
+*.min.js
+*.min.css
+
+# Documentation
+*.md
+CHANGELOG.md
+
+# Logs
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Test coverage
+coverage/
+
+
+================================================
+FILE: .prettierrc
+================================================
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 88,
+  "tabWidth": 2,
+  "useTabs": false,
+  "bracketSpacing": true,
+  "bracketSameLine": false,
+  "arrowParens": "avoid",
+  "endOfLine": "lf",
+  "quoteProps": "as-needed",
+  "jsxSingleQuote": false,
+  "htmlWhitespaceSensitivity": "css",
+  "embeddedLanguageFormatting": "auto",
+  "proseWrap": "preserve"
+}
+
+
+
+================================================
+FILE: src/App.tsx
+================================================
+import { CopilotKit } from '@copilotkit/react-core';
+import '@copilotkit/react-ui/styles.css';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import { useAppStore } from './stores/useAppStore';
+
+// Pages
+import LoadingScreen from './components/ui/LoadingScreen';
+import DashboardPage from './pages/DashboardPage';
+import LoginPage from './pages/LoginPage';
+import { authService } from './services/authService';
+
+// Styles
+import 'react-toastify/dist/ReactToastify.css';
+import './styles/globals.css';
+
+// Create query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: (failureCount, error: any) => {
+        if (error?.code === 'AUTH_EXPIRED') return false;
+        return failureCount < 3;
+      }
+    }
+  }
+});
+
+function App() {
+  const { user, setUser, loadStateFromBackend, theme } = useAppStore();
+  const [loading, setLoading] = useState(true);
+  const [authChecking, setAuthChecking] = useState(false);
+
+  useEffect(() => {
+    // Check authentication on app load
+    const initAuth = async () => {
+      // Prevent multiple auth checks
+      if (authChecking) return;
+
+      setAuthChecking(true);
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          const userData = await authService.getCurrentUser();
+          if (userData) {
+            setUser(userData);
+            await loadStateFromBackend();
+          }
+        }
+      } catch (error) {
+        console.error('Auth init failed:', error);
+        localStorage.removeItem('auth_token');
+      } finally {
+        setLoading(false);
+        setAuthChecking(false);
+      }
+    };
+
+    initAuth();
+  }, [setUser, loadStateFromBackend]); // Remove authChecking from dependencies
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+    return (
+      <QueryClientProvider client={queryClient}>
+        <CopilotKit runtimeUrl="http://127.0.0.1:8000/api/copilotkit">
+          <Router>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+              <Routes>
+                <Route
+                  path="/login"
+                  element={user ? <Navigate to="/" replace /> : <LoginPage />}
+                />
+                <Route
+                  path="/*"
+                  element={user ? <DashboardPage /> : <Navigate to="/login" replace />}
+                />
+              </Routes>
+
+              <ToastContainer
+                position="top-right"
+                theme={theme}
+                closeOnClick
+                pauseOnHover
+                draggable
+                newestOnTop
+                hideProgressBar={false}
+                autoClose={5000}
+                className="mt-16"
+              />
+            </div>
+          </Router>
+        </CopilotKit>
+      </QueryClientProvider>
+    );
+  }
+export default App;
+
+
+================================================
+FILE: src/main.tsx
+================================================
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+================================================
+FILE: src/components/ChatPanel.tsx
+================================================
+import { MessageCircle, Send, X } from 'lucide-react';
+import React, { useState } from 'react';
+
+interface Message {
+  id: string;
+  content: string;
+  sender: 'user' | 'assistant';
+  timestamp: Date;
+}
+
+interface ChatPanelProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen = true, onClose }) => {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      content: 'Hello! I\'m your AI assistant. How can I help you today?',
+      sender: 'assistant',
+      timestamp: new Date()
+    }
+  ]);
+  const [inputMessage, setInputMessage] = useState('');
+
+  const handleSendMessage = () => {
+    if (inputMessage.trim()) {
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        content: inputMessage,
+        sender: 'user',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, newMessage]);
+      setInputMessage('');
+
+      // Simulate assistant response
+      setTimeout(() => {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: 'I understand your message. How else can I assist you?',
+          sender: 'assistant',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      }, 1000);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="flex flex-col h-full bg-white border-l border-gray-200">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="w-5 h-5 text-blue-600" />
+          <h3 className="font-semibold text-gray-900">AI Assistant</h3>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                message.sender === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-900'
+              }`}
+            >
+              <p className="text-sm">{message.content}</p>
+              <p className={`text-xs mt-1 ${
+                message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
+              }`}>
+                {message.timestamp.toLocaleTimeString()}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div className="p-4 border-t border-gray-200">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Type your message..."
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!inputMessage.trim()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+================================================
+FILE: src/components/EditorPanel.tsx
+================================================
+
+import React from 'react';
+import type { Document } from '../types';
+import { Icon } from './ui/Icon';
+
+interface EditorPanelProps {
+    item: (Document & { type: 'document' | 'manual' }) | null;
+    onContentChange: (id: string, content: string) => void;
+}
+
+export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange }) => {
+    const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        if (item && item.type === 'document' && item.file.type.startsWith('text/')) {
+            onContentChange(item.id, e.target.value);
+        }
+    };
+
+    const handleDownload = () => {
+        if (!item) return;
+
+        const link = window.document.createElement('a');
+        link.href = item.url;
+        link.download = item.name;
+        window.document.body.appendChild(link);
+        link.click();
+        window.document.body.removeChild(link);
+    };
+
+    if (!item) {
+        return (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-[#1e1e1e] text-gray-500">
+                <Icon name="edit" className="w-16 h-16 mb-4 text-gray-700" />
+                <p>Select a file from the explorer to start editing.</p>
+                <p className="text-sm">Or create a new file.</p>
+            </div>
+        );
+    }
+
+    const isTextFile = item.file.type.startsWith('text/');
+    const isPdfFile = item.file.type === 'application/pdf';
+    const isReadOnly = item.type === 'manual' || !isTextFile;
+
+    return (
+        <div className="w-full h-full flex flex-col">
+            <div className="bg-[#2d2d30] px-4 py-2 text-sm border-b border-[#3e3e42] text-gray-300 flex justify-between items-center flex-shrink-0">
+                <span className="flex items-center gap-2">
+                    <Icon name="file" className="w-4 h-4 text-gray-400" />
+                    {item.name}
+                </span>
+                 <button
+                    onClick={handleDownload}
+                    className="p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-[#094771] transition-colors"
+                    title={`Download ${item.name}`}
+                    aria-label={`Download file ${item.name}`}
+                >
+                    <Icon name="download" className="w-4 h-4" />
+                </button>
+            </div>
+            {isTextFile ? (
+                <textarea
+                    value={item.content}
+                    onChange={handleTextChange}
+                    readOnly={isReadOnly}
+                    className={`flex-grow p-4 text-gray-200 font-mono text-sm leading-relaxed focus:outline-none resize-none ${
+                        isReadOnly ? 'bg-[#1e1e1e] cursor-default' : 'bg-[#1e1e1e]'
+                    }`}
+                    placeholder="Start typing your document content here..."
+                    spellCheck="false"
+                />
+            ) : isPdfFile ? (
+                 <iframe
+                    src={item.url}
+                    title={item.name}
+                    className="w-full h-full border-none bg-white"
+                />
+            ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-[#1e1e1e] text-gray-500 p-4">
+                    <Icon name="file" className="w-16 h-16 mb-4 text-gray-700" />
+                    <p className="font-bold text-gray-400">Preview not available</p>
+                     <p className="text-sm text-center">Cannot display file '{item.name}' ({item.file.type}).</p>
+                     <p className="text-sm mt-2">You can still download it using the button above.</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+================================================
+FILE: src/components/FileExplorer.tsx
+================================================
+
+import React, { useRef } from 'react';
+import type { Document } from '../types';
+import { Icon } from './ui/Icon';
+
+interface FileExplorerProps {
+    documents: Document[];
+    activeView: { id: string, type: 'document' | 'manual' } | null;
+    onSelectDocument: (id: string) => void;
+    onUploadDocument: (file: File) => void;
+    policyManuals: Document[];
+    activeManualId: string | null;
+    onSelectManual: (id: string) => void;
+    onUploadManual: (file: File) => void;
+    onOpenSettings: () => void;
+}
+
+export const FileExplorer: React.FC<FileExplorerProps> = ({
+    documents,
+    activeView,
+    onSelectDocument,
+    onUploadDocument,
+    policyManuals,
+    activeManualId,
+    onSelectManual,
+    onUploadManual,
+    onOpenSettings
+}) => {
+    const docInputRef = useRef<HTMLInputElement>(null);
+    const manualInputRef = useRef<HTMLInputElement>(null);
+
+    const handleDocUploadClick = () => {
+        docInputRef.current?.click();
+    };
+
+    const handleManualUploadClick = () => {
+        manualInputRef.current?.click();
+    };
+
+    const handleDocFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            onUploadDocument(file);
+        }
+        event.target.value = '';
+    };
+
+    const handleManualFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            onUploadManual(file);
+        }
+        event.target.value = '';
+    };
+
+    return (
+        <div className="w-full h-full bg-gray-100 dark:bg-[#252526] flex flex-col overflow-hidden">
+            {/* Documents Section */}
+            <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center flex-shrink-0">
+                <h2 className="text-sm font-bold tracking-wider uppercase">Explorer</h2>
+                <button
+                    onClick={handleDocUploadClick}
+                    className="p-1 rounded-md text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                    title="Upload Document"
+                >
+                    <Icon name="upload" className="w-5 h-5" />
+                </button>
+                <input
+                    type="file"
+                    ref={docInputRef}
+                    onChange={handleDocFileChange}
+                    className="hidden"
+                    accept=".txt,.md,.js,.ts,.py,.html,.css,.pdf"
+                />
+            </div>
+            <ul className="flex-grow overflow-y-auto min-h-[100px]">
+                {documents.map(doc => {
+                    const isViewing = activeView?.type === 'document' && activeView.id === doc.id;
+                    return (
+                        <li key={doc.id}>
+                            <button
+                                onClick={() => onSelectDocument(doc.id)}
+                                className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${
+                                    isViewing
+                                        ? 'bg-gray-300 dark:bg-[#37373d] text-gray-900 dark:text-white'
+                                        : 'hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+                                }`}
+                            >
+                                <Icon name="file" className="w-4 h-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                <span className="truncate">{doc.name}</span>
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+
+            {/* Manuals Section */}
+            <div className="p-3 border-b border-t border-gray-200 dark:border-gray-700 flex justify-between items-center flex-shrink-0">
+                <h2 className="text-sm font-bold tracking-wider uppercase">Policy Manuals</h2>
+                <button
+                    onClick={handleManualUploadClick}
+                    className="p-1 rounded-md text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                    title="Upload Manual"
+                >
+                    <Icon name="upload" className="w-5 h-5" />
+                </button>
+                <input
+                    type="file"
+                    ref={manualInputRef}
+                    onChange={handleManualFileChange}
+                    className="hidden"
+                    accept=".txt,.md,.pdf"
+                />
+            </div>
+            <ul className="flex-grow overflow-y-auto min-h-[100px]">
+                 {policyManuals.map(manual => {
+                    const isViewing = activeView?.type === 'manual' && activeView.id === manual.id;
+                    const isContext = activeManualId === manual.id;
+                    let bgClass = 'hover:bg-gray-200/50 dark:hover:bg-gray-700/50';
+                    let textClass = '';
+                    if (isViewing) {
+                        bgClass = 'bg-gray-300 dark:bg-[#37373d]';
+                        textClass = 'text-gray-900 dark:text-white';
+                    }
+                    if (isContext) {
+                        bgClass = 'bg-indigo-200 dark:bg-indigo-800/50';
+                        textClass = 'text-indigo-900 dark:text-white';
+                    }
+
+                    return (
+                        <li key={manual.id}>
+                            <button
+                                onClick={() => onSelectManual(manual.id)}
+                                className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${bgClass} ${textClass}`}
+                            >
+                                <Icon name="book" className="w-4 h-4 text-indigo-500 dark:text-indigo-300 flex-shrink-0" />
+                                <span className="truncate">{manual.name}</span>
+                            </button>
+                        </li>
+                    );
+                })}
+                {policyManuals.length === 0 && (
+                    <li className="px-4 py-2 text-xs text-gray-500 dark:text-gray-500 italic">
+                        No manuals uploaded.
+                    </li>
+                )}
+            </ul>
+             {/* Settings Button */}
+            <div className="p-2 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+                 <button
+                    onClick={onOpenSettings}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    title="Open Settings"
+                >
+                    <Icon name="gear" className="w-5 h-5" />
+                    <span>Settings</span>
+                </button>
+            </div>
+        </div>
+    );
+};
+
+
+================================================
+FILE: src/components/SettingsModal.tsx
+================================================
+import React from 'react';
+import { Icon } from './ui/Icon';
+
+interface SettingsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    currentTheme: 'light' | 'dark';
+    onThemeChange: (theme: 'light' | 'dark') => void;
+}
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentTheme, onThemeChange }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+            onClick={onClose}
+            aria-modal="true"
+            role="dialog"
+        >
+            <div
+                className="bg-gray-200 dark:bg-[#252526] rounded-lg shadow-xl w-full max-w-md m-4 text-gray-800 dark:text-gray-200"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex justify-between items-center p-4 border-b border-gray-300 dark:border-gray-700">
+                    <h2 className="text-lg font-semibold">Settings</h2>
+                    <button
+                        onClick={onClose}
+                        className="p-1 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
+                        aria-label="Close settings"
+                    >
+                        <Icon name="close" className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-6 space-y-6">
+                    <div>
+                        <h3 className="text-md font-medium mb-2">Theme</h3>
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => onThemeChange('light')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                    currentTheme === 'light'
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600'
+                                }`}
+                            >
+                                Light
+                            </button>
+                            <button
+                                onClick={() => onThemeChange('dark')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                    currentTheme === 'dark'
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600'
+                                }`}
+                            >
+                                Dark
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                 {/* Footer */}
+                 <div className="flex justify-end p-4 border-t border-gray-300 dark:border-gray-700">
+                     <button
+                        onClick={onClose}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                     >
+                        Done
+                     </button>
+                 </div>
+            </div>
+        </div>
+    );
+};
+
+
+
+================================================
+FILE: src/components/layout/Header.tsx
+================================================
+import React, { useState } from 'react';
+import { User, Wifi, WifiOff, LogOut } from 'lucide-react';
+import { useAppStore } from '../../stores/useAppStore';
+import { authService } from '../../services/authService';
+
+interface HeaderProps {
+  connectionStatus: 'connected' | 'disconnected' | 'reconnecting';
+  selectedAgent: string;
+  setSelectedAgent: (agentType: string) => void;
+}
+
+export default function Header({ connectionStatus, selectedAgent, setSelectedAgent }: HeaderProps) {
+  const { user, setUser } = useAppStore();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Force logout even if server request fails
+      setUser(null);
+    }
+  };
+
+  const getConnectionIcon = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return <Wifi className="h-4 w-4 text-green-500" />;
+      case 'reconnecting':
+        return <Wifi className="h-4 w-4 text-yellow-500 animate-pulse" />;
+      default:
+        return <WifiOff className="h-4 w-4 text-red-500" />;
+    }
+  };
+
+  const getConnectionText = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return 'Connected';
+      case 'reconnecting':
+        return 'Reconnecting...';
+      default:
+        return 'Disconnected';
+    }
+  };
+
+  return (
+    <header className="bg-[#2d2d30] border-b border-[#3e3e42] px-4 py-2">
+      <div className="flex items-center justify-between">
+        {/* Left side - could add breadcrumbs or page title here */}
+        <div className="flex items-center space-x-3">
+          <h2 className="text-sm font-medium text-gray-300">
+            Agent Dashboard
+          </h2>
+          {/* Agent Selector */}
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          >
+            <option value="document_editor">Document Editor</option>
+            <option value="browser_use">Browser Agent</option>
+            <option value="deep_research">Research Agent</option>
+          </select>
+        </div>
+
+        {/* Right side - controls */}
+        <div className="flex items-center space-x-4">
+          {/* Connection Status */}
+          <div className="flex items-center space-x-2 text-xs text-gray-400">
+            {getConnectionIcon()}
+            <span className="hidden sm:block">{getConnectionText()}</span>
+          </div>
+
+          {/* User Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center space-x-2 p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-[#094771]"
+            >
+              <div className="w-6 h-6 bg-[#0e639c] rounded-full flex items-center justify-center">
+                {user?.picture ? (
+                  <img
+                    src={user.picture}
+                    alt={user.name || user.email}
+                    className="w-6 h-6 rounded-full"
+                  />
+                ) : (
+                  <User className="h-3 w-3 text-white" />
+                )}
+              </div>
+              <div className="hidden md:block text-left">
+                <div className="text-xs font-medium text-gray-300">
+                  {user?.name || 'User'}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {user?.email}
+                </div>
+              </div>
+            </button>
+
+            {/* User Dropdown */}
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-[#252526] rounded shadow-lg border border-[#3e3e42] z-50">
+                <div className="py-1">
+                  <div className="px-4 py-2 text-sm text-gray-300 border-b border-[#3e3e42]">
+                    <div className="font-medium">{user?.name || 'User'}</div>
+                    <div className="text-xs text-gray-500">
+                      {user?.email}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-[#094771] hover:text-white"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Click outside to close menu */}
+      {showUserMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowUserMenu(false)}
+        />
+      )}
+    </header>
+  );
+}
+
+
+================================================
+FILE: src/components/layout/Sidebar.tsx
+================================================
+import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  FileText,
+  ListTodo,
+  Settings,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+import { useAppStore } from '../../stores/useAppStore';
+import { cn } from '../../utils/cn';
+
+const navigation = [
+  { name: 'Editor', href: '/editor', icon: FileText },
+  { name: 'Tasks', href: '/tasks', icon: ListTodo },
+  { name: 'Settings', href: '/settings', icon: Settings },
+];
+
+export default function Sidebar() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { sidebarCollapsed, setSidebarCollapsed } = useAppStore();
+
+  return (
+    <div className={cn(
+      "bg-[#252526] border-r border-[#3e3e42] flex flex-col transition-all duration-300",
+      sidebarCollapsed ? "w-16" : "w-64"
+    )}>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-[#3e3e42]">
+        {!sidebarCollapsed && (
+          <h1 className="text-lg font-semibold text-gray-200">
+            Web-UI
+          </h1>
+        )}
+        <button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-[#2a2d2e]"
+        >
+          {sidebarCollapsed ? (
+            <ChevronRight className="h-5 w-5" />
+          ) : (
+            <ChevronLeft className="h-5 w-5" />
+          )}
+        </button>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-2 py-4 space-y-1">
+        {navigation.map((item) => {
+          const isActive = location.pathname === item.href ||
+                          (item.href === '/editor' && location.pathname === '/');
+
+          return (
+            <button
+              key={item.name}
+              onClick={() => navigate(item.href)}
+              className={cn(
+                "w-full flex items-center px-2 py-2 text-sm font-medium rounded transition-colors",
+                isActive
+                  ? "bg-[#094771] text-white"
+                  : "text-gray-400 hover:bg-[#2a2d2e] hover:text-gray-200"
+              )}
+              title={sidebarCollapsed ? item.name : undefined}
+            >
+              <item.icon className={cn("h-5 w-5", sidebarCollapsed ? "mx-auto" : "mr-3")} />
+              {!sidebarCollapsed && item.name}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Connection Status */}
+      <div className="p-4 border-t border-[#3e3e42]">
+        <div className={cn(
+          "flex items-center text-xs text-gray-400",
+          sidebarCollapsed ? "justify-center" : ""
+        )}>
+          <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+          {!sidebarCollapsed && "Connected"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+================================================
+FILE: src/components/ui/Icon.tsx
+================================================
+
+import React from 'react';
+
+interface IconProps {
+    name: 'upload' | 'file' | 'edit' | 'send' | 'sparkles' | 'chevron-left' | 'chevron-right' | 'download' | 'book' | 'gear' | 'close';
+    className?: string;
+}
+
+export const Icon: React.FC<IconProps> = ({ name, className }) => {
+    const icons: Record<string, JSX.Element> = {
+        upload: (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+            </svg>
+        ),
+        file: (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+            </svg>
+        ),
+        edit: (
+             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+            </svg>
+        ),
+        send: (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+            </svg>
+        ),
+        sparkles: (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+            </svg>
+        ),
+        'chevron-left': (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+            </svg>
+        ),
+        'chevron-right': (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
+        ),
+        download: (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+        ),
+        book: (
+             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6-2.292m0 0V21" />
+            </svg>
+        ),
+        gear: (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.43.992a6.759 6.759 0 0 1 0 1.844c.008.379.137.752.43.992l1.003.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.075-.124l-1.217.456a1.125 1.125 0 0 1-1.37-.49l-1.296-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.759 6.759 0 0 1 0-1.844c-.008-.379-.137-.752-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.49l1.217.456c.355.133.75.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+        ),
+        close: (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+        )
+    };
+
+    return <div className={className}>{icons[name]}</div>;
+};
+
+
+
+================================================
+FILE: src/components/ui/LoadingScreen.tsx
+================================================
+import React from 'react';
+
+export default function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          Loading...
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+          Initializing Web-UI
+        </p>
+      </div>
+    </div>
+  );
+}
+
+
+================================================
+FILE: src/hooks/useWebSocket.ts
+================================================
+import { useEffect, useRef, useCallback } from 'react';
+import { useAppStore } from '../stores/useAppStore';
+import { authService } from '../services/authService';
+import { WebSocketMessage, Task } from '../types';
+
+interface UseWebSocketOptions {
+  reconnectInterval?: number;
+  maxReconnectAttempts?: number;
+  heartbeatInterval?: number;
+}
+
+export function useWebSocket(options: UseWebSocketOptions = {}) {
+  const {
+    reconnectInterval = 3000,
+    maxReconnectAttempts = 10,
+    heartbeatInterval = 30000,
+  } = options;
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const {
+    user,
+    connectionStatus,
+    setConnectionStatus,
+    updateTask,
+    addTask,
+  } = useAppStore();
+
+  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+
+  const cleanup = useCallback(() => {
+    if (heartbeatTimerRef.current) {
+      clearInterval(heartbeatTimerRef.current);
+      heartbeatTimerRef.current = null;
+    }
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const handleMessage = useCallback((event: MessageEvent) => {
+    try {
+      const message: WebSocketMessage = JSON.parse(event.data);
+
+      switch (message.type) {
+        case 'task_created':
+          console.log('Task created:', message);
+          // Task will be added when we get the full task data
+          break;
+
+        case 'task_update':
+          if (message.task_id && message.data) {
+            const taskUpdate: Partial<Task> = {
+              status: message.data.status,
+              result: message.data.result,
+              error: message.data.error,
+              progress: message.data.progress,
+            };
+
+            if (message.data.status === 'completed' || message.data.status === 'failed') {
+              taskUpdate.completed_at = new Date().toISOString();
+            }
+
+            updateTask(message.task_id, taskUpdate);
+          }
+          break;
+
+        case 'ping':
+          // Respond to ping with pong
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'pong' }));
+          }
+          break;
+
+        case 'queued_message':
+          // Handle queued messages from when we were offline
+          if (message.data) {
+            handleMessage({ data: JSON.stringify(message.data) } as MessageEvent);
+          }
+          break;
+
+        case 'notification':
+          // Handle general notifications
+          console.log('Notification:', message.data);
+          break;
+
+        default:
+          console.log('Unknown message type:', message.type);
+      }
+    } catch (error) {
+      console.error('Failed to parse WebSocket message:', error);
+    }
+  }, [updateTask]);
+
+  const connect = useCallback(() => {
+    // Temporarily disable WebSocket to debug the blank dashboard issue
+    console.warn('WebSocket connection temporarily disabled for debugging');
+    return;
+
+    if (!user || wsRef.current?.readyState === WebSocket.OPEN) {
+      return;
+    }
+
+    const token = authService.getToken();
+    if (!token) {
+      console.error('No auth token available for WebSocket connection');
+      return;
+    }
+
+    try {
+      setConnectionStatus('reconnecting');
+
+      const ws = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        setConnectionStatus('connected');
+        reconnectAttemptsRef.current = 0;
+
+        // Start heartbeat
+        heartbeatTimerRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, heartbeatInterval);
+      };
+
+      ws.onmessage = handleMessage;
+
+      ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason);
+        setConnectionStatus('disconnected');
+        cleanup();
+
+        // Don't reconnect if authentication failed
+        if (event.code === 4001) {
+          console.error('WebSocket authentication failed');
+          return;
+        }
+
+        // Attempt to reconnect if not a normal closure and we haven't exceeded max attempts
+        if (
+          event.code !== 1000 &&
+          reconnectAttemptsRef.current < maxReconnectAttempts &&
+          user
+        ) {
+          reconnectAttemptsRef.current++;
+          console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${maxReconnectAttempts})...`);
+
+          reconnectTimerRef.current = setTimeout(() => {
+            connect();
+          }, reconnectInterval * Math.pow(2, reconnectAttemptsRef.current - 1)); // Exponential backoff
+        } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          console.error('Max reconnection attempts reached');
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setConnectionStatus('disconnected');
+      };
+
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error);
+      setConnectionStatus('disconnected');
+    }
+  }, [user, wsUrl, handleMessage, setConnectionStatus, cleanup, reconnectInterval, maxReconnectAttempts, heartbeatInterval]);
+
+  const disconnect = useCallback(() => {
+    cleanup();
+    if (wsRef.current) {
+      wsRef.current.close(1000, 'User initiated disconnect');
+      wsRef.current = null;
+    }
+    setConnectionStatus('disconnected');
+  }, [cleanup, setConnectionStatus]);
+
+  const sendMessage = useCallback((message: any) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(message));
+      return true;
+    }
+    console.warn('WebSocket not connected, message not sent:', message);
+    return false;
+  }, []);
+
+  // Connect when user is available
+  useEffect(() => {
+    if (user && connectionStatus === 'disconnected') {
+      connect();
+    } else if (!user && wsRef.current) {
+      disconnect();
+    }
+
+    return () => {
+      disconnect();
+    };
+  }, [user, connect, disconnect, connectionStatus]);
+
+  return {
+    connectionStatus,
+    connect,
+    disconnect,
+    sendMessage,
+    isConnected: connectionStatus === 'connected',
+  };
+}
+
+
+================================================
+FILE: src/pages/DashboardPage.tsx
+================================================
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { useAppStore } from '../stores/useAppStore'; // Import useAppStore
+
+// Layout components
+import Sidebar from '../components/layout/Sidebar';
+import Header from '../components/layout/Header';
+
+// Feature views
+import EditorView from '../views/EditorView';
+import TasksView from '../views/TasksView';
+import SettingsView from '../views/SettingsView';
+import ChatView from '../views/ChatView'; // Import ChatView
+
+export default function DashboardPage() {
+  const { isConnected } = useWebSocket();
+  const { selectedAgent, setSelectedAgent } = useAppStore(); // Get selectedAgent and setSelectedAgent
+
+  return (
+    <div className="flex h-screen bg-[#1e1e1e]">
+      {/* Sidebar */}
+      <Sidebar />
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header with connection status and agent selector */}
+        <Header
+          connectionStatus={isConnected ? 'connected' : 'disconnected'}
+          selectedAgent={selectedAgent}
+          setSelectedAgent={setSelectedAgent}
+        />
+
+        {/* Content area */}
+        <main className="flex-1 overflow-hidden">
+          <Routes>
+            <Route path="/" element={<EditorView />} />
+            <Route path="/editor" element={<EditorView />} />
+            <Route path="/tasks" element={<TasksView />} />
+            <Route path="/settings" element={<SettingsView />} />
+            <Route path="/chat" element={<ChatView />} /> {/* Add route for ChatView */}
+          </Routes>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+
+================================================
+FILE: src/pages/LoginPage.tsx
+================================================
+import React, { useState } from 'react';
+import { toast } from 'react-toastify';
+import { useAppStore } from '../stores/useAppStore';
+import { authService } from '../services/authService';
+import { LoginRequest, RegisterRequest } from '../../types';
+
+export default function LoginPage() {
+  const [isLogin, setIsLogin] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    name: '',
+  });
+
+  const { setUser, setTheme, setSidebarCollapsed } = useAppStore();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      let response;
+      if (isLogin) {
+        const loginData: LoginRequest = {
+          email: formData.email,
+          password: formData.password,
+        };
+        response = await authService.login(loginData);
+      } else {
+        const registerData: RegisterRequest = {
+          email: formData.email,
+          password: formData.password,
+          name: formData.name || undefined,
+        };
+        response = await authService.register(registerData);
+      }
+
+      // Set user first
+      setUser(response.user);
+
+      // Apply user state if it exists
+      if (response.user.state) {
+        const userState = response.user.state;
+
+        // Apply preferences
+        if (userState.preferences) {
+          if (userState.preferences.theme) {
+            setTheme(userState.preferences.theme);
+          }
+          if (typeof userState.preferences.sidebarWidth === 'number') {
+            setSidebarCollapsed(userState.preferences.sidebarWidth <= 64);
+          }
+        }
+      }
+
+      toast.success(`${isLogin ? 'Login' : 'Registration'} successful!`);
+    } catch (error: any) {
+      console.error('Auth error:', error);
+      toast.error(error.message || `${isLogin ? 'Login' : 'Registration'} failed`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClearUsers = async () => {
+    if (process.env.NODE_ENV !== 'development') {
+      toast.error('This feature is only available in development mode.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/dev/clear-users', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message);
+      } else {
+        const text = await response.text();
+        throw new Error(`Server responded with ${response.status}: ${text}`);
+      }
+    } catch (error: any) {
+      console.error('Clear users error:', error);
+      toast.error(error.message || 'An unexpected error occurred.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
+            {isLogin ? 'Sign in to your account' : 'Create your account'}
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+            {isLogin ? "Don't have an account? " : 'Already have an account? '}
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              {isLogin ? 'Sign up' : 'Sign in'}
+            </button>
+          </p>
+        </div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm space-y-4">
+            {!isLogin && (
+              <div>
+                <label htmlFor="name" className="sr-only">
+                  Name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  className="input"
+                  placeholder="Full name (optional)"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                />
+              </div>
+            )}
+            <div>
+              <label htmlFor="email" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="input"
+                placeholder="Email address"
+                value={formData.email}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+                required
+                className="input"
+                placeholder="Password"
+                value={formData.password}
+                onChange={handleInputChange}
+              />
+            </div>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="btn btn-primary btn-md w-full"
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {isLogin ? 'Signing in...' : 'Creating account...'}
+                </div>
+              ) : (
+                isLogin ? 'Sign in' : 'Create account'
+              )}
+            </button>
+          </div>
+
+          <div className="text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              By continuing, you agree to our terms of service and privacy policy.
+            </p>
+          </div>
+        </form>
+
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={handleClearUsers}
+              className="btn btn-danger btn-sm w-full"
+            >
+              Clear Users (Dev only)
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+================================================
+FILE: src/services/agentService.ts
+================================================
+import { api } from '../utils/api';
+import { Agent, Task, TaskSubmissionForm } from '../types';
+
+class AgentService {
+  async getAvailableAgents(): Promise<Agent[]> {
+    const response = await api.get<{ agents: Agent[] }>('/api/agents/available');
+    return response.data.agents;
+  }
+
+  async executeTask(taskForm: TaskSubmissionForm): Promise<{ task_id: string; status: string; message: string }> {
+    const response = await api.post<{ task_id: string; status: string; message: string }>(
+      '/api/agents/execute',
+      taskForm
+    );
+    return response.data;
+  }
+
+  async getUserTasks(limit: number = 50): Promise<Task[]> {
+    const response = await api.get<{ tasks: Task[] }>('/api/agents/tasks', {
+      params: { limit }
+    });
+    return response.data.tasks;
+  }
+
+  async getTask(taskId: string): Promise<Task> {
+    const response = await api.get<Task>(`/api/agents/tasks/${taskId}`);
+    return response.data;
+  }
+
+  async cancelTask(taskId: string): Promise<{ message: string }> {
+    const response = await api.delete<{ message: string }>(`/api/agents/tasks/${taskId}`);
+    return response.data;
+  }
+
+  async getAgentStats(): Promise<{
+    total_tasks: number;
+    active_tasks: number;
+    completed_tasks: number;
+    failed_tasks: number;
+    agents_status: Record<string, any>;
+  }> {
+    const response = await api.get<{
+      total_tasks: number;
+      active_tasks: number;
+      completed_tasks: number;
+      failed_tasks: number;
+      agents_status: Record<string, any>;
+    }>('/api/agents/stats');
+    return response.data;
+  }
+
+  async checkAgentHealth(): Promise<{ status: string; agents: Record<string, any> }> {
+    const response = await api.get<{ status: string; agents: Record<string, any> }>('/api/agents/health');
+    return response.data;
+  }
+
+  // Helper methods for specific agent actions
+  async createDocument(filename: string, content: string, documentType: string = 'markdown'): Promise<{ task_id: string }> {
+    return this.executeTask({
+      agent_type: 'document_editor',
+      action: 'create_document',
+      payload: { filename, content, document_type: documentType }
+    });
+  }
+
+  async editDocument(documentId: string, instruction: string): Promise<{ task_id: string }> {
+    return this.executeTask({
+      agent_type: 'document_editor',
+      action: 'edit_document',
+      payload: { document_id: documentId, instruction }
+    });
+  }
+
+  async searchDocuments(query: string, limit: number = 10): Promise<{ task_id: string }> {
+    return this.executeTask({
+      agent_type: 'document_editor',
+      action: 'search_documents',
+      payload: { query, limit }
+    });
+  }
+
+  async browseUrl(url: string, instruction: string): Promise<{ task_id: string }> {
+    return this.executeTask({
+      agent_type: 'browser_use',
+      action: 'browse',
+      payload: { url, instruction }
+    });
+  }
+
+  async extractFromUrl(url: string, selectors: string[]): Promise<{ task_id: string }> {
+    return this.executeTask({
+      agent_type: 'browser_use',
+      action: 'extract',
+      payload: { url, selectors }
+    });
+  }
+
+  async takeScreenshot(url: string): Promise<{ task_id: string }> {
+    return this.executeTask({
+      agent_type: 'browser_use',
+      action: 'screenshot',
+      payload: { url }
+    });
+  }
+
+  async conductResearch(
+    topic: string,
+    depth: 'quick' | 'standard' | 'comprehensive' = 'standard',
+    sources?: string[]
+  ): Promise<{ task_id: string }> {
+    return this.executeTask({
+      agent_type: 'deep_research',
+      action: 'research',
+      payload: { topic, depth, sources }
+    });
+  }
+
+  async analyzeSources(sources: string[]): Promise<{ task_id: string }> {
+    return this.executeTask({
+      agent_type: 'deep_research',
+      action: 'analyze_sources',
+      payload: { sources }
+    });
+  }
+}
+
+export const agentService = new AgentService();
+
+
+================================================
+FILE: src/services/agUiService.ts
+================================================
+
+import { HttpAgent } from "@ag-ui/client";
+
+const AGENT_URL = "/api/ag_ui/chat";
+
+class AgUiService {
+  private agent: HttpAgent;
+
+  constructor() {
+    console.log(`AgUiService: Initializing HttpAgent with URL: ${AGENT_URL}`);
+    this.agent = new HttpAgent({
+      url: AGENT_URL,
+      agentId: "web-ui-agent",
+      threadId: "main-thread",
+    });
+    console.log("AgUiService: HttpAgent initialized.", this.agent);
+  }
+
+  getAgent() {
+    return this.agent;
+  }
+}
+
+export const agUiService = new AgUiService();
+
+
+
+================================================
+FILE: src/services/authService.ts
+================================================
+import { AuthResponse, LoginRequest, RegisterRequest, User } from '../../types';
+import { api } from '../utils/api';
+
+// Backend user response format (without state)
+interface UserMeResponse {
+  id: string;
+  email: string;
+  name?: string;
+  picture?: string;
+  is_active: boolean;
+  created_at: string;
+  last_login?: string;
+}
+
+class AuthService {
+  private baseURL = 'http://127.0.0.1:3000/api';
+  private tokenKey = 'auth_token';
+
+  async login(credentials: LoginRequest): Promise<AuthResponse> {
+    const response = await api.post<AuthResponse>('/api/auth/login', credentials);
+    const { access_token, user } = response.data;
+
+    // Store token
+    localStorage.setItem(this.tokenKey, access_token);
+
+    return response.data;
+  }
+
+  async register(userData: RegisterRequest): Promise<AuthResponse> {
+    const response = await api.post<AuthResponse>('/api/auth/register', userData);
+    const { access_token, user } = response.data;
+
+    // Store token
+    localStorage.setItem(this.tokenKey, access_token);
+
+    return response.data;
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await api.post('/api/auth/logout');
+    } catch (error) {
+      // Continue with logout even if server request fails
+      console.warn('Logout request failed:', error);
+    } finally {
+      // Always clear local storage
+      localStorage.removeItem(this.tokenKey);
+    }
+  }
+
+  async getCurrentUser(): Promise<User | null> {
+    try {
+      const response = await api.get<UserMeResponse>('/api/auth/me');
+      const userData = response.data;
+
+      // Convert to our User type format (without state initially)
+      const user: User = {
+        id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        picture: userData.picture,
+        is_active: userData.is_active,
+        created_at: userData.created_at,
+      };
+
+      return user;
+    } catch (error) {
+      // Clear invalid token
+      localStorage.removeItem(this.tokenKey);
+      return null;
+    }
+  }
+
+  async getCurrentUserWithState(): Promise<User | null> {
+    try {
+      // Get basic user data
+      const user = await this.getCurrentUser();
+      if (!user) return null;
+
+      // Get user state separately
+      try {
+        const stateResponse = await api.get<{ state: any }>('/api/auth/state');
+        user.state = stateResponse.data.state;
+      } catch (stateError) {
+        // State is optional, continue without it
+        console.warn('Failed to load user state:', stateError);
+      }
+
+      return user;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async verifyToken(token: string): Promise<User | null> {
+    try {
+      // Temporarily set token for verification
+      const originalToken = localStorage.getItem(this.tokenKey);
+      localStorage.setItem(this.tokenKey, token);
+
+      const user = await this.getCurrentUser();
+
+      // Restore original token if verification failed
+      if (!user && originalToken) {
+        localStorage.setItem(this.tokenKey, originalToken);
+      }
+
+      return user;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async refreshToken(): Promise<string | null> {
+    try {
+      const response = await api.post<{ access_token: string }>('/api/auth/refresh');
+      const { access_token } = response.data;
+
+      localStorage.setItem(this.tokenKey, access_token);
+      return access_token;
+    } catch (error) {
+      localStorage.removeItem(this.tokenKey);
+      return null;
+    }
+  }
+
+  getToken(): string | null {
+    return localStorage.getItem(this.tokenKey);
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.getToken();
+  }
+
+  async updateUserPreferences(preferences: Record<string, any>): Promise<void> {
+    await api.put('/api/auth/preferences', { preferences });
+  }
+
+  async updateUserState(state: Record<string, any>): Promise<void> {
+    await api.put('/api/auth/state', { state });
+  }
+}
+
+export const authService = new AuthService();
+
+
+================================================
+FILE: src/services/userStateService.ts
+================================================
+import { api } from '../utils/api';
+
+export interface UserState {
+  preferences: {
+    theme: 'light' | 'dark';
+    sidebarWidth: number;
+    editorFontSize: number;
+    [key: string]: any;
+  };
+  workspace: {
+    openDocuments: string[];
+    activeDocument: string | null;
+    recentFiles: string[];
+    [key: string]: any;
+  };
+  agentSettings: {
+    [key: string]: any;
+  };
+  ui?: {
+    [key: string]: any;
+  };
+}
+
+class UserStateService {
+  async getUserState(): Promise<UserState | null> {
+    try {
+      const response = await api.get<{ state: UserState }>('/api/auth/state');
+      return response.data.state;
+    } catch (error) {
+      console.error('Failed to load user state:', error);
+      return null;
+    }
+  }
+
+  async saveUserState(state: UserState): Promise<boolean> {
+    try {
+      await api.put('/api/auth/state', { state });
+      return true;
+    } catch (error) {
+      console.error('Failed to save user state:', error);
+      return false;
+    }
+  }
+
+  async updateUserPreference(key: string, value: any): Promise<boolean> {
+    try {
+      await api.put('/api/auth/preferences', { key, value });
+      return true;
+    } catch (error) {
+      console.error('Failed to update user preference:', error);
+      return false;
+    }
+  }
+}
+
+export const userStateService = new UserStateService();
+
+
+================================================
+FILE: src/stores/useAppStore.ts
+================================================
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { AppState, User, Document, Task } from '../../types';
+import { userStateService } from '../services/userStateService';
+
+export const useAppStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      // User state
+      user: null,
+
+      // UI state
+      theme: 'dark',
+      sidebarCollapsed: false,
+      activeView: 'editor',
+
+      // Document state
+      openDocuments: [],
+      activeDocument: null,
+      documentCache: new Map(),
+
+      // Agent state
+      activeTasks: [],
+      taskHistory: [],
+      selectedAgent: 'document_editor', // New state for selected agent
+
+      // WebSocket state
+      connectionStatus: 'disconnected',
+
+      // Actions
+      setUser: (user: User | null) => {
+        set({ user });
+      },
+
+      setSelectedAgent: (agentType: string) => {
+        set({ selectedAgent: agentType });
+      },
+
+      setTheme: (theme: 'light' | 'dark') => {
+        set({ theme });
+        // Apply theme to document root
+        document.documentElement.classList.remove('light', 'dark');
+        document.documentElement.classList.add(theme);
+      },
+
+      setSidebarCollapsed: (collapsed: boolean) => {
+        set({ sidebarCollapsed: collapsed });
+      },
+
+      setActiveView: (view: 'editor' | 'chat' | 'tasks' | 'settings') => {
+        set({ activeView: view });
+      },
+
+      addDocument: (doc: Document) => {
+        set((state) => ({
+          openDocuments: [...state.openDocuments, doc],
+          documentCache: new Map(state.documentCache).set(doc.id, doc),
+        }));
+      },
+
+      updateDocument: (id: string, updates: Partial<Document>) => {
+        set((state) => {
+          const updatedDocuments = state.openDocuments.map((doc) =>
+            doc.id === id ? { ...doc, ...updates } : doc
+          );
+          const updatedCache = new Map(state.documentCache);
+          const existingDoc = updatedCache.get(id);
+          if (existingDoc) {
+            updatedCache.set(id, { ...existingDoc, ...updates });
+          }
+
+          return {
+            openDocuments: updatedDocuments,
+            documentCache: updatedCache,
+          };
+        });
+      },
+
+      removeDocument: (id: string) => {
+        set((state) => {
+          const filteredDocuments = state.openDocuments.filter((doc) => doc.id !== id);
+          const updatedCache = new Map(state.documentCache);
+          updatedCache.delete(id);
+
+          return {
+            openDocuments: filteredDocuments,
+            documentCache: updatedCache,
+            activeDocument: state.activeDocument === id ? null : state.activeDocument,
+          };
+        });
+      },
+
+      setActiveDocument: (id: string | null) => {
+        set({ activeDocument: id });
+      },
+
+      addTask: (task: Task) => {
+        set((state) => ({
+          activeTasks: [...state.activeTasks, task],
+          taskHistory: [task, ...state.taskHistory.slice(0, 99)], // Keep last 100
+        }));
+      },
+
+      updateTask: (id: string, updates: Partial<Task>) => {
+        set((state) => {
+          const updatedActiveTasks = state.activeTasks.map((task) =>
+            task.id === id ? { ...task, ...updates } : task
+          );
+
+          const updatedTaskHistory = state.taskHistory.map((task) =>
+            task.id === id ? { ...task, ...updates } : task
+          );
+
+          // Remove completed/failed tasks from active list
+          const filteredActiveTasks = updatedActiveTasks.filter(
+            (task) => task.status === 'pending' || task.status === 'running'
+          );
+
+          return {
+            activeTasks: filteredActiveTasks,
+            taskHistory: updatedTaskHistory,
+          };
+        });
+      },
+
+      setConnectionStatus: (status: 'connected' | 'disconnected' | 'reconnecting') => {
+        set({ connectionStatus: status });
+      },
+
+      saveStateToBackend: async () => {
+        const state = get();
+        if (!state.user) return;
+
+        try {
+          const userState = {
+            preferences: {
+              theme: state.theme,
+              sidebarWidth: state.sidebarCollapsed ? 64 : 250,
+              editorFontSize: 14,
+            },
+            workspace: {
+              openDocuments: state.openDocuments.map(doc => doc.id),
+              activeDocument: state.activeDocument,
+              recentFiles: [],
+            },
+            agentSettings: {},
+          };
+
+          await userStateService.saveUserState(userState);
+        } catch (error) {
+          console.error('Failed to save state:', error);
+        }
+      },
+
+      loadStateFromBackend: async () => {
+        const state = get();
+        if (!state.user) return;
+
+        try {
+          const userState = await userStateService.getUserState();
+          if (userState) {
+            // Apply loaded preferences to current state
+            if (userState.preferences) {
+              if (userState.preferences.theme) {
+                get().setTheme(userState.preferences.theme);
+              }
+              if (typeof userState.preferences.sidebarWidth === 'number') {
+                get().setSidebarCollapsed(userState.preferences.sidebarWidth <= 64);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load state:', error);
+        }
+      },
+    }),
+    {
+      name: 'app-state',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        // Only persist non-sensitive UI preferences locally
+        theme: state.theme,
+        sidebarCollapsed: state.sidebarCollapsed,
+        activeView: state.activeView,
+      }),
+    }
+  )
+);
+
+// Initialize theme on store creation
+const initializeTheme = () => {
+  const state = useAppStore.getState();
+  document.documentElement.classList.add(state.theme);
+};
+
+// Call initialization
+if (typeof window !== 'undefined') {
+  initializeTheme();
+}
+
+
+================================================
+FILE: src/styles/globals.css
+================================================
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #1e1e1e;
+    color: #cccccc;
+  }
+
+  /* Custom scrollbar styles for VS Code theme */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #1e1e1e;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #424242;
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #4f4f4f;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary/90;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600;
+  }
+
+  .btn-outline {
+    @apply border border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-gray-100 dark:hover:bg-gray-700;
+  }
+
+  .btn-sm {
+    @apply h-9 px-3 text-xs;
+  }
+
+  .btn-md {
+    @apply h-10 py-2 px-4;
+  }
+
+  .btn-lg {
+    @apply h-11 px-8;
+  }
+
+  .input {
+    @apply flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-400;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #6b7280;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+
+================================================
+FILE: src/types/index.ts
+================================================
+// User types
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  picture?: string;
+  is_active: boolean;
+  created_at: string;
+  state?: {
+    preferences: {
+      theme: 'light' | 'dark';
+      sidebarWidth: number;
+      editorFontSize: number;
+      [key: string]: any;
+    };
+    workspace: {
+      openDocuments: string[];
+      activeDocument: string | null;
+      recentFiles: string[];
+      [key: string]: any;
+    };
+    agentSettings: {
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
+}
+
+// Document types
+export interface Document {
+  id: string;
+  title: string;
+  name: string; // Added for compatibility with existing components
+  content: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  metadata?: Record<string, any>;
+  file?: File; // Added for compatibility with existing components
+  url?: string; // Added for compatibility with existing components
+}
+
+// Chat types
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'ai';
+  text: string;
+  timestamp?: string;
+}
+
+// Agent types
+export interface Agent {
+  type: string;
+  name: string;
+  description: string;
+  actions: AgentAction[];
+}
+
+export interface AgentAction {
+  name: string;
+  description: string;
+  parameters: string[];
+}
+
+// Task types
+export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface Task {
+  id: string;
+  agent_type: string;
+  action: string;
+  status: TaskStatus;
+  created_at: string;
+  completed_at?: string;
+  result?: any;
+  error?: string;
+  progress?: TaskProgress;
+}
+
+export interface TaskProgress {
+  percentage: number;
+  message: string;
+}
+
+// WebSocket message types
+export interface WebSocketMessage {
+  type: 'task_created' | 'task_update' | 'ping' | 'queued_message' | 'notification';
+  data?: any;
+  task_id?: string;
+  timestamp?: string;
+}
+
+// API Response types
+export interface ApiResponse<T> {
+  data: T;
+  message?: string;
+}
+
+export interface ApiError {
+  code: string;
+  message: string;
+  field?: string;
+  timestamp: string;
+  retryable?: boolean;
+}
+
+// App State types
+export interface AppState {
+  // User
+  user: User | null;
+
+  // UI State
+  theme: 'light' | 'dark';
+  sidebarCollapsed: boolean;
+  activeView: 'editor' | 'chat' | 'tasks' | 'settings';
+
+  // Document State
+  openDocuments: Document[];
+  activeDocument: string | null;
+  documentCache: Map<string, Document>;
+
+  // Agent State
+  activeTasks: Task[];
+  taskHistory: Task[];
+
+  // WebSocket
+  connectionStatus: 'connected' | 'disconnected' | 'reconnecting';
+
+  // Actions
+  setUser: (user: User | null) => void;
+  setTheme: (theme: 'light' | 'dark') => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  setActiveView: (view: 'editor' | 'chat' | 'tasks' | 'settings') => void;
+  addDocument: (doc: Document) => void;
+  updateDocument: (id: string, updates: Partial<Document>) => void;
+  removeDocument: (id: string) => void;
+  setActiveDocument: (id: string | null) => void;
+  addTask: (task: Task) => void;
+  updateTask: (id: string, updates: Partial<Task>) => void;
+  setConnectionStatus: (status: 'connected' | 'disconnected' | 'reconnecting') => void;
+  saveStateToBackend: () => Promise<void>;
+  loadStateFromBackend: () => Promise<void>;
+}
+
+// Auth types
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  name?: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+// Form types
+export interface TaskSubmissionForm {
+  agent_type: string;
+  action: string;
+  payload: Record<string, any>;
+}
+
+
+================================================
+FILE: src/utils/api.ts
+================================================
+import axios, { AxiosError, AxiosResponse } from 'axios';
+import { ApiError } from '../types';
+
+// API configuration
+const BASE_URL = 'http://127.0.0.1:3000';
+
+// Create axios instance
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as any;
+
+    // Handle authentication errors
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      // Clear invalid token
+      localStorage.removeItem('auth_token');
+
+      // Redirect to login
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
+
+    // Transform error to our format
+    const apiError: ApiError = {
+      code: 'UNKNOWN_ERROR',
+      message: 'An unexpected error occurred',
+      timestamp: new Date().toISOString(),
+      retryable: false,
+    };
+
+    if (error.response?.data?.error) {
+      const serverError = error.response.data.error;
+      apiError.code = serverError.code || 'SERVER_ERROR';
+      apiError.message = serverError.message || 'Server error occurred';
+      apiError.field = serverError.field;
+      apiError.timestamp = serverError.timestamp || apiError.timestamp;
+      apiError.retryable = isRetryableError(apiError.code);
+    } else if (!error.response) {
+      apiError.code = 'NETWORK_ERROR';
+      apiError.message = 'Network connection failed';
+      apiError.retryable = true;
+    }
+
+    return Promise.reject(apiError);
+  }
+);
+
+// Helper function to determine if an error is retryable
+function isRetryableError(code: string): boolean {
+  const retryableCodes = ['NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMIT', 'SERVICE_UNAVAILABLE'];
+  return retryableCodes.includes(code);
+}
+
+export default api;
+
+
+================================================
+FILE: src/utils/cn.ts
+================================================
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+
+================================================
+FILE: src/utils/logging.ts
+================================================
+/**
+ * Centralized logging configuration for the frontend.
+ *
+ * This module provides a single source of truth for logging configuration,
+ * ensuring consistent logging across all frontend components with file persistence.
+ */
+
+export enum LogLevel {
+  TRACE = 0,
+  DEBUG = 1,
+  INFO = 2,
+  WARN = 3,
+  ERROR = 4,
+  SILENT = 5,
+}
+
+export interface LogEntry {
+  timestamp: string;
+  level: LogLevel;
+  name: string;
+  message: string;
+  error?: Error;
+  metadata?: Record<string, any>;
+}
+
+export interface LoggingConfig {
+  level: LogLevel;
+  enableConsole: boolean;
+  enableFile: boolean;
+  maxFileSize: number; // in bytes
+  maxEntries: number;
+  flushInterval: number; // in milliseconds
+}
+
+class FrontendLoggingConfig {
+  private static _initialized = false;
+  private static _config: LoggingConfig = {
+    level: LogLevel.INFO,
+    enableConsole: true,
+    enableFile: true,
+    maxFileSize: 5 * 1024 * 1024, // 5MB
+    maxEntries: 1000,
+    flushInterval: 30000, // 30 seconds
+  };
+
+  private static _logBuffer: LogEntry[] = [];
+  private static _flushTimer: NodeJS.Timeout | null = null;
+  private static _loggers = new Map<string, Logger>();
+
+  /**
+   * Initialize the logging system
+   */
+  static initialize(config?: Partial<LoggingConfig>): void {
+    if (this._initialized) {
+      return;
+    }
+
+    if (config) {
+      this._config = { ...this._config, ...config };
+    }
+
+    // Set up periodic flush to logs directory
+    if (this._config.enableFile) {
+      this._setupFileFlush();
+    }
+
+    this._initialized = true;
+
+    // Log initialization
+    this.getLogger('frontend.logging').info('Logging initialized', {
+      level: LogLevel[this._config.level],
+      enableConsole: this._config.enableConsole,
+      enableFile: this._config.enableFile,
+    });
+  }
+
+  /**
+   * Get a logger instance
+   */
+  static getLogger(name: string): Logger {
+    if (!this._initialized) {
+      this.initialize();
+    }
+
+    if (!this._loggers.has(name)) {
+      this._loggers.set(name, new Logger(name, this._config));
+    }
+
+    return this._loggers.get(name)!;
+  }
+
+  /**
+   * Update logging configuration
+   */
+  static updateConfig(newConfig: Partial<LoggingConfig>): void {
+    const oldLevel = this._config.level;
+    this._config = { ...this._config, ...newConfig };
+
+    // Update all existing loggers with new config
+    for (const logger of this._loggers.values()) {
+      logger.updateConfig(this._config);
+    }
+
+    this.getLogger('frontend.logging').info('Logging configuration updated', {
+      oldLevel: LogLevel[oldLevel],
+      newLevel: LogLevel[this._config.level],
+      changes: Object.keys(newConfig),
+    });
+  }
+
+  /**
+   * Set up periodic flush to logs directory
+   */
+  private static _setupFileFlush(): void {
+    if (this._flushTimer) {
+      clearInterval(this._flushTimer);
+    }
+
+    this._flushTimer = setInterval(() => {
+      this.flushLogsToFile();
+    }, this._config.flushInterval);
+  }
+
+  /**
+   * Add a log entry to the buffer
+   */
+  static addLogEntry(entry: LogEntry): void {
+    this._logBuffer.push(entry);
+
+    // Keep buffer size in check
+    if (this._logBuffer.length > this._config.maxEntries) {
+      this._logBuffer = this._logBuffer.slice(-this._config.maxEntries);
+    }
+  }
+
+  /**
+   * Flush logs to the main logs directory
+   */
+  static async flushLogsToFile(): Promise<void> {
+    if (this._logBuffer.length === 0) {
+      return;
+    }
+
+    try {
+      const logsToFlush = [...this._logBuffer];
+      this._logBuffer = [];
+
+      // Format logs for file output (similar to backend format)
+      const logContent = logsToFlush
+        .map(entry => {
+          const timestamp = new Date(entry.timestamp).toISOString().replace('T', ' ');
+          const level = LogLevel[entry.level].padEnd(5);
+          const name = entry.name.padEnd(30);
+          let message = entry.message;
+
+          // Add error details if present
+          if (entry.error) {
+            message += ` | Error: ${entry.error.message}`;
+            if (entry.error.stack) {
+              message += `\nStack: ${entry.error.stack}`;
+            }
+          }
+
+          // Add metadata if present
+          if (entry.metadata && Object.keys(entry.metadata).length > 0) {
+            message += ` | ${JSON.stringify(entry.metadata)}`;
+          }
+
+          return `${timestamp} - ${name} - ${level} - ${message}`;
+        })
+        .join('\n');
+
+      // Write to logs directory using fetch to backend
+      const response = await fetch('/api/logs/frontend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+        body: logContent,
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to flush frontend logs to backend');
+        // Put logs back in buffer for retry
+        this._logBuffer.unshift(...logsToFlush);
+      }
+    } catch (error) {
+      console.warn('Error flushing frontend logs:', error);
+      // Put logs back in buffer for retry
+      this._logBuffer.unshift(...this._logBuffer);
+    }
+  }
+
+  /**
+   * Get current configuration
+   */
+  static getConfig(): LoggingConfig {
+    return { ...this._config };
+  }
+
+  /**
+   * Get all buffered log entries
+   */
+  static getBufferedLogs(): LogEntry[] {
+    return [...this._logBuffer];
+  }
+
+  /**
+   * Clear all buffered logs
+   */
+  static clearBuffer(): void {
+    this._logBuffer = [];
+  }
+
+  /**
+   * Cleanup resources
+   */
+  static cleanup(): void {
+    if (this._flushTimer) {
+      clearInterval(this._flushTimer);
+      this._flushTimer = null;
+    }
+
+    // Flush any remaining logs
+    this.flushLogsToFile();
+
+    this._loggers.clear();
+    this._initialized = false;
+  }
+}
+
+/**
+ * Logger class for individual components
+ */
+export class Logger {
+  private name: string;
+  private config: LoggingConfig;
+
+  constructor(name: string, config: LoggingConfig) {
+    this.name = name;
+    this.config = config;
+  }
+
+  updateConfig(config: LoggingConfig): void {
+    this.config = config;
+  }
+
+  private shouldLog(level: LogLevel): boolean {
+    return level >= this.config.level;
+  }
+
+  private createLogEntry(level: LogLevel, message: string, error?: Error, metadata?: Record<string, any>): LogEntry {
+    return {
+      timestamp: new Date().toISOString(),
+      level,
+      name: this.name,
+      message,
+      error,
+      metadata,
+    };
+  }
+
+  private log(level: LogLevel, message: string, error?: Error, metadata?: Record<string, any>): void {
+    if (!this.shouldLog(level)) {
+      return;
+    }
+
+    const entry = this.createLogEntry(level, message, error, metadata);
+
+    // Add to buffer for file logging
+    if (this.config.enableFile) {
+      FrontendLoggingConfig.addLogEntry(entry);
+    }
+
+    // Console output
+    if (this.config.enableConsole) {
+      const levelName = LogLevel[level];
+      const formattedMessage = `[${this.name}] ${message}`;
+
+      switch (level) {
+        case LogLevel.ERROR:
+          console.error(formattedMessage, error || '', metadata || '');
+          break;
+        case LogLevel.WARN:
+          console.warn(formattedMessage, metadata || '');
+          break;
+        case LogLevel.INFO:
+          console.info(formattedMessage, metadata || '');
+          break;
+        case LogLevel.DEBUG:
+        case LogLevel.TRACE:
+          console.debug(formattedMessage, metadata || '');
+          break;
+      }
+    }
+  }
+
+  trace(message: string, metadata?: Record<string, any>): void {
+    this.log(LogLevel.TRACE, message, undefined, metadata);
+  }
+
+  debug(message: string, metadata?: Record<string, any>): void {
+    this.log(LogLevel.DEBUG, message, undefined, metadata);
+  }
+
+  info(message: string, metadata?: Record<string, any>): void {
+    this.log(LogLevel.INFO, message, undefined, metadata);
+  }
+
+  warn(message: string, metadata?: Record<string, any>): void {
+    this.log(LogLevel.WARN, message, undefined, metadata);
+  }
+
+  error(message: string, error?: Error, metadata?: Record<string, any>): void {
+    this.log(LogLevel.ERROR, message, error, metadata);
+  }
+}
+
+/**
+ * Convenience functions for backward compatibility
+ */
+export function setupFrontendLogging(config?: Partial<LoggingConfig>): void {
+  FrontendLoggingConfig.initialize(config);
+}
+
+export function getFrontendLogger(name: string): Logger {
+  return FrontendLoggingConfig.getLogger(name);
+}
+
+// Initialize with default configuration
+if (typeof window !== 'undefined') {
+  // Auto-initialize when imported in browser
+  FrontendLoggingConfig.initialize();
+}
+
+
+================================================
+FILE: src/views/ChatView.tsx
+================================================
+import React from 'react';
+import { CopilotChat } from '@copilotkit/react-ui';
+
+export default function ChatView() {
+  return (
+    <div className="h-full w-full">
+      <CopilotChat
+        labels={{
+          title: "AI Assistant",
+          initialMessage: "Hello! I can help you with document editing, web browsing, and research tasks. What would you like to do?",
+        }}
+        // You can add more customization props here to match the existing UI
+        // For example, to customize the chat input or message rendering
+      />
+    </div>
+  );
+}
+
+
+================================================
+FILE: src/views/EditorView.tsx
+================================================
+import { CopilotChat } from '@copilotkit/react-ui';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, FileText, Plus, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { EditorPanel } from '../components/EditorPanel';
+import { useAppStore } from '../stores/useAppStore';
+import { Document } from '../types';
+
+export default function EditorView() {
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [documentContent, setDocumentContent] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newDocumentTitle, setNewDocumentTitle] = useState('');
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(true);
+  const [explorerWidth, setExplorerWidth] = useState(256); // 16rem = 256px
+  const [chatWidth, setChatWidth] = useState(320); // 20rem = 320px
+  const [isResizingExplorer, setIsResizingExplorer] = useState(false);
+  const [isResizingChat, setIsResizingChat] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { } = useAppStore();
+  const queryClient = useQueryClient();
+
+  // Handle mouse move for resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingExplorer && containerRef.current) {
+        const newWidth = e.clientX - containerRef.current.getBoundingClientRect().left;
+        setExplorerWidth(Math.max(200, Math.min(400, newWidth)));
+      } else if (isResizingChat && containerRef.current) {
+        const containerRight = containerRef.current.getBoundingClientRect().right;
+        const newWidth = containerRight - e.clientX;
+        setChatWidth(Math.max(280, Math.min(600, newWidth)));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingExplorer(false);
+      setIsResizingChat(false);
+    };
+
+    if (isResizingExplorer || isResizingChat) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingExplorer, isResizingChat]);
+
+  // This would be replaced with actual document API calls
+  const { data: documents, isLoading } = useQuery({
+    queryKey: ['documents'],
+    queryFn: async () => {
+      // Placeholder - would call document service
+      return [] as Document[];
+    },
+  });
+
+  const createDocumentMutation = useMutation({
+    mutationFn: async (data: { title: string; content: string }) => {
+      // Use the direct create endpoint
+      const response = await fetch('http://127.0.0.1:3000/api/documents/create-live', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          title: data.title,
+          content: data.content,
+          document_type: 'markdown',
+          metadata: {}
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create document');
+      }
+
+      return response.json();
+    },
+    onSuccess: (document) => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      setShowCreateModal(false);
+      setNewDocumentTitle('');
+
+      // Select the newly created document
+      setSelectedDocument({
+        id: document.id,
+        name: document.title,
+        title: document.title,
+        content: document.content,
+        created_at: document.created_at,
+        updated_at: document.updated_at,
+        user_id: document.owner_id || '',
+        url: '',
+        file: new File([document.content], document.title, { type: 'text/markdown' })
+      });
+      setDocumentContent(document.content);
+    },
+    onError: (error: any) => {
+      console.error('Error creating document:', error);
+      // You could add a toast notification here
+    }
+  });
+
+  const handleCreateDocument = () => {
+    if (newDocumentTitle.trim()) {
+      createDocumentMutation.mutate({
+        title: newDocumentTitle,
+        content: `# ${newDocumentTitle}\n\nCreated on ${new Date().toLocaleDateString()}\n\n## Overview\n\nStart writing here...\n`,
+      });
+    }
+  };
+
+  const handleDocumentContentChange = async (id: string, content: string) => {
+    setDocumentContent(content);
+
+    // Auto-save functionality with debouncing
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch(`http://127.0.0.1:3000/api/documents/edit-live/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({
+            content: content,
+            title: selectedDocument?.title,
+            metadata: {}
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save document');
+        }
+
+        // Update saved indicator (you could add UI feedback here)
+        console.log('Document saved');
+      } catch (error) {
+        console.error('Error saving document:', error);
+      }
+    }, 1000); // Save after 1 second of inactivity
+  };
+
+  // Add ref for save timeout
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className="h-full flex bg-[#1e1e1e]">
+      {/* Left Section - Document List */}
+      <div
+        className="bg-[#252526] border-r border-[#3e3e42] flex flex-col flex-shrink-0 relative"
+        style={{ width: `${explorerWidth}px` }}
+      >
+        {/* Header */}
+        <div className="p-3 border-b border-[#3e3e42]">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+              Explorer
+            </h2>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="p-1 text-gray-400 hover:text-gray-200 hover:bg-[#2a2d2e] rounded"
+              title="Create new document"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search files..."
+              className="w-full px-2 py-1 pl-7 bg-[#3c3c3c] border border-[#3e3e42] rounded text-xs text-gray-300 placeholder-gray-500 focus:outline-none focus:border-[#007acc]"
+            />
+            <Search className="h-3 w-3 text-gray-500 absolute left-2 top-1/2 transform -translate-y-1/2" />
+          </div>
+        </div>
+
+        {/* Document List */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="p-4 text-center text-gray-500 text-xs">
+              Loading documents...
+            </div>
+          ) : !documents || documents.length === 0 ? (
+            <div className="p-4 text-center text-gray-500">
+              <FileText className="h-8 w-8 mx-auto mb-2 text-gray-600" />
+              <p className="text-xs">No documents yet</p>
+            </div>
+          ) : (
+            <div className="p-1">
+              {documents.map((doc) => (
+                <button
+                  key={doc.id}
+                  onClick={() => {
+                    setSelectedDocument(doc);
+                    setDocumentContent(doc.content);
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${selectedDocument?.id === doc.id
+                      ? 'bg-[#094771] text-white'
+                      : 'text-gray-300 hover:bg-[#2a2d2e]'}`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{doc.title || doc.name}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Resize handle for explorer */}
+        <div
+          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-[#007acc] transition-colors"
+          onMouseDown={() => setIsResizingExplorer(true)}
+        />
+      </div>
+
+      {/* Main Editor Area */}
+      <div className="flex-1 flex flex-col bg-[#1e1e1e] relative">
+        {selectedDocument ? (
+          <EditorPanel
+            item={{
+              ...selectedDocument,
+              type: 'document',
+              url: selectedDocument.url || '#',
+              file: selectedDocument.file || new File([selectedDocument.content], selectedDocument.name, {
+                type: 'text/plain'
+              })
+            }}
+            onContentChange={handleDocumentContentChange}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="text-center">
+              <FileText className="h-16 w-16 text-gray-700 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-400 mb-2">
+                No document selected
+              </h3>
+              <p className="text-gray-500 mb-4 text-sm">
+                Choose a document from the explorer or create a new one
+              </p>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center px-4 py-2 bg-[#0e639c] text-white rounded hover:bg-[#1177bb] text-sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Document
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Chat Panel Toggle Button - Only show when collapsed */}
+      {!isChatPanelOpen && (
+        <button
+          onClick={() => setIsChatPanelOpen(true)}
+          className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-[#2a2d2e] hover:bg-[#3e3e42] text-gray-400 hover:text-gray-200 p-2 rounded-l-md border-l border-t border-b border-[#3e3e42] transition-all duration-200"
+          title="Show chat"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      )}
+
+      {/* Right Sidebar - Chat Panel */}
+      <div
+        className={`border-l border-[#3e3e42] flex-shrink-0 transition-all duration-300 ease-in-out relative ${isChatPanelOpen ? '' : 'w-0'}`}
+        style={{ width: isChatPanelOpen ? `${chatWidth}px` : '0' }}
+      >
+        {isChatPanelOpen && (
+          <>
+            {/* Close button inside chat panel */}
+            <button
+              onClick={() => setIsChatPanelOpen(false)}
+              className="absolute left-2 top-3 z-10 p-1 text-gray-400 hover:text-gray-200 hover:bg-[#2a2d2e] rounded"
+              title="Hide chat"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+
+            {/* Resize handle for chat */}
+            <div
+              className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-[#007acc] transition-colors"
+              onMouseDown={() => setIsResizingChat(true)}
+            />
+
+            <div className="h-full">
+              <CopilotChat
+                labels={{
+                  title: "AI Assistant",
+                  initialMessage: "Hello! I can help you with document editing, web browsing, and research tasks. What would you like to do?",
+                }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Create Document Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-[#252526] rounded-lg shadow-xl p-6 w-full max-w-md border border-[#3e3e42]">
+            <h3 className="text-lg font-semibold text-gray-200 mb-4">
+              Create New Document
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">
+                  Document Title
+                </label>
+                <input
+                  type="text"
+                  value={newDocumentTitle}
+                  onChange={(e) => setNewDocumentTitle(e.target.value)}
+                  placeholder="Enter document title..."
+                  className="w-full px-3 py-2 bg-[#3c3c3c] border border-[#3e3e42] rounded text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#007acc]"
+                  onKeyPress={(e) => e.key === 'Enter' && handleCreateDocument()}
+                />
+              </div>
+              <div className="flex space-x-3 pt-4">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-4 py-2 border border-[#3e3e42] text-gray-400 rounded hover:bg-[#2a2d2e]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateDocument}
+                  disabled={!newDocumentTitle.trim() || createDocumentMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-[#0e639c] text-white rounded hover:bg-[#1177bb] disabled:opacity-50"
+                >
+                  {createDocumentMutation.isPending ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+================================================
+FILE: src/views/SettingsView.tsx
+================================================
+import React, { useState } from 'react';
+import { Save, User, Palette, Bot, Bell, Shield } from 'lucide-react';
+import { useAppStore } from '../stores/useAppStore';
+import { authService } from '../services/authService';
+import { toast } from 'react-toastify';
+
+export default function SettingsView() {
+  const { user, theme, setTheme } = useAppStore();
+  const [activeTab, setActiveTab] = useState('profile');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Profile settings
+  const [profileData, setProfileData] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+  });
+
+  // Agent settings
+  const [agentSettings, setAgentSettings] = useState({
+    defaultAgent: 'document_editor',
+    autoSave: true,
+    taskTimeout: 300,
+    enableNotifications: true,
+  });
+
+  const tabs = [
+    { id: 'profile', name: 'Profile', icon: User },
+    { id: 'appearance', name: 'Appearance', icon: Palette },
+    { id: 'agents', name: 'Agents', icon: Bot },
+    { id: 'notifications', name: 'Notifications', icon: Bell },
+    { id: 'security', name: 'Security', icon: Shield },
+  ];
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    try {
+      await authService.updateUserPreferences({
+        name: profileData.name,
+      });
+      toast.success('Profile updated successfully!');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveAgentSettings = async () => {
+    setIsSaving(true);
+    try {
+      await authService.updateUserState({
+        agentSettings,
+      });
+      toast.success('Agent settings saved successfully!');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save agent settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderProfileTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+          Profile Information
+        </h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Name
+            </label>
+            <input
+              type="text"
+              value={profileData.name}
+              onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Email
+            </label>
+            <input
+              type="email"
+              value={profileData.email}
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Email cannot be changed
+            </p>
+          </div>
+        </div>
+        <div className="mt-6">
+          <button
+            onClick={handleSaveProfile}
+            disabled={isSaving}
+            className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {isSaving ? 'Saving...' : 'Save Profile'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderAppearanceTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+          Theme
+        </h3>
+        <div className="space-y-3">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              name="theme"
+              value="light"
+              checked={theme === 'light'}
+              onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
+              className="mr-3"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Light</span>
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              name="theme"
+              value="dark"
+              checked={theme === 'dark'}
+              onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
+              className="mr-3"
+            />
+            <span className="text-gray-700 dark:text-gray-300">Dark</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderAgentsTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+          Agent Configuration
+        </h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Default Agent
+            </label>
+            <select
+              value={agentSettings.defaultAgent}
+              onChange={(e) => setAgentSettings({ ...agentSettings, defaultAgent: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            >
+              <option value="document_editor">Document Editor</option>
+              <option value="browser_use">Browser Agent</option>
+              <option value="deep_research">Research Agent</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Task Timeout (seconds)
+            </label>
+            <input
+              type="number"
+              value={agentSettings.taskTimeout}
+              onChange={(e) => setAgentSettings({ ...agentSettings, taskTimeout: parseInt(e.target.value) })}
+              min="60"
+              max="3600"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="autoSave"
+              checked={agentSettings.autoSave}
+              onChange={(e) => setAgentSettings({ ...agentSettings, autoSave: e.target.checked })}
+              className="mr-3"
+            />
+            <label htmlFor="autoSave" className="text-sm text-gray-700 dark:text-gray-300">
+              Auto-save document changes
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <button
+            onClick={handleSaveAgentSettings}
+            disabled={isSaving}
+            className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {isSaving ? 'Saving...' : 'Save Agent Settings'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderNotificationsTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+          Notification Preferences
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="enableNotifications"
+              checked={agentSettings.enableNotifications}
+              onChange={(e) => setAgentSettings({ ...agentSettings, enableNotifications: e.target.checked })}
+              className="mr-3"
+            />
+            <label htmlFor="enableNotifications" className="text-sm text-gray-700 dark:text-gray-300">
+              Enable task completion notifications
+            </label>
+          </div>
+
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            <p>Notifications will appear when:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Agent tasks are completed</li>
+              <li>Tasks fail or encounter errors</li>
+              <li>WebSocket connection is lost</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSecurityTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+          Security Settings
+        </h3>
+        <div className="space-y-4">
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+            <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+              Session Information
+            </h4>
+            <div className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+              <p>Current session is secured with JWT authentication</p>
+              <p>Session expires after 24 hours of inactivity</p>
+              <p>All API communications are encrypted</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+            <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
+              Data Privacy
+            </h4>
+            <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+              <p>Your documents and data are stored locally</p>
+              <p>Agent tasks are processed securely</p>
+              <p>No data is shared with third parties</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'profile':
+        return renderProfileTab();
+      case 'appearance':
+        return renderAppearanceTab();
+      case 'agents':
+        return renderAgentsTab();
+      case 'notifications':
+        return renderNotificationsTab();
+      case 'security':
+        return renderSecurityTab();
+      default:
+        return renderProfileTab();
+    }
+  };
+
+  return (
+    <div className="h-full flex bg-gray-50 dark:bg-gray-900">
+      {/* Settings Navigation */}
+      <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Settings
+          </h2>
+        </div>
+        <nav className="p-2">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-primary/10 text-primary border border-primary/20'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Icon className="h-5 w-5 mr-3" />
+                {tab.name}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Settings Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-6">
+          {renderTabContent()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+================================================
+FILE: src/views/TasksView.tsx
+================================================
+import React from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatDistanceToNow } from 'date-fns';
+import { Clock, CheckCircle, XCircle, AlertCircle, Bot, Globe, FileSearch, X } from 'lucide-react';
+import { agentService } from '../services/agentService';
+import { Task, TaskStatus } from '../types';
+import { cn } from '../utils/cn';
+
+export default function TasksView() {
+  const queryClient = useQueryClient();
+
+  // Fetch user tasks
+  const { data: tasks, isLoading } = useQuery({
+    queryKey: ['tasks'],
+    queryFn: () => agentService.getUserTasks(),
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
+
+  // Cancel task mutation
+  const cancelTaskMutation = useMutation({
+    mutationFn: (taskId: string) => agentService.cancelTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+
+  const getStatusIcon = (status: TaskStatus) => {
+    switch (status) {
+      case 'pending':
+        return <Clock className="h-5 w-5 text-yellow-500" />;
+      case 'running':
+        return <AlertCircle className="h-5 w-5 text-blue-500 animate-pulse" />;
+      case 'completed':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'failed':
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      case 'cancelled':
+        return <XCircle className="h-5 w-5 text-gray-500" />;
+      default:
+        return <AlertCircle className="h-5 w-5 text-gray-500" />;
+    }
+  };
+
+  const getAgentIcon = (agentType: string) => {
+    switch (agentType) {
+      case 'document_editor':
+        return <FileSearch className="h-6 w-6 text-blue-500" />;
+      case 'browser_use':
+        return <Globe className="h-6 w-6 text-green-500" />;
+      case 'deep_research':
+        return <Bot className="h-6 w-6 text-purple-500" />;
+      default:
+        return <Bot className="h-6 w-6 text-gray-500" />;
+    }
+  };
+
+  const getStatusColor = (status: TaskStatus) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
+      case 'running':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
+      case 'completed':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'failed':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+    }
+  };
+
+  const formatAgentName = (agentType: string) => {
+    return agentType
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full p-6 overflow-auto">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
+          Agent Tasks
+        </h1>
+
+        {!tasks || tasks.length === 0 ? (
+          <div className="text-center py-12">
+            <Bot className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              No tasks yet
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400">
+              Start by using one of the agents to create your first task!
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {tasks.map((task: Task) => (
+              <div
+                key={task.id}
+                className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-6"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-4 flex-1">
+                    {/* Agent Icon */}
+                    <div className="flex-shrink-0">
+                      {getAgentIcon(task.agent_type)}
+                    </div>
+
+                    {/* Task Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                          {formatAgentName(task.agent_type)}
+                        </h3>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {task.action}
+                        </span>
+                        <span className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                          getStatusColor(task.status)
+                        )}>
+                          {task.status}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400 mb-3">
+                        <div className="flex items-center space-x-1">
+                          {getStatusIcon(task.status)}
+                          <span>
+                            Created {formatDistanceToNow(new Date(task.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                        {task.completed_at && (
+                          <span>
+                            â€¢ Completed {formatDistanceToNow(new Date(task.completed_at), { addSuffix: true })}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Progress Bar */}
+                      {task.progress && task.status === 'running' && (
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between text-sm mb-1">
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {task.progress.message}
+                            </span>
+                            <span className="text-gray-500 dark:text-gray-400">
+                              {task.progress.percentage}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div
+                              className="bg-primary h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${task.progress.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error Display */}
+                      {task.error && (
+                        <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                          <div className="flex items-center">
+                            <XCircle className="h-4 w-4 text-red-500 mr-2 flex-shrink-0" />
+                            <span className="text-sm text-red-700 dark:text-red-400">
+                              {task.error}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Result Display */}
+                      {task.result && task.status === 'completed' && (
+                        <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                          <div className="text-sm text-green-700 dark:text-green-400">
+                            <strong>Result:</strong>
+                            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs">
+                              {typeof task.result === 'string'
+                                ? task.result
+                                : JSON.stringify(task.result, null, 2)
+                              }
+                            </pre>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex-shrink-0 ml-4">
+                    {(task.status === 'pending' || task.status === 'running') && (
+                      <button
+                        onClick={() => cancelTaskMutation.mutate(task.id)}
+                        disabled={cancelTaskMutation.isPending}
+                        className="inline-flex items-center px-3 py-1.5 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40 disabled:opacity-50"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

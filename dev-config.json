@@ -1,0 +1,16 @@
+{
+    "backendPort": 8000,
+    "frontendPort": 3000,
+    "backendPortRange": [8000, 8010],
+    "frontendPortRange": [3000, 3010],
+    "logFile": "./logs/web-ui-dev.log",
+    "metricsFile": "./logs/metrics.log",
+    "analyticsFile": "./logs/analytics.log",
+    "settings": {
+        "enableAutoOpenBrowser": true,
+        "memoryWarningThresholdMB": 500,
+        "healthCheckTimeoutSeconds": 30,
+        "checkDependencies": true,
+        "loggingLevel": "DEBUG"
+    }
+}

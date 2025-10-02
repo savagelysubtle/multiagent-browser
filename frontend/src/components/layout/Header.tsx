@@ -5,9 +5,11 @@ import { authService } from '../../services/authService';
 
 interface HeaderProps {
   connectionStatus: 'connected' | 'disconnected' | 'reconnecting';
+  selectedAgent: string;
+  setSelectedAgent: (agentType: string) => void;
 }
 
-export default function Header({ connectionStatus }: HeaderProps) {
+export default function Header({ connectionStatus, selectedAgent, setSelectedAgent }: HeaderProps) {
   const { user, setUser } = useAppStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -48,10 +50,20 @@ export default function Header({ connectionStatus }: HeaderProps) {
     <header className="bg-[#2d2d30] border-b border-[#3e3e42] px-4 py-2">
       <div className="flex items-center justify-between">
         {/* Left side - could add breadcrumbs or page title here */}
-        <div className="flex items-center">
+        <div className="flex items-center space-x-3">
           <h2 className="text-sm font-medium text-gray-300">
             Agent Dashboard
           </h2>
+          {/* Agent Selector */}
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          >
+            <option value="document_editor">Document Editor</option>
+            <option value="browser_use">Browser Agent</option>
+            <option value="deep_research">Research Agent</option>
+          </select>
         </div>
 
         {/* Right side - controls */}

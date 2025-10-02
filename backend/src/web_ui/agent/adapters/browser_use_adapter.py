@@ -2,6 +2,7 @@
 Browser Use Agent Adapter.
 
 Adapts the existing BrowserUse agent to work with the SimpleAgentOrchestrator.
+Supports Google A2A (Agent-to-Agent) protocol for inter-agent communication.
 """
 
 from collections.abc import Awaitable, Callable
@@ -15,10 +16,10 @@ logger = get_logger(__name__)
 
 class BrowserUseAdapter:
     """
-    Adapter for the Browser Use agent.
+    Adapter for the Browser Use agent with A2A protocol support.
 
     This adapter wraps the existing BrowserUse agent and provides
-    a standardized interface for the orchestrator.
+    a standardized interface for the orchestrator, including A2A messaging.
     """
 
     def __init__(self, browser_use_instance=None):
@@ -30,6 +31,131 @@ class BrowserUseAdapter:
         """
         self.browser_use = browser_use_instance
         self.agent_type = "browser_use"
+        self.agent_id = "browser_use_agent"
+        self.a2a_enabled = True
+        self.message_handlers = {}
+        self._register_a2a_handlers()
+
+    def _register_a2a_handlers(self):
+        """Register A2A message type handlers."""
+        self.message_handlers = {
+            "task_request": self._handle_task_request,
+            "capability_query": self._handle_capability_query,
+            "status_query": self._handle_status_query,
+        }
+
+    async def handle_a2a_message(self, message: Any) -> dict[str, Any]:
+        """
+        Handle incoming A2A protocol messages.
+
+        Args:
+            message: A2A message object with attributes:
+                - message_type: Type of message
+                - sender_agent: Sending agent ID
+                - payload: Message payload
+                - conversation_id: Conversation identifier
+
+        Returns:
+            Dict with response data
+        """
+        try:
+            logger.info(
+                f"BrowserUseAdapter received A2A message: {message.message_type} from {message.sender_agent}"
+            )
+
+            # Get appropriate handler
+            handler = self.message_handlers.get(
+                message.message_type, self._handle_unknown_message
+            )
+
+            # Process message
+            response = await handler(message)
+
+            logger.info(f"A2A message processed successfully: {message.id}")
+            return response
+
+        except Exception as e:
+            logger.error(f"Error handling A2A message: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message_id": message.id if hasattr(message, "id") else None,
+            }
+
+    async def _handle_task_request(self, message: Any) -> dict[str, Any]:
+        """Handle A2A task request."""
+        try:
+            payload = message.payload
+            action = payload.get("action", "browse")
+            params = payload.get("params", {})
+
+            logger.info(f"Processing A2A task request: action={action}")
+
+            # Route to appropriate method
+            if action == "browse":
+                result = await self.browse(
+                    url=params.get("url", ""),
+                    instruction=params.get("instruction", ""),
+                    **params.get("kwargs", {}),
+                )
+            elif action == "extract":
+                result = await self.extract(
+                    url=params.get("url", ""),
+                    selectors=params.get("selectors", []),
+                    **params.get("kwargs", {}),
+                )
+            elif action == "screenshot":
+                result = await self.screenshot(
+                    url=params.get("url", ""), **params.get("kwargs", {})
+                )
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unknown action: {action}",
+                    "supported_actions": ["browse", "extract", "screenshot"],
+                }
+
+            return {
+                "success": True,
+                "action": action,
+                "result": result,
+                "agent_id": self.agent_id,
+                "conversation_id": message.conversation_id,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in A2A task request: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _handle_capability_query(self, message: Any) -> dict[str, Any]:
+        """Handle A2A capability query."""
+        return {
+            "success": True,
+            "agent_id": self.agent_id,
+            "agent_type": self.agent_type,
+            "capabilities": self.get_capabilities(),
+            "a2a_enabled": self.a2a_enabled,
+            "supported_protocols": ["http", "https"],
+        }
+
+    async def _handle_status_query(self, message: Any) -> dict[str, Any]:
+        """Handle A2A status query."""
+        return {
+            "success": True,
+            "agent_id": self.agent_id,
+            "status": "ready",
+            "active": self.browser_use is not None,
+            "a2a_enabled": self.a2a_enabled,
+        }
+
+    async def _handle_unknown_message(self, message: Any) -> dict[str, Any]:
+        """Handle unknown A2A message types."""
+        logger.warning(f"Unknown A2A message type: {message.message_type}")
+        return {
+            "success": False,
+            "error": f"Unknown message type: {message.message_type}",
+            "supported_types": list(self.message_handlers.keys()),
+        }
 
     async def browse(
         self,

@@ -22,6 +22,7 @@ export const useAppStore = create<AppState>()(
       // Agent state
       activeTasks: [],
       taskHistory: [],
+      selectedAgent: 'document_editor', // New state for selected agent
 
       // WebSocket state
       connectionStatus: 'disconnected',
@@ -29,6 +30,10 @@ export const useAppStore = create<AppState>()(
       // Actions
       setUser: (user: User | null) => {
         set({ user });
+      },
+
+      setSelectedAgent: (agentType: string) => {
+        set({ selectedAgent: agentType });
       },
 
       setTheme: (theme: 'light' | 'dark') => {

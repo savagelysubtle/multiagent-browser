@@ -1,5 +1,5 @@
+import { AuthResponse, LoginRequest, RegisterRequest, User } from '../../types';
 import { api } from '../utils/api';
-import { User, LoginRequest, RegisterRequest, AuthResponse } from '../../types';
 
 // Backend user response format (without state)
 interface UserMeResponse {
@@ -13,6 +13,7 @@ interface UserMeResponse {
 }
 
 class AuthService {
+  private baseURL = 'http://127.0.0.1:3000/api';
   private tokenKey = 'auth_token';
 
   async login(credentials: LoginRequest): Promise<AuthResponse> {

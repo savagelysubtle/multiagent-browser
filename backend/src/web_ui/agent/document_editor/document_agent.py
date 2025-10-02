@@ -14,6 +14,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
 from ...database import (
     ChromaManager,
     DatabaseUtils,
@@ -73,6 +77,7 @@ class DocumentEditingAgent:
         # MCP client and tools
         self.mcp_client = None
         self.mcp_tools = []
+        self.agent_executor: AgentExecutor | None = None # Initialize agent_executor
 
         # Agent state
         self.current_document_id: str | None = None
@@ -111,6 +116,7 @@ class DocumentEditingAgent:
                 if self.mcp_client:
                     self.mcp_tools = self.mcp_client.get_tools()
                     self.logger.info(f"Loaded {len(self.mcp_tools)} MCP tools")
+                    self._setup_llm_with_tools() # Setup LLM with tools after loading them
                     return True
 
             return False
@@ -175,6 +181,39 @@ class DocumentEditingAgent:
         except Exception as e:
             self.logger.error(f"Error setting up LLM: {e}")
             return False
+
+    def _setup_llm_with_tools(self):
+        """Sets up the LLM with the loaded MCP tools using LangChain's create_react_agent."""
+        if not self.llm:
+            self.logger.warning("LLM not available, cannot set up tools.")
+            return
+
+        if not self.mcp_tools:
+            self.logger.warning("No MCP tools loaded, cannot set up tools with LLM.")
+            return
+
+        self.logger.info(f"Setting up LLM with {len(self.mcp_tools)} tools.")
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                SystemMessage(
+                    "You are an AI assistant specialized in document editing and management. "
+                    "You can create, edit, and search documents. "
+                    "Use the available tools to fulfill user requests. "
+                    "Be concise and helpful."
+                ),
+                MessagesPlaceholder(variable_name="chat_history"),
+                HumanMessage(content="{input}"),
+                MessagesPlaceholder(variable_name="agent_scratchpad"),
+            ]
+        )
+
+        # Create the ReAct agent
+        agent = create_react_agent(self.llm, self.mcp_tools, prompt)
+
+        # Create the AgentExecutor
+        self.agent_executor = AgentExecutor(agent=agent, tools=self.mcp_tools, verbose=True)
+        self.logger.info("LLM with tools (AgentExecutor) setup complete.")
 
     def get_available_providers(self) -> dict[str, Any]:
         """Get available LLM providers and their models."""
@@ -731,72 +770,43 @@ Provide the edited content:"""
             return f"I apologize, but I encountered an error while processing your request: {str(e)}"
 
     async def chat_with_user_stream(
-        self, message: str, context_document_id: str | None = None
+        self, message: str, session_id: str = "default", context_document_id: str | None = None
     ) -> AsyncGenerator[str]:
         """Stream chat responses for real-time interaction."""
         try:
-            if not self.llm:
-                yield "I'm sorry, but I don't have an LLM configured. Please configure your AI settings first."
+            if not self.agent_executor:
+                yield "I'm sorry, but the AI agent is not fully configured. Please check the backend logs."
                 return
 
-            # Build context from current document if available
-            context = ""
-            if context_document_id:
-                document = self.chroma_manager.get_document(
-                    "documents", context_document_id
-                )
-                if document:
-                    context = f"\n\nCurrent Document ({document.metadata.get('filename', 'Untitled')}):\n{document.content[:1000]}"
-                    if len(document.content) > 1000:
-                        context += "\n... (content truncated)"
+            # Retrieve chat history for the session
+            chat_history = self._get_chat_history_for_session(session_id)
 
-            system_prompt = f"""You are an AI document assistant powered by {self.llm_provider_name}/{self.llm_model_name}.
-You help users with document editing, creation, and management tasks.
-You have access to advanced document management capabilities including search, editing, and policy management.
+            # Append user's message to history
+            chat_history.append(HumanMessage(content=message))
 
-Your capabilities include:
-- Creating and editing documents with AI assistance
-- Searching through documents and policies
-- Providing document suggestions and templates
-- Managing document organization and metadata
-- Helping with content generation and improvements
+            # Prepare input for the agent executor
+            full_response_content = ""
+            async for chunk in self.agent_executor.astream({"input": message, "chat_history": chat_history}):
+                if "output" in chunk:
+                    content_chunk = chunk["output"]
+                    full_response_content += content_chunk
+                    yield content_chunk
+                elif "actions" in chunk:
+                    for action in chunk["actions"]:
+                        tool_message = f"\n> Tool Used: {action.tool} with input {action.tool_input}\n"
+                        full_response_content += tool_message
+                        yield tool_message
+                elif "steps" in chunk:
+                    for step in chunk["steps"]:
+                        observation_message = f"\n> Observation: {step.observation}\n"
+                        full_response_content += observation_message
+                        yield observation_message
 
-Always be helpful, concise, and focused on document-related tasks.{context}"""
-
-            # Check if LLM supports streaming
-            if hasattr(self.llm, "astream"):
-                try:
-                    # Try chat format first
-                    async for chunk in self.llm.astream(
-                        [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": message},
-                        ]
-                    ):
-                        if hasattr(chunk, "content"):
-                            yield chunk.content
-                        else:
-                            yield str(chunk)
-                except:
-                    # Fallback to single prompt streaming
-                    full_prompt = f"{system_prompt}\n\nUser: {message}\n\nAssistant:"
-                    async for chunk in self.llm.astream(full_prompt):
-                        if hasattr(chunk, "content"):
-                            yield chunk.content
-                        else:
-                            yield str(chunk)
-            else:
-                # Fallback to non-streaming response
-                response = await self.chat_with_user(message, context_document_id)
-                # Simulate streaming by yielding in chunks
-                words = response.split()
-                for i in range(0, len(words), 3):
-                    chunk = " ".join(words[i : i + 3])
-                    yield chunk + " "
-                    await asyncio.sleep(0.05)  # Small delay to simulate streaming
+            # Append AI's full response to history
+            chat_history.append(AIMessage(content=full_response_content))
 
         except Exception as e:
-            self.logger.error(f"Error in streaming chat: {e}")
+            self.logger.error(f"Error in streaming chat with agent executor: {e}")
             yield f"I apologize, but I encountered an error: {str(e)}"
 
     async def process_batch_documents(

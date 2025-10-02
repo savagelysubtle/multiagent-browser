@@ -1,0 +1,167 @@
+{
+  "name": "Browser Use Agent",
+  "description": "Web browsing and data extraction agent powered by browser automation. Capable of navigating websites, extracting information, and capturing screenshots.",
+  "version": "1.0.0",
+  "agent_id": "browser_use_agent",
+  "endpoint": "https://webui.example.com/a2a/agents/browser_use",
+  "protocols": ["a2a-v1"],
+  "skills": [
+    {
+      "name": "browse",
+      "description": "Navigate to a URL and interact with it based on natural language instructions",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URL to navigate to"
+          },
+          "instruction": {
+            "type": "string",
+            "description": "Natural language instructions for what to do on the page"
+          }
+        },
+        "required": ["url", "instruction"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the browsing task was successful"
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL that was browsed"
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "content": { "type": "string" },
+              "title": { "type": "string" },
+              "status": { "type": "string" }
+            }
+          },
+          "browsed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    {
+      "name": "extract",
+      "description": "Extract data from webpages using CSS selectors",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URL to extract data from"
+          },
+          "selectors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "CSS selectors for elements to extract"
+          }
+        },
+        "required": ["url", "selectors"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "extracted_data": {
+            "type": "object",
+            "description": "Extracted data keyed by CSS selector"
+          },
+          "selectors_found": {
+            "type": "integer",
+            "description": "Number of selectors that matched elements"
+          }
+        }
+      }
+    },
+    {
+      "name": "screenshot",
+      "description": "Capture a screenshot of a webpage",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URL to screenshot"
+          }
+        },
+        "required": ["url"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "screenshot_path": {
+            "type": "string",
+            "description": "Path to the saved screenshot"
+          },
+          "format": {
+            "type": "string",
+            "enum": ["png", "jpg"]
+          },
+          "taken_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  ],
+  "supported_modalities": ["text", "images"],
+  "supported_protocols": ["http", "https"],
+  "collaboration_patterns": [
+    {
+      "name": "web_data_gathering",
+      "description": "Gather web data on behalf of other agents",
+      "input_format": "structured",
+      "example": {
+        "type": "task_request",
+        "action": "browse",
+        "params": {
+          "url": "https://example.com",
+          "instruction": "Extract main article content"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "organization": "web-ui",
+    "contact": "simpleflowworks@gmail.com",
+    "documentation": "https://github.com/savagelysubtle/web-ui/blob/main/backend/src/web_ui/agent/A2A_AGENT_CARDS.md",
+    "status": "production",
+    "implementation_version": "0.1.0",
+    "langchain_compatible": true,
+    "browser_automation": "Playwright",
+    "capabilities": [
+      "javascript_execution",
+      "screenshot_capture",
+      "element_interaction",
+      "form_submission",
+      "navigation"
+    ],
+    "limitations": ["no_pdf_rendering"]
+  }
+}

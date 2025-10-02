@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { CopilotKit } from '@copilotkit/react-core';
+import '@copilotkit/react-ui/styles.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
-import { setupFrontendLogging, getFrontendLogger } from './utils/logging';
 import { useAppStore } from './stores/useAppStore';
 
 // Pages
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
 import LoadingScreen from './components/ui/LoadingScreen';
+import DashboardPage from './pages/DashboardPage';
+import LoginPage from './pages/LoginPage';
 import { authService } from './services/authService';
 
 // Styles
@@ -65,36 +66,37 @@ function App() {
     return <LoadingScreen />;
   }
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
-          <Routes>
-            <Route
-              path="/login"
-              element={user ? <Navigate to="/" replace /> : <LoginPage />}
-            />
-            <Route
-              path="/*"
-              element={user ? <DashboardPage /> : <Navigate to="/login" replace />}
-            />
-          </Routes>
+    return (
+      <QueryClientProvider client={queryClient}>
+        <CopilotKit runtimeUrl="http://127.0.0.1:8000/api/copilotkit">
+          <Router>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+              <Routes>
+                <Route
+                  path="/login"
+                  element={user ? <Navigate to="/" replace /> : <LoginPage />}
+                />
+                <Route
+                  path="/*"
+                  element={user ? <DashboardPage /> : <Navigate to="/login" replace />}
+                />
+              </Routes>
 
-          <ToastContainer
-            position="top-right"
-            theme={theme}
-            closeOnClick
-            pauseOnHover
-            draggable
-            newestOnTop
-            hideProgressBar={false}
-            autoClose={5000}
-            className="mt-16"
-          />
-        </div>
-      </Router>
-    </QueryClientProvider>
-  );
-}
-
+              <ToastContainer
+                position="top-right"
+                theme={theme}
+                closeOnClick
+                pauseOnHover
+                draggable
+                newestOnTop
+                hideProgressBar={false}
+                autoClose={5000}
+                className="mt-16"
+              />
+            </div>
+          </Router>
+        </CopilotKit>
+      </QueryClientProvider>
+    );
+  }
 export default App;

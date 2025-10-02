@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useAppStore } from '../stores/useAppStore'; // Import useAppStore
 
 // Layout components
 import Sidebar from '../components/layout/Sidebar';
@@ -14,6 +15,7 @@ import ChatView from '../views/ChatView'; // Import ChatView
 
 export default function DashboardPage() {
   const { isConnected } = useWebSocket();
+  const { selectedAgent, setSelectedAgent } = useAppStore(); // Get selectedAgent and setSelectedAgent
 
   return (
     <div className="flex h-screen bg-[#1e1e1e]">
@@ -22,8 +24,12 @@ export default function DashboardPage() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header with connection status */}
-        <Header connectionStatus={isConnected ? 'connected' : 'disconnected'} />
+        {/* Header with connection status and agent selector */}
+        <Header
+          connectionStatus={isConnected ? 'connected' : 'disconnected'}
+          selectedAgent={selectedAgent}
+          setSelectedAgent={setSelectedAgent}
+        />
 
         {/* Content area */}
         <main className="flex-1 overflow-hidden">

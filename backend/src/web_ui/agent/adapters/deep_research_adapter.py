@@ -2,6 +2,7 @@
 Deep Research Agent Adapter.
 
 Adapts the existing DeepResearch agent to work with the SimpleAgentOrchestrator.
+Supports Google A2A (Agent-to-Agent) protocol for inter-agent communication.
 """
 
 from collections.abc import Awaitable, Callable
@@ -15,10 +16,10 @@ logger = get_logger(__name__)
 
 class DeepResearchAdapter:
     """
-    Adapter for the Deep Research agent.
+    Adapter for the Deep Research agent with A2A protocol support.
 
     This adapter wraps the existing DeepResearch agent and provides
-    a standardized interface for the orchestrator.
+    a standardized interface for the orchestrator, including A2A messaging.
     """
 
     def __init__(self, deep_research_instance=None):
@@ -30,6 +31,200 @@ class DeepResearchAdapter:
         """
         self.deep_research = deep_research_instance
         self.agent_type = "deep_research"
+        self.agent_id = "deep_research_agent"
+        self.a2a_enabled = True
+        self.message_handlers = {}
+        self._register_a2a_handlers()
+
+    def _register_a2a_handlers(self):
+        """Register A2A message type handlers."""
+        self.message_handlers = {
+            "task_request": self._handle_task_request,
+            "capability_query": self._handle_capability_query,
+            "status_query": self._handle_status_query,
+            "collaboration_request": self._handle_collaboration_request,
+        }
+
+    async def handle_a2a_message(self, message: Any) -> dict[str, Any]:
+        """
+        Handle incoming A2A protocol messages.
+
+        Args:
+            message: A2A message object with attributes:
+                - message_type: Type of message
+                - sender_agent: Sending agent ID
+                - payload: Message payload
+                - conversation_id: Conversation identifier
+
+        Returns:
+            Dict with response data
+        """
+        try:
+            logger.info(
+                f"DeepResearchAdapter received A2A message: {message.message_type} from {message.sender_agent}"
+            )
+
+            # Get appropriate handler
+            handler = self.message_handlers.get(
+                message.message_type, self._handle_unknown_message
+            )
+
+            # Process message
+            response = await handler(message)
+
+            logger.info(f"A2A message processed successfully: {message.id}")
+            return response
+
+        except Exception as e:
+            logger.error(f"Error handling A2A message: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message_id": message.id if hasattr(message, "id") else None,
+            }
+
+    async def _handle_task_request(self, message: Any) -> dict[str, Any]:
+        """Handle A2A task request."""
+        try:
+            payload = message.payload
+            action = payload.get("action", "research")
+            params = payload.get("params", {})
+
+            logger.info(f"Processing A2A task request: action={action}")
+
+            # Route to appropriate method
+            if action == "research":
+                result = await self.research(
+                    topic=params.get("topic", ""),
+                    depth=params.get("depth", "standard"),
+                    sources=params.get("sources"),
+                    **params.get("kwargs", {}),
+                )
+            elif action == "analyze_sources":
+                result = await self.analyze_sources(
+                    sources=params.get("sources", []), **params.get("kwargs", {})
+                )
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unknown action: {action}",
+                    "supported_actions": ["research", "analyze_sources"],
+                }
+
+            return {
+                "success": True,
+                "action": action,
+                "result": result,
+                "agent_id": self.agent_id,
+                "conversation_id": message.conversation_id,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in A2A task request: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _handle_capability_query(self, message: Any) -> dict[str, Any]:
+        """Handle A2A capability query."""
+        return {
+            "success": True,
+            "agent_id": self.agent_id,
+            "agent_type": self.agent_type,
+            "capabilities": self.get_capabilities(),
+            "a2a_enabled": self.a2a_enabled,
+            "research_depths": ["quick", "standard", "comprehensive"],
+        }
+
+    async def _handle_status_query(self, message: Any) -> dict[str, Any]:
+        """Handle A2A status query."""
+        return {
+            "success": True,
+            "agent_id": self.agent_id,
+            "status": "ready",
+            "active": self.deep_research is not None,
+            "a2a_enabled": self.a2a_enabled,
+        }
+
+    async def _handle_collaboration_request(self, message: Any) -> dict[str, Any]:
+        """Handle collaboration request from another agent."""
+        try:
+            payload = message.payload
+            collaboration_type = payload.get("type", "research_assistance")
+
+            logger.info(
+                f"Collaboration request from {message.sender_id}: {collaboration_type}"
+            )
+
+            if collaboration_type == "research_assistance":
+                # Provide research assistance to another agent
+                topic = payload.get("topic")
+                context = payload.get("context", "")
+                depth = payload.get("depth", "quick")
+
+                if topic:
+                    # Conduct focused research for the requesting agent
+                    research_result = await self.research(
+                        topic=topic,
+                        depth=depth,
+                        sources=payload.get("sources"),
+                        **payload.get("kwargs", {}),
+                    )
+
+                    return {
+                        "success": True,
+                        "collaboration_type": collaboration_type,
+                        "research_result": research_result,
+                        "agent_id": self.agent_id,
+                        "conversation_id": message.conversation_id,
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "No research topic provided",
+                        "required_params": ["topic"],
+                    }
+
+            elif collaboration_type == "source_verification":
+                # Verify sources on behalf of another agent
+                sources = payload.get("sources", [])
+
+                if sources:
+                    verification_result = await self.analyze_sources(
+                        sources=sources,
+                        **payload.get("kwargs", {}),
+                    )
+
+                    return {
+                        "success": True,
+                        "collaboration_type": collaboration_type,
+                        "verification_result": verification_result,
+                        "agent_id": self.agent_id,
+                        "conversation_id": message.conversation_id,
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "No sources provided for verification",
+                        "required_params": ["sources"],
+                    }
+
+            return {
+                "success": False,
+                "error": f"Unknown collaboration type: {collaboration_type}",
+                "supported_types": ["research_assistance", "source_verification"],
+            }
+
+        except Exception as e:
+            logger.error(f"Error in collaboration request: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _handle_unknown_message(self, message: Any) -> dict[str, Any]:
+        """Handle unknown A2A message types."""
+        logger.warning(f"Unknown A2A message type: {message.message_type}")
+        return {
+            "success": False,
+            "error": f"Unknown message type: {message.message_type}",
+            "supported_types": list(self.message_handlers.keys()),
+        }
 
     async def research(
         self,

@@ -40,6 +40,7 @@ from .routes.auth import router as auth_router
 from .routes.documents import router as documents_router
 from .routes.ag_ui import router as ag_ui_router
 from .routes.dev_routes import router as dev_router
+from .routes.copilotkit import router as copilotkit_router
 
 logger = get_logger(__name__)
 
@@ -135,6 +136,7 @@ app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
 app.include_router(logging_router, prefix="/api/logs", tags=["Frontend Logging"])
 app.include_router(ag_ui_router, prefix="/api/ag_ui", tags=["AG-UI"])
 app.include_router(dev_router, prefix="/api", tags=["Development"])
+app.include_router(copilotkit_router, prefix="/api/copilotkit", tags=["CopilotKit"])
 
 # --- Register Error Handlers ---
 app.add_exception_handler(AppException, app_exception_handler)
@@ -207,6 +209,7 @@ def run_api_server(
         reload=reload,
         log_config=log_config,
     )
+    logger.info(f"Uvicorn server started and listening on {host}:{port}")
 
 
 if __name__ == "__main__":

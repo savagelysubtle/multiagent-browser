@@ -224,6 +224,7 @@ Examples:
 
             # Start the FastAPI server (with or without frontend serving)
             start_api_server(args)
+            logger.info(f"FastAPI server launched on {args.api_host}:{args.api_port}")
 
     except KeyboardInterrupt:
         logger.info("Application interrupted by user")

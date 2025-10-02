@@ -1,13 +1,14 @@
 """
 Google Agent-to-Agent (A2A) Interface.
 
-Prepares the infrastructure for Google A2A integration while maintaining
-compatibility with the existing agent orchestrator.
+Implements the Google A2A protocol specification for inter-agent communication
+while maintaining compatibility with the existing agent orchestrator.
 """
 
 from datetime import datetime
 from enum import Enum
 from typing import Any
+import uuid
 
 from ...utils.logging_config import get_logger
 
@@ -15,8 +16,18 @@ logger = get_logger(__name__)
 
 
 class A2AMessageType(Enum):
-    """Types of A2A messages."""
+    """Types of A2A messages following Google A2A specification."""
 
+    # Core message types from Google A2A spec
+    MESSAGE_SEND = "message/send"
+    MESSAGE_STREAM = "message/stream"
+    TASKS_GET = "tasks/get"
+    TASKS_CANCEL = "tasks/cancel"
+    TASKS_RESUBSCRIBE = "tasks/resubscribe"
+    PUSH_NOTIFICATION_CONFIG_SET = "tasks/pushNotificationConfig/set"
+    PUSH_NOTIFICATION_CONFIG_GET = "tasks/pushNotificationConfig/get"
+
+    # Legacy types for backward compatibility
     TASK_REQUEST = "task_request"
     TASK_RESPONSE = "task_response"
     STATUS_UPDATE = "status_update"
@@ -29,8 +40,7 @@ class A2AMessage:
     """
     Represents a message in the Google A2A protocol.
 
-    This is a preparation structure that can be extended when
-    Google A2A specification is finalized.
+    Follows the Google A2A specification for agent-to-agent communication.
     """
 
     def __init__(
@@ -47,11 +57,11 @@ class A2AMessage:
         self.receiver_id = receiver_id
         self.payload = payload
         self.conversation_id = conversation_id
-        self.message_id = message_id or f"msg_{datetime.utcnow().timestamp()}"
+        self.message_id = message_id or f"msg_{uuid.uuid4()}"
         self.timestamp = datetime.utcnow()
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert message to dictionary format."""
+        """Convert message to dictionary format following A2A spec."""
         return {
             "message_id": self.message_id,
             "message_type": self.message_type.value,
@@ -64,7 +74,7 @@ class A2AMessage:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "A2AMessage":
-        """Create message from dictionary."""
+        """Create message from dictionary following A2A spec."""
         message = cls(
             message_type=A2AMessageType(data["message_type"]),
             sender_id=data["sender_id"],
@@ -82,9 +92,8 @@ class GoogleA2AInterface:
     """
     Interface for Google Agent-to-Agent communication.
 
-    This is a preparation implementation that provides the structure
-    for future Google A2A integration while working with the current
-    orchestrator system.
+    Implements the Google A2A protocol specification for standardized
+    agent communication while working with the current orchestrator system.
     """
 
     def __init__(self, orchestrator=None):
@@ -98,7 +107,7 @@ class GoogleA2AInterface:
         self.agent_id = "web-ui-orchestrator"
         self.registered_agents: dict[str, dict[str, Any]] = {}
         self.conversation_history: dict[str, list[A2AMessage]] = {}
-        self.enabled = False  # Disabled by default until Google A2A is available
+        self.enabled = True  # Enable by default for development
 
     def register_local_agent(self, agent_id: str, capabilities: dict[str, Any]):
         """
@@ -106,11 +115,28 @@ class GoogleA2AInterface:
 
         Args:
             agent_id: Unique identifier for the agent
-            capabilities: Agent capabilities and metadata
+            capabilities: Agent capabilities and metadata per A2A spec
         """
+        # Enhance capabilities with A2A-specific metadata
+        enhanced_capabilities = {
+            **capabilities,
+            "a2a_registration_time": datetime.utcnow().isoformat(),
+            "a2a_interface_version": "0.2.1",  # Google A2A spec version
+            "a2a_features": {
+                "message_types": [
+                    A2AMessageType.MESSAGE_SEND.value,
+                    A2AMessageType.TASKS_GET.value,
+                    A2AMessageType.CAPABILITY_QUERY.value,
+                ],
+                "collaboration_types": capabilities.get("collaboration_types", []),
+                "can_receive_a2a": True,
+                "can_send_a2a": True,
+            },
+        }
+
         self.registered_agents[agent_id] = {
             "id": agent_id,
-            "capabilities": capabilities,
+            "capabilities": enhanced_capabilities,
             "registered_at": datetime.utcnow().isoformat(),
             "status": "active",
         }
@@ -118,7 +144,7 @@ class GoogleA2AInterface:
 
     async def send_message(self, message: A2AMessage) -> bool:
         """
-        Send an A2A message.
+        Send an A2A message following Google specification.
 
         Args:
             message: The A2A message to send
@@ -131,8 +157,11 @@ class GoogleA2AInterface:
                 logger.debug(f"A2A not enabled, message queued: {message.message_id}")
                 return self._queue_message(message)
 
-            # Future implementation will use Google A2A protocol
-            logger.info(f"A2A message sent: {message.message_id}")
+            # Log the message using Google A2A format
+            logger.info(
+                f"A2A message sent: {message.sender_id} -> {message.receiver_id} "
+                f"(type: {message.message_type.value})"
+            )
 
             # Store in conversation history
             if message.conversation_id:
@@ -148,7 +177,7 @@ class GoogleA2AInterface:
 
     async def receive_message(self, message_data: dict[str, Any]) -> A2AMessage | None:
         """
-        Receive and process an A2A message.
+        Receive and process an A2A message following Google specification.
 
         Args:
             message_data: Raw message data from A2A protocol
@@ -176,23 +205,108 @@ class GoogleA2AInterface:
 
     async def _route_message(self, message: A2AMessage):
         """
-        Route A2A message to appropriate handler.
+        Route A2A message to appropriate handler based on Google spec.
 
         Args:
             message: The A2A message to route
         """
         try:
-            if message.message_type == A2AMessageType.TASK_REQUEST:
-                await self._handle_task_request(message)
+            if message.message_type == A2AMessageType.MESSAGE_SEND:
+                await self._handle_message_send(message)
+            elif message.message_type == A2AMessageType.TASKS_GET:
+                await self._handle_tasks_get(message)
             elif message.message_type == A2AMessageType.CAPABILITY_QUERY:
                 await self._handle_capability_query(message)
             elif message.message_type == A2AMessageType.STATUS_UPDATE:
                 await self._handle_status_update(message)
+            # Legacy handlers for backward compatibility
+            elif message.message_type == A2AMessageType.TASK_REQUEST:
+                await self._handle_task_request(message)
             else:
                 logger.warning(f"Unhandled A2A message type: {message.message_type}")
 
         except Exception as e:
             logger.error(f"Failed to route A2A message: {e}")
+
+    async def _handle_message_send(self, message: A2AMessage):
+        """Handle message/send requests per Google A2A spec."""
+        try:
+            if not self.orchestrator:
+                logger.error("No orchestrator available for message/send")
+                return
+
+            # Extract message details from payload
+            payload = message.payload
+            user_message = payload.get("message", {})
+            parts = user_message.get("parts", [])
+
+            if not parts:
+                logger.error("No message parts found in message/send request")
+                return
+
+            # Convert to orchestrator format
+            text_content = ""
+            for part in parts:
+                if part.get("kind") == "text":
+                    text_content += part.get("text", "")
+
+            if text_content:
+                # Submit to local orchestrator
+                task_id = await self.orchestrator.submit_task(
+                    user_id="a2a_user",  # Special user for A2A requests
+                    agent_type=payload.get("agent_type", "document_editor"),
+                    action="chat",
+                    payload={"message": text_content},
+                )
+
+                # Send response per A2A spec
+                response = A2AMessage(
+                    message_type=A2AMessageType.TASK_RESPONSE,
+                    sender_id=self.agent_id,
+                    receiver_id=message.sender_id,
+                    conversation_id=message.conversation_id,
+                    payload={
+                        "task_id": task_id,
+                        "status": "accepted",
+                        "original_message_id": message.message_id,
+                    },
+                )
+
+                await self.send_message(response)
+
+        except Exception as e:
+            logger.error(f"Failed to handle message/send: {e}")
+
+    async def _handle_tasks_get(self, message: A2AMessage):
+        """Handle tasks/get requests per Google A2A spec."""
+        try:
+            task_id = message.payload.get("id")
+            if not task_id:
+                logger.error("No task ID provided in tasks/get request")
+                return
+
+            # Get task from orchestrator
+            if self.orchestrator:
+                task = self.orchestrator.get_task(task_id)
+                if task:
+                    response = A2AMessage(
+                        message_type=A2AMessageType.TASK_RESPONSE,
+                        sender_id=self.agent_id,
+                        receiver_id=message.sender_id,
+                        conversation_id=message.conversation_id,
+                        payload={
+                            "task": {
+                                "id": task.id,
+                                "status": {"state": task.status},
+                                "result": task.result,
+                                "error": task.error,
+                            }
+                        },
+                    )
+                    await self.send_message(response)
+
+        except Exception as e:
+            logger.error(f"Failed to handle tasks/get: {e}")
 
     async def _handle_task_request(self, message: A2AMessage):
         """
@@ -342,6 +456,80 @@ class GoogleA2AInterface:
             "status": "enabled" if self.enabled else "preparation_mode",
         }
 
+    def get_registered_agents(self) -> dict[str, Any]:
+        """
+        Get information about all registered A2A agents.
+
+        Returns:
+            Dict with registered agent details
+        """
+        agents_info = {}
+
+        for agent_id, agent_data in self.registered_agents.items():
+            capabilities = agent_data.get("capabilities", {})
+            a2a_features = capabilities.get("a2a_features", {})
+
+            agents_info[agent_id] = {
+                "agent_id": agent_id,
+                "type": capabilities.get("type", "unknown"),
+                "name": capabilities.get("name", "Unknown Agent"),
+                "a2a_enabled": capabilities.get("a2a_enabled", False),
+                "message_types": a2a_features.get("message_types", []),
+                "collaboration_types": a2a_features.get("collaboration_types", []),
+                "can_receive_a2a": a2a_features.get("can_receive_a2a", False),
+                "can_send_a2a": a2a_features.get("can_send_a2a", False),
+                "actions_count": len(capabilities.get("actions", [])),
+                "registered_at": agent_data.get("registered_at"),
+                "status": agent_data.get("status", "unknown"),
+            }
+
+        return {
+            "total_agents": len(agents_info),
+            "a2a_enabled_agents": sum(
+                1 for a in agents_info.values() if a["a2a_enabled"]
+            ),
+            "agents": agents_info,
+        }
+
+    def get_agent_info(self, agent_id: str) -> dict[str, Any] | None:
+        """
+        Get detailed information about a specific registered agent.
+
+        Args:
+            agent_id: ID of the agent to query
+
+        Returns:
+            Agent information dict or None if not found
+        """
+        if agent_id not in self.registered_agents:
+            return None
+
+        agent_data = self.registered_agents[agent_id]
+        capabilities = agent_data.get("capabilities", {})
+        a2a_features = capabilities.get("a2a_features", {})
+
+        return {
+            "agent_id": agent_id,
+            "type": capabilities.get("type"),
+            "name": capabilities.get("name"),
+            "description": capabilities.get("description"),
+            "a2a_enabled": capabilities.get("a2a_enabled", False),
+            "a2a_features": {
+                "message_types": a2a_features.get("message_types", []),
+                "collaboration_types": a2a_features.get("collaboration_types", []),
+                "can_receive_a2a": a2a_features.get("can_receive_a2a", False),
+                "can_send_a2a": a2a_features.get("can_send_a2a", False),
+            },
+            "actions": capabilities.get("actions", []),
+            "collaboration_capabilities": capabilities.get(
+                "collaboration_capabilities", []
+            ),
+            "registered_at": agent_data.get("registered_at"),
+            "status": agent_data.get("status"),
+            "a2a_registration_time": capabilities.get("a2a_registration_time"),
+            "a2a_interface_version": capabilities.get("a2a_interface_version"),
+        }
+
     def enable_a2a(self):
         """Enable A2A communication (when Google A2A becomes available)."""
         self.enabled = True
@@ -370,10 +558,34 @@ def initialize_a2a_interface(orchestrator):
     # Register local agents with A2A interface
     if orchestrator:
         available_agents = orchestrator.get_available_agents()
-        for agent in available_agents:
-            a2a_interface.register_local_agent(
-                agent_id=f"local_{agent['type']}", capabilities=agent
-            )
+        a2a_enabled_count = 0
 
-    logger.info("Google A2A interface initialized")
+        for agent in available_agents:
+            # Only register A2A-enabled agents
+            if agent.get("a2a_enabled", False):
+                agent_id = agent.get("agent_id", f"local_{agent['type']}")
+                a2a_interface.register_local_agent(
+                    agent_id=agent_id,
+                    capabilities={
+                        **agent,
+                        "a2a_registration_time": datetime.utcnow().isoformat(),
+                        "a2a_interface_version": "0.1.0",
+                    },
+                )
+                a2a_enabled_count += 1
+                logger.info(
+                    f"Registered A2A agent: {agent_id} | "
+                    f"Type: {agent['type']} | "
+                    f"Message Types: {len(agent.get('a2a_features', {}).get('message_types', []))}"
+                )
+            else:
+                logger.debug(f"Skipping non-A2A agent: {agent['type']}")
+
+        logger.info(
+            f"Google A2A interface initialized with {a2a_enabled_count} A2A-enabled agents "
+            f"({len(available_agents) - a2a_enabled_count} non-A2A agents skipped)"
+        )
+    else:
+        logger.warning("A2A interface initialized without orchestrator")
+
     return a2a_interface
