@@ -9,9 +9,11 @@ procedures.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union, Dict, List
+import uuid
+from datetime import datetime
 
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class JSONRPCError(BaseModel):
@@ -23,21 +25,21 @@ class JSONRPCError(BaseModel):
 
 
 class JSONRPCResponse(BaseModel):
-    """JSON-RPC 2.0 response envelope."""
+    """JSON-RPC 2.0 Response format for A2A communication."""
 
-    jsonrpc: Literal["2.0"] = "2.0"
-    id: Union[str, int, None]
-    result: Any | None = None
-    error: JSONRPCError | None = None
+    jsonrpc: str = Field(default="2.0", description="JSON-RPC version")
+    id: Optional[Union[str, int]] = Field(description="Request ID")
+    result: Optional[Any] = Field(default=None, description="Result data")
+    error: Optional[Dict[str, Any]] = Field(default=None, description="Error information")
 
-    @root_validator
-    def _validate_result_or_error(cls, values: dict[str, Any]) -> dict[str, Any]:
-        result, error = values.get("result"), values.get("error")
-        if result is None and error is None:
-            raise ValueError("Either result or error must be provided for a JSON-RPC response")
-        if result is not None and error is not None:
-            raise ValueError("JSON-RPC responses cannot contain both result and error")
-        return values
+    @model_validator(mode='after')
+    def validate_result_or_error(self):
+        """Ensure either result or error is present, but not both."""
+        if self.result is not None and self.error is not None:
+            raise ValueError("Response cannot have both result and error")
+        if self.result is None and self.error is None:
+            raise ValueError("Response must have either result or error")
+        return self
 
 
 class FileResource(BaseModel):
