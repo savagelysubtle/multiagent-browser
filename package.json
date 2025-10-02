@@ -11,7 +11,11 @@
     "install:backend": "uv sync --all-groups",
     "install:all": "npm run install:backend && npm run install:frontend",
     "build": "npm run build --prefix frontend",
-    "start": "python webui.py"
+    "start": "python webui.py",
+    "check:api": "curl -X GET http://127.0.0.1:8000/api/documents/types || echo 'Backend API not responding'",
+    "test:backend": "python -m pytest backend/tests/ -v",
+    "format:backend": "cd backend && ruff format .",
+    "lint:backend": "cd backend && ruff check ."
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

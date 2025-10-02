@@ -78,7 +78,7 @@ class AgentTask:
         history: list[Message] | None = self.history
         if history_length is not None and history:
             history = history[-history_length:]
-        if history and not history:
+        if not history:
             history = None
 
         return Task(
@@ -248,6 +248,8 @@ class SimpleAgentOrchestrator:
         result = await handler(**task.payload)
         if isinstance(result, dict):
             return result
+        if isinstance(result, str):
+            return {"response": result}
         return {"result": result}
 
     # ------------------------------------------------------------------

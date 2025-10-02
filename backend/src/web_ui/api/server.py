@@ -93,7 +93,21 @@ async def lifespan(app: FastAPI):
 
         # 4. Register agent with orchestrator
         if orchestrator:
-            orchestrator.register_agent("document_editor", document_agent)
+            orchestrator.register_agent(
+                "document_editor",
+                document_agent,
+                capabilities={
+                    "name": "Document Editor Agent",
+                    "description": "AI-powered document creation and editing agent",
+                    "actions": [
+                        "create_document",
+                        "edit_document",
+                        "search_documents",
+                        "chat",
+                    ],
+                },
+                a2a_endpoint="/a2a/agents/document_editor",
+            )
             logger.info("DocumentEditingAgent registered with orchestrator")
 
     except Exception as e:
@@ -114,44 +128,51 @@ async def lifespan(app: FastAPI):
 
 
 # --- FastAPI App Initialization ---
-app = FastAPI(
-    title="Web UI Document Editor API",
-    description="API for AI-powered document editing with DocumentEditingAgent",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="Web-UI Agent API",
+        description="API for Web-UI Agent Dashboard",
+        version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+    )
 
-# Add CORS middleware for React frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "*"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # Add CORS middleware for React frontend
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "*"
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-# --- Register Routers ---
-app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(documents_router, prefix="/api/documents", tags=["Documents"])
-app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
-app.include_router(logging_router, prefix="/api/logs", tags=["Frontend Logging"])
-app.include_router(ag_ui_router, prefix="/api/ag_ui", tags=["AG-UI"])
-app.include_router(dev_router, prefix="/api", tags=["Development"])
-app.include_router(copilotkit_router, prefix="/api/copilotkit", tags=["CopilotKit"])
-app.include_router(a2a_router)
+    # Include routers with proper prefixes
+    app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+    app.include_router(copilotkit_router, prefix="/api/copilotkit", tags=["copilotkit"])
+    app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
+    app.include_router(a2a_router, prefix="/api/a2a", tags=["agent-to-agent"])
+    app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
+    app.include_router(logging_router, prefix="/api/logs", tags=["Frontend Logging"])
+    app.include_router(ag_ui_router, prefix="/api/ag_ui", tags=["AG-UI"])
+    app.include_router(dev_router, prefix="/api", tags=["Development"])
 
-# --- Register Error Handlers ---
-app.add_exception_handler(AppException, app_exception_handler)
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-app.add_exception_handler(Exception, generic_exception_handler)
+    # --- Register Error Handlers ---
+    app.add_exception_handler(AppException, app_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_exception_handler(Exception, generic_exception_handler)
 
+    return app
+
+
+app = create_app()
 
 # --- WebSocket Endpoint ---
 @app.websocket("/ws")
