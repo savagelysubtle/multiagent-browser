@@ -129,9 +129,6 @@ export const useAppStore = create<AppState>()(
 
       setTheme: (theme: 'light' | 'dark') => {
         set({ theme });
-        // Apply theme to document root
-        document.documentElement.classList.remove('light', 'dark');
-        document.documentElement.classList.add(theme);
       },
 
       setSidebarCollapsed: (collapsed: boolean) => {
@@ -327,15 +324,4 @@ function detectDocumentType(filename: string): DocumentType {
     pdf: 'pdf',
   };
   return extMap[ext || ''] || 'plaintext';
-}
-
-// Initialize theme on store creation
-const initializeTheme = () => {
-  const state = useAppStore.getState();
-  document.documentElement.classList.add(state.theme);
-};
-
-// Call initialization
-if (typeof window !== 'undefined') {
-  initializeTheme();
 }

@@ -42,6 +42,7 @@ from .routes.documents import router as documents_router
 from .routes.ag_ui import router as ag_ui_router
 from .routes.dev_routes import router as dev_router
 from .routes.copilotkit import router as copilotkit_router
+from .user_documents import router as user_documents_router
 
 logger = get_logger(__name__)
 
@@ -157,6 +158,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
     app.include_router(copilotkit_router, prefix="/api/copilotkit", tags=["copilotkit"])
     app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
+    app.include_router(user_documents_router, prefix="/api/user-documents", tags=["user-documents"])
     app.include_router(a2a_router)
     app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
     app.include_router(logging_router, prefix="/api/logs", tags=["Frontend Logging"])
@@ -168,8 +170,6 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(Exception, generic_exception_handler)
-
-    return app
 
 
 app = create_app()

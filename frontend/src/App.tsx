@@ -1,3 +1,4 @@
+
 import { CopilotKit } from '@copilotkit/react-core';
 import '@copilotkit/react-ui/styles.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -29,18 +30,42 @@ const queryClient = new QueryClient({
   }
 });
 
+type Theme = 'light' | 'dark';
+
+const getInitialTheme = (): Theme => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const storedPrefs = window.localStorage.getItem('theme');
+    if (typeof storedPrefs === 'string') {
+      return storedPrefs as Theme;
+    }
+
+    const userMedia = window.matchMedia('(prefers-color-scheme: dark)');
+    if (userMedia.matches) {
+      return 'dark';
+    }
+  }
+
+  return 'light';
+};
+
 function App() {
-  const { user, setUser, loadStateFromBackend, theme } = useAppStore();
+  const { user, setUser, loadStateFromBackend } = useAppStore();
+  const [theme, setTheme] = useState<Theme>(getInitialTheme());
   const [loading, setLoading] = useState(true);
-  const [authChecking, setAuthChecking] = useState(false);
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [theme]);
 
   useEffect(() => {
     // Check authentication on app load
     const initAuth = async () => {
-      // Prevent multiple auth checks
-      if (authChecking) return;
-
-      setAuthChecking(true);
       try {
         const token = localStorage.getItem('auth_token');
         if (token) {
@@ -55,12 +80,11 @@ function App() {
         localStorage.removeItem('auth_token');
       } finally {
         setLoading(false);
-        setAuthChecking(false);
       }
     };
 
     initAuth();
-  }, [setUser, loadStateFromBackend]); // Remove authChecking from dependencies
+  }, [setUser, loadStateFromBackend]);
 
   if (loading) {
     return <LoadingScreen />;
@@ -78,7 +102,7 @@ function App() {
                 />
                 <Route
                   path="/*"
-                  element={user ? <DashboardPage /> : <Navigate to="/login" replace />}
+                  element={user ? <DashboardPage theme={theme} setTheme={setTheme} /> : <Navigate to="/login" replace />}
                 />
               </Routes>
 

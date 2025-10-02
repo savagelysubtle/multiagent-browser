@@ -4,8 +4,13 @@ import { useAppStore } from '../stores/useAppStore';
 import { authService } from '../services/authService';
 import { toast } from 'react-toastify';
 
-export default function SettingsView() {
-  const { user, theme, setTheme } = useAppStore();
+interface SettingsViewProps {
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
+}
+
+export default function SettingsView({ theme, setTheme }: SettingsViewProps) {
+  const { user } = useAppStore();
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
 

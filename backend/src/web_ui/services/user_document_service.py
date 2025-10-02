@@ -32,7 +32,6 @@ import csv
 import json
 
 # File processing
-import magic
 import chardet
 from striprtf.striprtf import rtf_to_text
 import PyPDF2
@@ -246,89 +245,6 @@ class UserDocumentService:
                 'error': str(e)
             }
 
-    async def create_spreadsheet(self, data: List[List[str]], title: str = "spreadsheet") -> Dict[str, Any]:
-        """Create Excel spreadsheet from data"""
-        try:
-            workbook = openpyxl.Workbook()
-            sheet = workbook.active
-            sheet.title = "Sheet1"
-
-            # Add data to sheet
-            for row_idx, row_data in enumerate(data, 1):
-                for col_idx, cell_value in enumerate(row_data, 1):
-                    cell = sheet.cell(row=row_idx, column=col_idx, value=cell_value)
-
-                    # Style header row
-                    if row_idx == 1:
-                        cell.font = Font(bold=True)
-                        cell.alignment = Alignment(horizontal='center')
-
-            # Auto-adjust column widths
-            for column in sheet.columns:
-                max_length = 0
-                column_letter = column[0].column_letter
-                for cell in column:
-                    try:
-                        if len(str(cell.value)) > max_length:
-                            max_length = len(str(cell.value))
-                    except:
-                        pass
-                adjusted_width = min(max_length + 2, 50)
-                sheet.column_dimensions[column_letter].width = adjusted_width
-
-            # Save to bytes
-            buffer = io.BytesIO()
-            workbook.save(buffer)
-
-            return {
-                'success': True,
-                'data': buffer.getvalue(),
-                'mime_type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'filename': f'{title}.xlsx'
-            }
-
-        except Exception as e:
-            logger.error(f"Error creating spreadsheet: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
-
-    async def create_presentation(self, slides_data: List[Dict[str, str]], title: str = "presentation") -> Dict[str, Any]:
-        """Create PowerPoint presentation from slide data"""
-        try:
-            prs = Presentation()
-
-            for slide_data in slides_data:
-                slide_layout = prs.slide_layouts[1]  # Title and Content layout
-                slide = prs.slides.add_slide(slide_layout)
-
-                # Set title
-                title_shape = slide.shapes.title
-                title_shape.text = slide_data.get('title', 'Slide Title')
-
-                # Set content
-                content_shape = slide.placeholders[1]
-                content_shape.text = slide_data.get('content', '')
-
-            # Save to bytes
-            buffer = io.BytesIO()
-            prs.save(buffer)
-
-            return {
-                'success': True,
-                'data': buffer.getvalue(),
-                'mime_type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                'filename': f'{title}.pptx'
-            }
-
-        except Exception as e:
-            logger.error(f"Error creating presentation: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
-
     # Document creation methods
     async def _create_pdf(self, content: str, title: str) -> bytes:
         """Create PDF from markdown content"""
@@ -497,31 +413,6 @@ class UserDocumentService:
             rtf_content = f.read()
 
         return rtf_to_text(rtf_content)
-
-    # Placeholder methods for legacy formats (removed textract dependency)
-    async def _process_doc_legacy(self, file_path: Path) -> Dict[str, Any]:
-        """Process legacy .doc files - requires conversion to .docx first"""
-        return {
-            'success': False,
-            'error': 'Legacy .doc files not supported. Please convert to .docx format first.',
-            'suggestion': 'Use Microsoft Word or LibreOffice to save as .docx format'
-        }
-
-    async def _process_xls_legacy(self, file_path: Path) -> Dict[str, Any]:
-        """Process legacy .xls files - requires conversion to .xlsx first"""
-        return {
-            'success': False,
-            'error': 'Legacy .xls files not supported. Please convert to .xlsx format first.',
-            'suggestion': 'Use Microsoft Excel or LibreOffice Calc to save as .xlsx format'
-        }
-
-    async def _process_ppt_legacy(self, file_path: Path) -> Dict[str, Any]:
-        """Process legacy .ppt files - requires conversion to .pptx first"""
-        return {
-            'success': False,
-            'error': 'Legacy .ppt files not supported. Please convert to .pptx format first.',
-            'suggestion': 'Use Microsoft PowerPoint or LibreOffice Impress to save as .pptx format'
-        }
 
     # Template methods
     def _get_letter_template(self) -> str:

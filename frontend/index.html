@@ -48,6 +48,24 @@
         background-color: #78716c;
       }
     </style>
+    <script>
+      (function() {
+        try {
+          const storedState = localStorage.getItem('app-state');
+          if (storedState) {
+            const state = JSON.parse(storedState);
+            const theme = state.state && state.state.theme ? state.state.theme : 'dark';
+            document.documentElement.classList.add(theme);
+          } else {
+            const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.classList.add(prefersDarkMode ? 'dark' : 'light');
+          }
+        } catch (e) {
+          console.error('Failed to apply pre-load theme:', e);
+          document.documentElement.classList.add('dark'); // Default to dark theme on error
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

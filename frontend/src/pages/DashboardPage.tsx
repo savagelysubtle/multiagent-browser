@@ -8,12 +8,19 @@ import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 
 // Feature views
-import EditorView from '../views/EditorView';
+import Editor from '../views/Editor';
 import TasksView from '../views/TasksView';
 import SettingsView from '../views/SettingsView';
 import ChatView from '../views/ChatView'; // Import ChatView
 
-export default function DashboardPage() {
+type Theme = 'light' | 'dark';
+
+interface DashboardPageProps {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+}
+
+export default function DashboardPage({ theme, setTheme }: DashboardPageProps) {
   const { isConnected } = useWebSocket();
   const { selectedAgent, setSelectedAgent } = useAppStore(); // Get selectedAgent and setSelectedAgent
 
@@ -34,10 +41,10 @@ export default function DashboardPage() {
         {/* Content area */}
         <main className="flex-1 overflow-hidden">
           <Routes>
-            <Route path="/" element={<EditorView />} />
-            <Route path="/editor" element={<EditorView />} />
+            <Route path="/" element={<Editor theme={theme} setTheme={setTheme} />} />
+            <Route path="/editor" element={<Editor theme={theme} setTheme={setTheme} />} />
             <Route path="/tasks" element={<TasksView />} />
-            <Route path="/settings" element={<SettingsView />} />
+            <Route path="/settings" element={<SettingsView theme={theme} setTheme={setTheme} />} />
             <Route path="/chat" element={<ChatView />} /> {/* Add route for ChatView */}
           </Routes>
         </main>
