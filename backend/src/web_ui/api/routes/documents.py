@@ -495,7 +495,7 @@ async def import_document_with_user_service(
         # Save uploaded file temporarily
         import tempfile
         from pathlib import Path
-        
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
             content = await file.read()
             temp_file.write(content)
@@ -504,7 +504,7 @@ async def import_document_with_user_service(
         try:
             # Import using user document service
             import_result = await user_document_service.import_document(temp_file_path)
-            
+
             if not import_result.get("success"):
                 raise HTTPException(status_code=400, detail=import_result.get("error", "Import failed"))
 

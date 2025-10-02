@@ -55,7 +55,6 @@ dependencies = [
     "python-magic>=0.4.27",
     "python-multipart>=0.0.6",
     "chardet>=5.2.0",
-    "textract>=1.6.5",
     # Image processing for documents
     "opencv-python>=4.8.0",
     "pytesseract>=0.3.10",
@@ -65,6 +64,8 @@ dependencies = [
     # Template engines and document generation
     "docxtpl>=0.16.7",
     "fpdf2>=2.7.0",
+    # Additional text extraction (without textract)
+    "python-magic-bin>=0.4.14; platform_system=='Windows'",
 ]
 description = "Web UI application"
 license = {file = "LICENSE"}

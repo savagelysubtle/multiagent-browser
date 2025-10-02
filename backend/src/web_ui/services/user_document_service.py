@@ -498,6 +498,31 @@ class UserDocumentService:
 
         return rtf_to_text(rtf_content)
 
+    # Placeholder methods for legacy formats (removed textract dependency)
+    async def _process_doc_legacy(self, file_path: Path) -> Dict[str, Any]:
+        """Process legacy .doc files - requires conversion to .docx first"""
+        return {
+            'success': False,
+            'error': 'Legacy .doc files not supported. Please convert to .docx format first.',
+            'suggestion': 'Use Microsoft Word or LibreOffice to save as .docx format'
+        }
+
+    async def _process_xls_legacy(self, file_path: Path) -> Dict[str, Any]:
+        """Process legacy .xls files - requires conversion to .xlsx first"""
+        return {
+            'success': False,
+            'error': 'Legacy .xls files not supported. Please convert to .xlsx format first.',
+            'suggestion': 'Use Microsoft Excel or LibreOffice Calc to save as .xlsx format'
+        }
+
+    async def _process_ppt_legacy(self, file_path: Path) -> Dict[str, Any]:
+        """Process legacy .ppt files - requires conversion to .pptx first"""
+        return {
+            'success': False,
+            'error': 'Legacy .ppt files not supported. Please convert to .pptx format first.',
+            'suggestion': 'Use Microsoft PowerPoint or LibreOffice Impress to save as .pptx format'
+        }
+
     # Template methods
     def _get_letter_template(self) -> str:
         return """{{date}}

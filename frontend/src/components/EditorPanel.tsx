@@ -144,17 +144,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange 
         const content = monacoRef.current.getValue();
 
         try {
-            // Use the new user document service API for export
-            const response = await fetch('/api/user-documents/export', {
+            // Use the enhanced export endpoint that pulls from database
+            const response = await fetch('/api/documents/export-from-db', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
                 body: JSON.stringify({
-                    content,
-                    format,
-                    title: item.title || item.name
+                    document_id: item.id,
+                    content: content, // Current editor content
+                    format: format,
+                    document_type: 'markdown'
                 }),
             });
 
@@ -164,7 +165,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange 
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                
+
                 // Get filename from Content-Disposition header or generate one
                 const contentDisposition = response.headers.get('Content-Disposition');
                 let filename = `${item.title || item.name}.${format}`;
@@ -174,7 +175,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange 
                         filename = filenameMatch[1];
                     }
                 }
-                
+
                 link.download = filename;
                 document.body.appendChild(link);
                 link.click();
@@ -183,6 +184,34 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ item, onContentChange 
             } else {
                 const errorData = await response.json();
                 console.error('Export failed:', errorData);
+
+                // Fallback to user document service export
+                const fallbackResponse = await fetch('/api/user-documents/export', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    },
+                    body: JSON.stringify({
+                        content,
+                        format,
+                        title: item.title || item.name
+                    }),
+                });
+
+                if (fallbackResponse.ok) {
+                    const blob = await fallbackResponse.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${item.title || item.name}.${format}`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                } else {
+                    console.error('Fallback export also failed');
+                }
             }
         } catch (error) {
             console.error('Export failed:', error);

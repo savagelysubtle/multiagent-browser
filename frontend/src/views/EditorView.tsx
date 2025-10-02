@@ -143,7 +143,7 @@ export default function EditorView() {
   const createDocumentMutation = useMutation({
     mutationFn: async (data: { title: string; content: string; type: DocumentType }) => {
       const token = localStorage.getItem('token');
-      
+
       // First try the new user document service
       const userDocResponse = await fetch('http://127.0.0.1:8000/api/user-documents/create', {
         method: 'POST',
