@@ -6,22 +6,125 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from typing import Any
 
 from ...utils.logging_config import get_logger
-from ..a2a import (
-    Artifact,
-    Message,
-    MessageRole,
-    MessageSendParams,
-    Part,
-    PartKind,
-    Task,
-    TaskIdParams,
-    TaskQueryParams,
-    TaskState,
-    TaskStatus,
-)
+
+logger = get_logger(__name__)
+
+
+# Temporary enum definitions until a2a models are fully migrated
+class TaskState(str, Enum):
+    SUBMITTED = "submitted"
+    WORKING = "working"
+    INPUT_REQUIRED = "input-required"
+    COMPLETED = "completed"
+    CANCELED = "canceled"
+    FAILED = "failed"
+    REJECTED = "rejected"
+    AUTH_REQUIRED = "auth-required"
+    UNKNOWN = "unknown"
+
+
+class MessageRole(str, Enum):
+    USER = "user"
+    AGENT = "agent"
+
+
+# Temporary stub classes until a2a models are migrated
+class Message:
+    def __init__(
+        self,
+        role=None,
+        parts=None,
+        message_id=None,
+        context_id=None,
+        task_id=None,
+        metadata=None,
+    ):
+        self.role = role
+        self.parts = parts or []
+        self.message_id = message_id
+        self.context_id = context_id
+        self.task_id = task_id
+        self.metadata = metadata
+
+    def copy(self, update=None):
+        new_msg = Message(
+            self.role,
+            self.parts,
+            self.message_id,
+            self.context_id,
+            self.task_id,
+            self.metadata,
+        )
+        if update:
+            for key, value in update.items():
+                setattr(new_msg, key, value)
+        return new_msg
+
+
+class Part:
+    def __init__(self, kind=None, text=None, data=None):
+        self.kind = kind
+        self.text = text
+        self.data = data
+
+
+class PartKind:
+    TEXT = "text"
+    DATA = "data"
+
+
+class Task:
+    def __init__(
+        self,
+        id=None,
+        contextId=None,
+        status=None,
+        artifacts=None,
+        history=None,
+        metadata=None,
+    ):
+        self.id = id
+        self.contextId = contextId
+        self.status = status
+        self.artifacts = artifacts
+        self.history = history
+        self.metadata = metadata
+
+
+class TaskStatus:
+    def __init__(self, state=None, message=None, timestamp=None):
+        self.state = state
+        self.message = message
+        self.timestamp = timestamp
+
+
+class Artifact:
+    pass
+
+
+class MessageSendParams:
+    def __init__(self, message=None, configuration=None, metadata=None):
+        self.message = message
+        self.configuration = configuration
+        self.metadata = metadata
+
+
+class TaskQueryParams:
+    def __init__(self, id=None, history_length=None, metadata=None):
+        self.id = id
+        self.history_length = history_length
+        self.metadata = metadata
+
+
+class TaskIdParams:
+    def __init__(self, id=None, metadata=None):
+        self.id = id
+        self.metadata = metadata
+
 
 logger = get_logger(__name__)
 
@@ -151,7 +254,9 @@ class SimpleAgentOrchestrator:
             agents.append(
                 {
                     "type": agent_type,
-                    "name": capabilities.get("name", agent_type.replace("_", " ").title()),
+                    "name": capabilities.get(
+                        "name", agent_type.replace("_", " ").title()
+                    ),
                     "description": capabilities.get(
                         "description", "Agent registered with orchestrator"
                     ),
@@ -238,7 +343,9 @@ class SimpleAgentOrchestrator:
             if task.result is None:
                 task.result = {"success": False, "error": task.error}
 
-    async def _run_agent_action(self, agent_instance, task: AgentTask) -> dict[str, Any]:
+    async def _run_agent_action(
+        self, agent_instance, task: AgentTask
+    ) -> dict[str, Any]:
         handler = getattr(agent_instance, task.action, None)
         if handler is None or not callable(handler):
             raise LookupError(
@@ -301,9 +408,15 @@ class SimpleAgentOrchestrator:
 
     def get_agent_stats(self) -> dict[str, Any]:
         total = len(self.task_store)
-        completed = sum(1 for task in self.task_store.values() if task.state == TaskState.COMPLETED)
-        failed = sum(1 for task in self.task_store.values() if task.state == TaskState.FAILED)
-        running = sum(1 for task in self.task_store.values() if task.state == TaskState.WORKING)
+        completed = sum(
+            1 for task in self.task_store.values() if task.state == TaskState.COMPLETED
+        )
+        failed = sum(
+            1 for task in self.task_store.values() if task.state == TaskState.FAILED
+        )
+        running = sum(
+            1 for task in self.task_store.values() if task.state == TaskState.WORKING
+        )
         return {
             "total_tasks": total,
             "completed_tasks": completed,
@@ -387,9 +500,7 @@ class SimpleAgentOrchestrator:
         task.origin_message = origin.copy(update=update_payload)
         task.history.append(task.origin_message)
 
-    def _make_message(
-        self, role: MessageRole, text: str, task: AgentTask
-    ) -> Message:
+    def _make_message(self, role: MessageRole, text: str, task: AgentTask) -> Message:
         return Message(
             role=role,
             parts=[Part(kind=PartKind.TEXT, text=text)],
@@ -430,7 +541,12 @@ class SimpleAgentOrchestrator:
 
         if payload is None:
             text = self._extract_text(message)
-            payload = {"message": text, "context_document_id": message.metadata.get("context_document_id") if message.metadata else None}
+            payload = {
+                "message": text,
+                "context_document_id": message.metadata.get("context_document_id")
+                if message.metadata
+                else None,
+            }
 
         return action, payload
 

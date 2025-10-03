@@ -66,12 +66,14 @@ def start_api_server(args: argparse.Namespace) -> None:
         from fastapi.staticfiles import StaticFiles
 
         # Import API routers
-        from .api.user_documents import router as user_documents_router
+        from .api.documents.user import router as user_documents_router
+        from .api.routes.router import router as main_api_router # Import the main API router
 
         app = FastAPI()
 
         # Include API routes
         app.include_router(user_documents_router)
+        app.include_router(main_api_router) # Include the main API router
 
         run_api_server(
             host=args.api_host,

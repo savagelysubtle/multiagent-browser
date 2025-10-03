@@ -1,119 +1,77 @@
-"""FastAPI router exposing the Google A2A JSON-RPC surface."""
+"""A2A (Agent-to-Agent) JSON-RPC router."""
 
-from __future__ import annotations
+from fastapi import APIRouter
 
-from typing import Any
+from ...utils.logging_config import get_logger
 
-from fastapi import APIRouter, Depends, Request
-from pydantic import ValidationError
-from starlette.responses import JSONResponse
+# Temporarily comment out a2a model imports until Pydantic v2 migration is complete
+# from ...agent.a2a import (
+#     JSONRPCRequest,
+#     JSONRPCResponse,
+#     MessageSendParams,
+#     TaskIdParams,
+#     TaskQueryParams,
+# )
 
-from ...agent.a2a import (
-    JSONRPCError,
-    JSONRPCRequest,
-    JSONRPCResponse,
-    MessageSendParams,
-    TaskIdParams,
-    TaskQueryParams,
-)
-from ...agent.orchestrator.simple_orchestrator import SimpleAgentOrchestrator
-from ..dependencies import get_orchestrator
+logger = get_logger(__name__)
 
-router = APIRouter(prefix="/a2a/agents", tags=["a2a"])
+router = APIRouter(prefix="/a2a", tags=["A2A"])
 
-
-def _success(id_value: Any, result: Any) -> JSONResponse:
-    """Build a JSON-RPC success envelope."""
-
-    response = JSONRPCResponse(id=id_value, result=result)
-    return JSONResponse(
-        status_code=200,
-        content=response.dict(by_alias=True, exclude_none=True),
-    )
+# Temporarily disable A2A endpoints until Pydantic v2 migration is complete
+# The endpoints will be re-enabled once the models are properly migrated
 
 
-def _error(id_value: Any, code: int, message: str, data: Any | None = None) -> JSONResponse:
-    """Build a JSON-RPC error envelope."""
-
-    response = JSONRPCResponse(
-        id=id_value,
-        error=JSONRPCError(code=code, message=message, data=data),
-    )
-    return JSONResponse(
-        status_code=200,
-        content=response.dict(by_alias=True, exclude_none=True),
-    )
+@router.get("/status")
+async def a2a_status():
+    """Get A2A interface status."""
+    return {
+        "status": "temporarily_disabled",
+        "message": "A2A endpoints are disabled during Pydantic v2 migration",
+        "available": False,
+    }
 
 
-@router.post("/{agent_id}")
-async def handle_jsonrpc(
-    agent_id: str,
-    request: Request,
-    orchestrator: SimpleAgentOrchestrator = Depends(get_orchestrator),
-):
-    """Entry point for JSON-RPC 2.0 requests."""
+# Commented out endpoints that depend on a2a models:
+# @router.post("/agents/{agent_type}")
+# async def a2a_message_send(
+#     agent_type: str,
+#     request: JSONRPCRequest,
+#     orchestrator=Depends(get_orchestrator),
+# ) -> JSONRPCResponse:
+#     """Handle JSON-RPC message/send for a specific agent."""
+#     try:
+#         if request.method != "message/send":
+#             return JSONRPCResponse(
+#                 jsonrpc="2.0",
+#                 id=request.id,
+#                 error={
+#                     "code": -32601,
+#                     "message": f"Method '{request.method}' not found",
+#                 },
+#             )
+#
+#         params = MessageSendParams(**request.params)
+#         task = await orchestrator.handle_a2a_message_send(
+#             agent_type, params, request.id
+#         )
+#
+#         return JSONRPCResponse(
+#             jsonrpc="2.0",
+#             id=request.id,
+#             result=task.dict() if hasattr(task, 'dict') else task.__dict__,
+#         )
+#
+#     except Exception as e:
+#         logger.error(f"A2A message/send error: {e}", exc_info=True)
+#         return JSONRPCResponse(
+#             jsonrpc="2.0",
+#             id=request.id,
+#             error={
+#                 "code": -32603,
+#                 "message": f"Internal error: {str(e)}",
+#             },
+#         )
 
-    try:
-        payload = await request.json()
-    except Exception as exc:  # noqa: BLE001 - propagate JSON-RPC error envelope
-        return _error(None, -32700, "Parse error", data=str(exc))
-
-    try:
-        rpc_request = JSONRPCRequest.parse_obj(payload)
-    except ValidationError as exc:
-        return _error(payload.get("id"), -32600, "Invalid request", data=exc.errors())
-
-    method = rpc_request.method
-
-    if method == "message/send":
-        try:
-            params = MessageSendParams.parse_obj(rpc_request.params or {})
-        except ValidationError as exc:
-            return _error(rpc_request.id, -32602, "Invalid params", data=exc.errors())
-
-        try:
-            result = await orchestrator.handle_a2a_message_send(agent_id, params, rpc_request.id)
-        except NotImplementedError:
-            return _error(rpc_request.id, -32004, "A2A message/send not implemented")
-        except LookupError as exc:
-            return _error(rpc_request.id, -32001, "Agent not found", data=str(exc))
-        except Exception as exc:  # noqa: BLE001 - convert to JSON-RPC error
-            return _error(rpc_request.id, -32000, "Server error", data=str(exc))
-
-        return _success(rpc_request.id, result)
-
-    if method == "tasks/get":
-        try:
-            params = TaskQueryParams.parse_obj(rpc_request.params or {})
-        except ValidationError as exc:
-            return _error(rpc_request.id, -32602, "Invalid params", data=exc.errors())
-
-        try:
-            result = await orchestrator.handle_a2a_tasks_get(params)
-        except NotImplementedError:
-            return _error(rpc_request.id, -32004, "A2A tasks/get not implemented")
-        except LookupError as exc:
-            return _error(rpc_request.id, -32001, "Task not found", data=str(exc))
-        except Exception as exc:  # noqa: BLE001
-            return _error(rpc_request.id, -32000, "Server error", data=str(exc))
-
-        return _success(rpc_request.id, result)
-
-    if method == "tasks/cancel":
-        try:
-            params = TaskIdParams.parse_obj(rpc_request.params or {})
-        except ValidationError as exc:
-            return _error(rpc_request.id, -32602, "Invalid params", data=exc.errors())
-
-        try:
-            result = await orchestrator.handle_a2a_tasks_cancel(params)
-        except NotImplementedError:
-            return _error(rpc_request.id, -32004, "A2A tasks/cancel not implemented")
-        except LookupError as exc:
-            return _error(rpc_request.id, -32001, "Task not found", data=str(exc))
-        except Exception as exc:  # noqa: BLE001
-            return _error(rpc_request.id, -32000, "Server error", data=str(exc))
-
-        return _success(rpc_request.id, result)
-
-    return _error(rpc_request.id, -32601, "Method not found", data={"method": method})
+# Other commented endpoints...
+# @router.post("/tasks/get")
+# @router.post("/tasks/cancel")

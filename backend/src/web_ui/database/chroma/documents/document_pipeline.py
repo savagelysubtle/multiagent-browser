@@ -5,10 +5,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..utils.logging_config import get_logger
+from web_ui.utils.logging_config import get_logger
 from .chroma_manager import ChromaManager
 from .models import DocumentModel, QueryRequest, SearchResult
-from .utils import DatabaseUtils
+from ...utils.utils import DatabaseUtils
 
 logger = get_logger(__name__)
 

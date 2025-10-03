@@ -1,16 +1,12 @@
 """
 FastAPI server for React frontend integration.
-
-This server provides REST API endpoints for the DocumentEditingAgent
-to enable seamless integration with the React frontend.
 """
 
-import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -20,13 +16,16 @@ project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
-from ..agent.document_editor import DocumentEditingAgent
 from ..agent.orchestrator.simple_orchestrator import (
-    SimpleAgentOrchestrator,
     initialize_orchestrator,
 )
+from ..database.session import get_db
+from .auth.auth_service import auth_service
+from .dependencies import set_orchestrator
 from ..utils.logging_config import get_logger
-from .dependencies import set_document_agent, set_orchestrator, get_document_agent
+
+logger = get_logger(__name__)
+
 from .middleware.error_handler import (
     AppException,
     app_exception_handler,
@@ -34,21 +33,17 @@ from .middleware.error_handler import (
     http_exception_handler,
     validation_exception_handler,
 )
-from .routes.agents import router as agents_router
 from .routes.a2a import router as a2a_router
-from .routes.logging import router as logging_router
-from .routes.auth import router as auth_router
-from .routes.documents import router as documents_router
 from .routes.ag_ui import router as ag_ui_router
-from .routes.dev_routes import router as dev_router
+from .routes.agents import router as agents_router
+from .routes.auth import router as auth_router
 from .routes.copilotkit import router as copilotkit_router
-from .user_documents import router as user_documents_router
+from .routes.documents import router as documents_router
+from .documents.user import router as user_documents_router
+from .routes.logging import router as logging_router
+from .routes.dev_routes import router as dev_router
 
-logger = get_logger(__name__)
-
-# --- Singleton Service Instances (Managed by Lifespan) ---
-document_agent: DocumentEditingAgent | None = None
-orchestrator: SimpleAgentOrchestrator | None = None
+# ... (rest of the imports)
 
 
 @asynccontextmanager
@@ -56,7 +51,7 @@ async def lifespan(app: FastAPI):
     """
     Application lifespan manager. Initializes and shuts down services gracefully.
     """
-    global document_agent, orchestrator
+    global orchestrator
 
     # --- Startup ---
     logger.info("Starting API server and initializing services...")
@@ -69,63 +64,21 @@ async def lifespan(app: FastAPI):
     set_orchestrator(orchestrator)
     logger.info("Agent orchestrator initialized")
 
-    # 3. Initialize document agent
+    # 3. Initialize authentication service and ensure admin user exists
     try:
-        llm_provider_name = os.getenv("LLM_PROVIDER", "ollama")
-        llm_model_name = os.getenv("LLM_MODEL", "llama3.2")
-        llm_temperature = float(os.getenv("LLM_TEMPERATURE", "0.3"))
-        llm_api_key = os.getenv("GOOGLE_API_KEY")
-        llm_base_url = os.getenv("LLM_BASE_URL")
-
-        logger.debug(f"LLM_PROVIDER in server.py before agent init: {llm_provider_name}")
-        logger.info(f"Resolved LLM Config: Provider={llm_provider_name}, Model={llm_model_name}, BaseURL={llm_base_url}, APIKeySet={bool(llm_api_key)}")
-
-        document_agent = DocumentEditingAgent(
-            llm_provider_name=llm_provider_name,
-            llm_model_name=llm_model_name,
-            llm_temperature=llm_temperature,
-            llm_api_key=llm_api_key,
-            llm_base_url=llm_base_url,
-            working_directory="./tmp/documents",
-        )
-        await document_agent.initialize()
-        set_document_agent(document_agent)
-        logger.info("DocumentEditingAgent initialized successfully")
-
-        # 4. Register agent with orchestrator
-        if orchestrator:
-            orchestrator.register_agent(
-                "document_editor",
-                document_agent,
-                capabilities={
-                    "name": "Document Editor Agent",
-                    "description": "AI-powered document creation and editing agent",
-                    "actions": [
-                        "create_document",
-                        "edit_document",
-                        "search_documents",
-                        "chat",
-                    ],
-                },
-                a2a_endpoint="/a2a/agents/document_editor",
-            )
-            logger.info("DocumentEditingAgent registered with orchestrator")
-
+        # Get database session - get_db() returns a Session object directly
+        db = get_db()
+        await auth_service.ensure_admin_user(db)
+        logger.info("Auth service initialized and admin user checked.")
+        db.close()  # Close the session after use
     except Exception as e:
-        logger.critical(
-            f"Failed to initialize DocumentEditingAgent at startup: {e}", exc_info=True
-        )
-        # Set to None to indicate failure
-        document_agent = None
-        set_document_agent(None)
+        logger.critical(f"Failed to initialize auth service: {e}", exc_info=True)
+        # Don't close db if there was an error getting it
 
     yield
 
     # --- Shutdown ---
     logger.info("Shutting down API server and services...")
-    if document_agent:
-        await document_agent.close()
-        logger.info("DocumentEditingAgent shut down gracefully.")
 
 
 # --- FastAPI App Initialization ---
@@ -137,6 +90,7 @@ def create_app() -> FastAPI:
         version="1.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,  # Add the lifespan manager
     )
 
     # Add CORS middleware for React frontend
@@ -147,7 +101,7 @@ def create_app() -> FastAPI:
             "http://127.0.0.1:3000",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "*"
+            "*",
         ],
         allow_credentials=True,
         allow_methods=["*"],
@@ -158,7 +112,9 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
     app.include_router(copilotkit_router, prefix="/api/copilotkit", tags=["copilotkit"])
     app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
-    app.include_router(user_documents_router, prefix="/api/user-documents", tags=["user-documents"])
+    app.include_router(
+        user_documents_router, prefix="/api/user-documents", tags=["user-documents"]
+    )
     app.include_router(a2a_router)
     app.include_router(agents_router, prefix="/api/agents", tags=["Agents"])
     app.include_router(logging_router, prefix="/api/logs", tags=["Frontend Logging"])
@@ -171,8 +127,11 @@ def create_app() -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(Exception, generic_exception_handler)
 
+    return app
+
 
 app = create_app()
+
 
 # --- WebSocket Endpoint ---
 @app.websocket("/ws")
@@ -203,17 +162,13 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
 @app.get("/", tags=["System"])
 async def root():
     """Root endpoint."""
-    return {"message": "Web UI Document Editor API", "status": "running"}
+    return {"message": "Web UI Agent API", "status": "running"}
 
 
 @app.get("/health", tags=["System"])
-async def health_check(agent: DocumentEditingAgent = Depends(get_document_agent)):
+async def health_check():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "agent_initialized": agent is not None,
-        "mcp_tools_available": len(agent.mcp_tools) if agent else 0,
-    }
+    return {"status": "healthy"}
 
 
 # --- Server Runner ---
@@ -226,17 +181,18 @@ def run_api_server(
     """Run the FastAPI server."""
     import uvicorn
 
-    from ..utils.logging_config import LoggingConfig
+    from web_ui.utils.logging_config import configure_uvicorn_logging
 
     logger.info(f"Starting API server on {host}:{port}")
-    log_config = LoggingConfig.configure_uvicorn_logging(log_level.upper())
+    # Configure uvicorn to use our custom logging setup
+    configure_uvicorn_logging()
 
     uvicorn.run(
         "web_ui.api.server:app",
         host=host,
         port=port,
         reload=reload,
-        log_config=log_config,
+        log_config=None,  # Uvicorn's logging is now handled by our config
     )
     logger.info(f"Uvicorn server started and listening on {host}:{port}")
 

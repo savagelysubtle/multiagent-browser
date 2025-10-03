@@ -4,16 +4,36 @@ Shared dependencies for API routes.
 Provides common dependencies like orchestrator instance, database connections, etc.
 """
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, Request
 
-from ..agent.document_editor import DocumentEditingAgent
 from ..agent.orchestrator.simple_orchestrator import SimpleAgentOrchestrator
-from ..database.user_db import UserDatabase
+from ..database.sql.user import UserDatabase
+from .auth.auth_service import AuthService, User
 
 # Global references to singleton instances, managed by the server's lifespan
 _orchestrator: SimpleAgentOrchestrator | None = None
-_document_agent: DocumentEditingAgent | None = None
 _user_db: UserDatabase | None = None
+_auth_service: AuthService | None = None
+
+
+def get_auth_service() -> AuthService:
+    """Dependency to get the current auth service instance."""
+    global _auth_service
+    if _auth_service is None:
+        _auth_service = AuthService()
+    return _auth_service
+
+
+async def get_current_user(request: Request, auth_service: AuthService = Depends(get_auth_service)) -> User:
+    """Dependency to get the current user from the request's token."""
+    token = request.headers.get("Authorization")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = token.replace("Bearer ", "")
+    user = await auth_service.get_user_from_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return user
 
 
 def get_user_db() -> UserDatabase:
@@ -30,12 +50,6 @@ def set_orchestrator(orchestrator: SimpleAgentOrchestrator) -> None:
     _orchestrator = orchestrator
 
 
-def set_document_agent(agent: DocumentEditingAgent) -> None:
-    """Set the global document agent instance (called at startup)."""
-    global _document_agent
-    _document_agent = agent
-
-
 def get_orchestrator() -> SimpleAgentOrchestrator:
     """Dependency to get the current orchestrator instance."""
     if _orchestrator is None:
@@ -44,13 +58,3 @@ def get_orchestrator() -> SimpleAgentOrchestrator:
             detail="Orchestrator is not available or still initializing.",
         )
     return _orchestrator
-
-
-def get_document_agent() -> DocumentEditingAgent:
-    """Dependency to get the current document agent instance."""
-    if _document_agent is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Document agent is not available or still initializing.",
-        )
-    return _document_agent

@@ -18,7 +18,7 @@ from playwright.async_api import (
     Playwright,
 )
 
-from ..utils.logging_config import get_logger
+from web_ui.utils.logging_config import get_logger
 from .custom_context import CustomBrowserContext
 
 logger = get_logger(__name__)

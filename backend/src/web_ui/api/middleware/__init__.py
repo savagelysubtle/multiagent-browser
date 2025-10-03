@@ -8,8 +8,10 @@ from .error_handler import (
     generic_exception_handler,
     validation_exception_handler,
 )
+from .router import router
 
 __all__ = [
+    "router",
     "AppException",
     "AgentException",
     "ValidationException",

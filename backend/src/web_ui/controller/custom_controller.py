@@ -11,7 +11,7 @@ from browser_use.utils import time_execution_sync
 from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import BaseModel
 
-from ..utils.logging_config import get_logger
+from web_ui.utils.logging_config import get_logger
 from ..utils.mcp_client import create_tool_param_model, setup_mcp_client_and_tools
 
 logger = get_logger(__name__)

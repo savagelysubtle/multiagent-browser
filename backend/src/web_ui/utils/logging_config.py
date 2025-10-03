@@ -1,8 +1,5 @@
 """
-Centralized logging configuration for the web-ui backend.
-
-This module provides a single source of truth for logging configuration,
-ensuring consistent logging across all backend components.
+Centralized, multi-file logging configuration for the web-ui backend.
 """
 
 import logging
@@ -11,169 +8,99 @@ import os
 import sys
 from pathlib import Path
 
+from .paths import get_project_root
 
-class LoggingConfig:
-    """Centralized logging configuration manager."""
+# --- Configuration ---
+LOG_DIR = get_project_root() / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-    _initialized: bool = False
-    _log_dir: Path = Path("logs")
-    _log_file: str = "web-ui.log"
-    _format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    _date_format: str = "%Y-%m-%d %H:%M:%S"
+# Mapping from logger name to filename
+LOG_FILES = {
+    "api": "api.log",
+    "database": "database.log",
+    "agent": "agent.log",
+    "auth": "auth.log",
+    "default": "backend_default.log",
+}
 
-    @classmethod
-    def setup_logging(
-        cls,
-        level: str = "DEBUG",
-        log_dir: Path | None = None,
-        log_file: str | None = None,
-        force_reinit: bool = False,
-    ) -> None:
-        """
-        Configure logging for the application.
+FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-        Args:
-            level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-            log_dir: Directory for log files (default: ./logs)
-            log_file: Name of the log file (default: web-ui.log)
-            force_reinit: Force re-initialization even if already initialized
-        """
-        # Prevent multiple initializations unless forced
-        if cls._initialized and not force_reinit:
-            return
+# --- State ---
+_loggers = {}
 
-        # Determine log file path from environment or use defaults
-        log_file_path_env = os.getenv("WEBUI_LOG_FILE")
-        if log_file_path_env:
-            log_file_path = Path(log_file_path_env).resolve()
-            # Ensure the directory exists
-            log_file_path.parent.mkdir(parents=True, exist_ok=True)
-        else:
-            # Set custom paths if provided
-            if log_dir:
-                cls._log_dir = Path(log_dir)
-            if log_file:
-                cls._log_file = log_file
-
-            # Ensure log directory exists
-            cls._log_dir.mkdir(parents=True, exist_ok=True)
-            log_file_path = cls._log_dir / cls._log_file
-
-        # Get the root logger
-        root_logger = logging.getLogger()
-
-        # Clear any existing handlers to prevent duplicates
-        root_logger.handlers.clear()
-
-        # Also clear handlers from common problematic loggers
-        for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
-            logger = logging.getLogger(logger_name)
-            logger.handlers.clear()
-            logger.propagate = True
-
-        # Set the logging level
-        root_logger.setLevel(getattr(logging, level.upper()))
-
-        # Create formatter
-        formatter = logging.Formatter(fmt=cls._format, datefmt=cls._date_format)
-
-        # Create and configure console handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(getattr(logging, level.upper()))
-        console_handler.setFormatter(formatter)
-        root_logger.addHandler(console_handler)
-
-        logger = logging.getLogger(__name__)
-        logger.info(f"Logging initialized - Level: {level}, Output: Console")
-
-        # Mark as initialized
-        cls._initialized = True
-
-    @classmethod
-    def get_logger(cls, name: str) -> logging.Logger:
-        """
-        Get a logger instance with the given name.
-
-        Args:
-            name: Logger name (typically __name__)
-
-        Returns:
-            Logger instance
-        """
-        # Ensure logging is set up
-        if not cls._initialized:
-            cls.setup_logging()
-
-        return logging.getLogger(name)
-
-    @classmethod
-    def configure_uvicorn_logging(cls, log_level: str = "INFO") -> dict:
-        """
-        Get uvicorn-specific logging configuration.
-
-        This prevents uvicorn from setting up its own handlers which
-        can cause duplicate log messages.
-
-        Args:
-            log_level: Logging level for uvicorn
-
-        Returns:
-            Dict with uvicorn log config
-        """
-        # Ensure our logging is set up first
-        if not cls._initialized:
-            cls.setup_logging(level=log_level)
-
-        return {
-            "version": 1,
-            "disable_existing_loggers": False,
-            "handlers": {
-                # Use our existing handlers by referencing root logger
-                "default": {
-                    "class": "logging.StreamHandler",
-                    "stream": "ext://sys.stdout",
-                    "formatter": "default",
-                }
-            },
-            "formatters": {
-                "default": {"format": cls._format, "datefmt": cls._date_format}
-            },
-            "loggers": {
-                "uvicorn": {
-                    "handlers": [],  # Use root logger handlers
-                    "level": log_level.upper(),
-                    "propagate": True,
-                },
-                "uvicorn.error": {
-                    "handlers": [],  # Use root logger handlers
-                    "level": log_level.upper(),
-                    "propagate": True,
-                },
-                "uvicorn.access": {
-                    "handlers": [],  # Use root logger handlers
-                    "level": log_level.upper(),
-                    "propagate": True,
-                },
-            },
-        }
-
-    @classmethod
-    def reset(cls) -> None:
-        """Reset the logging configuration state."""
-        cls._initialized = False
-
-        # Clear all handlers from root logger
-        root_logger = logging.getLogger()
-        root_logger.handlers.clear()
-
-
-# Convenience function for backward compatibility
-def setup_logging(level: str = "INFO", **kwargs) -> None:
-    """Setup logging using the centralized configuration."""
-    LoggingConfig.setup_logging(level=level, **kwargs)
-
-
-# Convenience function to get a logger
 def get_logger(name: str) -> logging.Logger:
-    """Get a logger instance."""
-    return LoggingConfig.get_logger(name)
+    """
+    Gets a configured logger instance for a specific part of the application.
+
+    The logger name determines which file it logs to based on the
+    component names defined in LOG_FILES (api, database, etc.).
+
+    Args:
+        name: The name for the logger, typically __name__.
+              The first part of the name (e.g., 'web_ui.api') is used
+              to determine the log file.
+
+    Returns:
+        A configured logger instance.
+    """
+    # Determine the logger's component name (e.g., 'api', 'database')
+    if 'web_ui.api' in name:
+        component_name = 'api'
+    elif 'web_ui.database' in name:
+        component_name = 'database'
+    elif 'web_ui.agent' in name:
+        component_name = 'agent'
+    elif 'web_ui.api.auth' in name:
+        component_name = 'auth'
+    else:
+        component_name = 'default'
+
+    # Return existing logger if already configured
+    if component_name in _loggers:
+        return _loggers[component_name]
+
+    # Create a new logger
+    logger = logging.getLogger(component_name)
+    logger.setLevel(logging.DEBUG)  # Set the lowest level to capture all messages
+    logger.propagate = False  # Prevent messages from bubbling up to the root logger
+
+    formatter = logging.Formatter(FORMAT, DATE_FORMAT)
+
+    # --- Console Handler ---
+    # Logs INFO and above to the console.
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    # --- File Handler ---
+    # Logs DEBUG and above to a component-specific file.
+    log_file_name = LOG_FILES.get(component_name, "backend_default.log")
+    log_file_path = LOG_DIR / log_file_name
+
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file_path, maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8'
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    _loggers[component_name] = logger
+    logger.info(f"Logger '{component_name}' initialized. Logging to {log_file_path}")
+
+    return logger
+
+def configure_uvicorn_logging():
+    """
+    Redirects Uvicorn's default loggers to our custom logger setup.
+    This ensures Uvicorn's output goes to the 'api.log' file.
+    """
+    api_logger = get_logger('web_ui.api') # Get the logger configured for the API
+    
+    # Clear existing handlers from uvicorn loggers and redirect
+    for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+        log = logging.getLogger(logger_name)
+        log.handlers = api_logger.handlers
+        log.setLevel(api_logger.level)
+        log.propagate = False # Important to prevent duplicate messages

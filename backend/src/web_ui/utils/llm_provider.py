@@ -29,7 +29,7 @@ except (ImportError, TypeError):
     pass
 
 from ..utils import config
-from ..utils.logging_config import get_logger
+from web_ui.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

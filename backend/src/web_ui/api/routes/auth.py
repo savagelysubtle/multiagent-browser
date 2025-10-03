@@ -13,7 +13,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 
-from ...database.user_state_manager import UserStateManager
+from ...database.session import get_db
+from ...database.sql.user_state_manager import UserStateManager
 from ...utils.logging_config import get_logger
 from ..auth.auth_service import User, auth_service
 from ..auth.dependencies import get_current_user
@@ -32,7 +33,7 @@ user_state_manager = UserStateManager()
 class LoginRequest(BaseModel):
     """Request model for user login."""
 
-    email: EmailStr
+    username: str
     password: str
 
 
@@ -86,8 +87,15 @@ class PreferenceRequest(BaseModel):
 # Authentication endpoints
 
 
+from sqlalchemy.orm import Session
+
+# ... (rest of the imports)
+
+# ... (router and models)
+
+
 @router.post("/dev-login", response_model=TokenResponse)
-async def dev_login():
+async def dev_login(db: Session = Depends(get_db)):
     """
     Development-only auto-login with admin credentials.
 
@@ -110,10 +118,10 @@ async def dev_login():
             )
 
         # Ensure admin user exists (create if needed)
-        user = await auth_service.ensure_admin_user()
+        user = await auth_service.ensure_admin_user(db)
         if not user:
             # Try to get existing admin user
-            user = await auth_service.get_user_by_email(admin_email)
+            user = await auth_service.get_user_by_email(db, admin_email)
 
         if not user:
             raise HTTPException(
@@ -169,7 +177,7 @@ async def dev_login():
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(login_data: LoginRequest):
+async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """
     Authenticate user with email and password.
 
@@ -177,7 +185,7 @@ async def login(login_data: LoginRequest):
     """
     try:
         user = await auth_service.authenticate_user(
-            login_data.email, login_data.password
+            db, login_data.username, login_data.password
         )
 
         if not user:
@@ -533,14 +541,14 @@ async def delete_user_by_email_endpoint(email: EmailStr):
 
 
 @router.get("/status")
-async def auth_system_status():
+async def auth_system_status(db: Session = Depends(get_db)):
     """
     Get authentication system status.
 
     Returns system health and configuration information.
     """
     try:
-        user_stats = auth_service.get_user_stats()
+        user_stats = auth_service.get_user_stats(db)
         state_stats = user_state_manager.get_collection_stats()
         google_status = get_google_oauth_status()
 

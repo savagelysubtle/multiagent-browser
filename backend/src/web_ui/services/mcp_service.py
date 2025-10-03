@@ -5,8 +5,8 @@ import json
 from datetime import datetime
 from typing import Any
 
-from ..database.mcp_config_manager import MCPConfigManager
-from ..utils.logging_config import get_logger
+from ..database.utils.mcp_config_manager import MCPConfigManager
+from web_ui.utils.logging_config import get_logger
 from ..utils.mcp_client import setup_mcp_client_and_tools
 
 logger = get_logger(__name__)

@@ -11,12 +11,13 @@ import os
 from datetime import datetime, timedelta
 from typing import Any
 
+from uuid import uuid4
 from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-from ...database.user_db import UserDatabase
+from ...database.sql.user import UserDatabase
 from ...utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -52,11 +53,10 @@ class AuthService:
         self.secret_key = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
         self.algorithm = "HS256"
         self.access_token_expire_minutes = 1440  # 24 hours
-        self.user_db = UserDatabase()
 
-        logger.info("AuthService initialized with SQLite user database")
+        logger.info("AuthService initialized")
 
-    async def ensure_admin_user(self):
+    async def ensure_admin_user(self, db: Session):
         """Create admin user if it doesn't exist and we're in development mode."""
         try:
             env = os.getenv("ENV", "production")
@@ -64,13 +64,15 @@ class AuthService:
             admin_password = os.getenv("ADMIN_PASSWORD")
             admin_name = os.getenv("ADMIN_NAME", "Administrator")
 
+            logger.info(f"Environment: {env}, Admin Email: {admin_email}, Password Set: {bool(admin_password)}")
+
             if env == "development" and admin_email and admin_password:
                 # Check if admin user already exists
-                existing_admin = await self.get_user_by_email(admin_email)
+                existing_admin = await self.get_user_by_email(db, admin_email)
                 if not existing_admin:
                     try:
                         admin_user = await self.create_user(
-                            email=admin_email, password=admin_password, name=admin_name
+                            db=db, email=admin_email, password=admin_password, name=admin_name
                         )
                         logger.info(f"Created admin user: {admin_email}")
                         return admin_user
@@ -80,6 +82,8 @@ class AuthService:
                 else:
                     logger.info(f"Admin user already exists: {admin_email}")
                     return existing_admin
+            else:
+                logger.info("Admin user creation skipped - not in development mode or missing credentials")
             return None
 
         except Exception as e:
@@ -133,57 +137,70 @@ class AuthService:
             logger.warning(f"JWT verification failed: {e}")
             return None
 
-    async def get_user_by_id(self, user_id: str) -> User | None:
+    async def get_user_from_token(self, token: str) -> User | None:
+        """Get a user from a JWT token."""
+        user_id = self.verify_token(token)
+        if not user_id:
+            return None
+        return await self.get_user_by_id(user_id)
+
+    async def get_user_by_id(self, db: Session, user_id: str) -> User | None:
         """Get a user by their ID from SQLite."""
         try:
-            user_data = self.user_db.get_user_by_id(user_id)
+            user_db = UserDatabase()
+            user_data = user_db.get_user_by_id(db, user_id)
             if user_data:
                 # Convert datetime strings back to datetime objects
-                if isinstance(user_data["created_at"], str):
-                    user_data["created_at"] = datetime.fromisoformat(
-                        user_data["created_at"]
+                if isinstance(user_data.created_at, str):
+                    user_data.created_at = datetime.fromisoformat(
+                        user_data.created_at
                     )
-                if user_data.get("last_login") and isinstance(
-                    user_data["last_login"], str
+                if user_data.last_login and isinstance(
+                    user_data.last_login, str
                 ):
-                    user_data["last_login"] = datetime.fromisoformat(
-                        user_data["last_login"]
+                    user_data.last_login = datetime.fromisoformat(
+                        user_data.last_login
                     )
 
                 # Remove password_hash before creating User object
-                user_data.pop("password_hash", None)
-                user_data.pop("metadata", None)
-                user_data.pop("auth_provider", None)
+                user_data_dict = user_data.__dict__.copy()
+                user_data_dict.pop("password_hash", None)
+                user_data_dict.pop("metadata", None)
+                user_data_dict.pop("auth_provider", None)
+                user_data_dict.pop("_sa_instance_state", None)
 
-                return User(**user_data)
+                return User(**user_data_dict)
             return None
         except Exception as e:
             logger.error(f"Error getting user by ID {user_id}: {e}")
             return None
 
-    async def get_user_by_email(self, email: str) -> User | None:
+    async def get_user_by_email(self, db: Session, email: str) -> User | None:
         """Get a user by their email from SQLite."""
         try:
-            user_data = self.user_db.get_user_by_email(email)
+            user_db = UserDatabase()
+            user_data = user_db.get_user_by_email(db, email)
             if user_data:
                 # Convert datetime strings back to datetime objects
-                if isinstance(user_data["created_at"], str):
-                    user_data["created_at"] = datetime.fromisoformat(
-                        user_data["created_at"]
+                if isinstance(user_data.created_at, str):
+                    user_data.created_at = datetime.fromisoformat(
+                        user_data.created_at
                     )
-                if user_data.get("last_login") and isinstance(
-                    user_data["last_login"], str
+                if user_data.last_login and isinstance(
+                    user_data.last_login, str
                 ):
-                    user_data["last_login"] = datetime.fromisoformat(
-                        user_data["last_login"]
+                    user_data.last_login = datetime.fromisoformat(
+                        user_data.last_login
                     )
 
                 # Remove password_hash before creating User object
-                user_data.pop("password_hash", None)
-                user_data.pop("metadata", None)
-                user_data.pop("auth_provider", None)
+                user_data_dict = user_data.__dict__.copy()
+                user_data_dict.pop("password_hash", None)
+                user_data_dict.pop("metadata", None)
+                user_data_dict.pop("auth_provider", None)
+                user_data_dict.pop("_sa_instance_state", None)
 
-                return User(**user_data)
+                return User(**user_data_dict)
             return None
         except Exception as e:
             logger.error(f"Error getting user by email {email}: {e}")
@@ -191,6 +208,7 @@ class AuthService:
 
     async def create_user(
         self,
+        db: Session,
         email: str,
         name: str | None = None,
         picture: str | None = None,
@@ -198,15 +216,17 @@ class AuthService:
     ) -> User:
         """Create a new user in SQLite."""
         try:
+            user_db = UserDatabase()
             # Check if user already exists
-            if self.user_db.user_exists(email):
+            if await self.get_user_by_email(db, email):
                 raise ValueError(f"User with email {email} already exists")
 
             # Hash password if provided
             password_hash = self.get_password_hash(password) if password else None
 
             # Create user in SQLite
-            user_data = self.user_db.create_user(
+            user_data = user_db.create_user(
+                db=db,
                 email=email,
                 name=name or email.split("@")[0],
                 password_hash=password_hash,
@@ -216,14 +236,9 @@ class AuthService:
             )
 
             # Convert created_at to datetime
-            user_data["created_at"] = datetime.fromisoformat(user_data["created_at"])
+            user_data.created_at = datetime.fromisoformat(user_data.created_at)
 
-            # Remove password_hash before creating User object
-            user_data.pop("password_hash", None)
-            user_data.pop("metadata", None)
-            user_data.pop("auth_provider", None)
-
-            user = User(**user_data)
+            user = User(**user_data.__dict__)
             logger.info(f"Created new user: {email}")
             return user
 
@@ -232,15 +247,17 @@ class AuthService:
             raise
 
     async def create_or_update_user(
-        self, email: str, name: str | None = None, picture: str | None = None
+        self, db: Session, email: str, name: str | None = None, picture: str | None = None
     ) -> User:
         """Create or update a user (used for Google SSO)."""
         try:
-            existing_user = await self.get_user_by_email(email)
+            user_db = UserDatabase()
+            existing_user = await self.get_user_by_email(db, email)
 
             if existing_user:
                 # Update existing user
-                self.user_db.update_user(
+                user_db.update_user(
+                    db,
                     existing_user.id,
                     name=name or existing_user.name,
                     picture=picture or existing_user.picture,
@@ -249,7 +266,7 @@ class AuthService:
 
                 logger.info(f"Updated existing user: {email}")
                 # Return updated user
-                updated_user = await self.get_user_by_id(existing_user.id)
+                updated_user = await self.get_user_by_id(db, existing_user.id)
                 if updated_user:
                     return updated_user
                 else:
@@ -259,17 +276,18 @@ class AuthService:
                     )
             else:
                 # Create new user
-                return await self.create_user(email, name, picture)
+                return await self.create_user(db, email, name, picture)
 
         except Exception as e:
             logger.error(f"Error creating/updating user {email}: {e}")
             raise
 
-    async def authenticate_user(self, email: str, password: str) -> User | None:
+    async def authenticate_user(self, db: Session, email: str, password: str) -> User | None:
         """Authenticate a user with email and password."""
         try:
+            user_db = UserDatabase()
             # Get user data with password hash
-            user_data = self.user_db.get_user_by_email(email)
+            user_data = user_db.get_user_by_email(db, email)
             if not user_data:
                 return None
 
@@ -282,42 +300,46 @@ class AuthService:
                 return None
 
             # Update last login
-            self.user_db.update_last_login(user_data["id"])
+            user_db.update_last_login(db, user_data.id)
 
             # Convert to User object
-            user_data["created_at"] = datetime.fromisoformat(user_data["created_at"])
-            user_data["last_login"] = datetime.utcnow()
+            user_data.created_at = datetime.fromisoformat(user_data.created_at)
+            user_data.last_login = datetime.utcnow()
 
             # Remove password_hash before creating User object
-            user_data.pop("password_hash", None)
-            user_data.pop("metadata", None)
-            user_data.pop("auth_provider", None)
+            user_data_dict = user_data.__dict__.copy()
+            user_data_dict.pop("password_hash", None)
+            user_data_dict.pop("metadata", None)
+            user_data_dict.pop("auth_provider", None)
+            user_data_dict.pop("_sa_instance_state", None)
 
-            return User(**user_data)
+            return User(**user_data_dict)
 
         except Exception as e:
             logger.error(f"Error authenticating user {email}: {e}")
             return None
 
-    async def update_last_login(self, user_id: str) -> bool:
+    async def update_last_login(self, db: Session, user_id: str) -> bool:
         """Update the user's last login timestamp."""
         try:
-            return self.user_db.update_last_login(user_id)
+            user_db = UserDatabase()
+            return user_db.update_last_login(db, user_id)
         except Exception as e:
             logger.error(f"Error updating last login for user {user_id}: {e}")
             return False
 
-    async def delete_user(self, user_id: str) -> bool:
+    async def delete_user(self, db: Session, user_id: str) -> bool:
         """Delete a user from the database."""
         try:
+            user_db = UserDatabase()
             # First check if user exists
-            user = await self.get_user_by_id(user_id)
+            user = await self.get_user_by_id(db, user_id)
             if not user:
                 logger.warning(f"Attempted to delete non-existent user: {user_id}")
                 return False
 
             # Delete user from SQLite
-            success = self.user_db.delete_user(user_id)
+            success = user_db.delete_user(db, user_id)
             if success:
                 logger.info(f"Deleted user: {user.email} (ID: {user_id})")
             else:
@@ -329,31 +351,33 @@ class AuthService:
             logger.error(f"Error deleting user {user_id}: {e}")
             return False
 
-    async def delete_user_by_email(self, email: str) -> bool:
+    async def delete_user_by_email(self, db: Session, email: str) -> bool:
         """Delete a user by their email address."""
         try:
-            user = await self.get_user_by_email(email)
+            user = await self.get_user_by_email(db, email)
             if not user:
                 logger.warning(f"Attempted to delete non-existent user: {email}")
                 return False
 
-            return await self.delete_user(user.id)
+            return await self.delete_user(db, user.id)
 
         except Exception as e:
             logger.error(f"Error deleting user by email {email}: {e}")
             return False
 
-    def get_user_stats(self) -> dict[str, Any]:
+    def get_user_stats(self, db: Session) -> dict[str, Any]:
         """Get user statistics."""
         try:
+            user_db = UserDatabase()
             return {
-                "total_users": self.user_db.get_user_count(),
+                "total_users": user_db.get_user_count(db),
                 "database_type": "SQLite",
                 "last_updated": datetime.now().isoformat(),
             }
         except Exception as e:
             logger.error(f"Error getting user stats: {e}")
             return {"error": str(e)}
+
 
 
 # Global instance

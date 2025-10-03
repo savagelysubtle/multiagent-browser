@@ -20,6 +20,22 @@ from .orchestrator.simple_orchestrator import (
     orchestrator,
 )
 
+# Temporarily comment out imports that depend on a2a models until Pydantic v2 migration is complete
+# from .a2a import (
+#     JSONRPCRequest,
+#     JSONRPCResponse,
+#     Message,
+#     MessageRole,
+#     MessageSendParams,
+#     Part,
+#     PartKind,
+#     Task,
+#     TaskIdParams,
+#     TaskQueryParams,
+#     TaskState,
+#     TaskStatus,
+# )
+
 __all__ = [
     "SimpleAgentOrchestrator",
     "AgentTask",
@@ -33,4 +49,17 @@ __all__ = [
     "A2AMessageType",
     "a2a_interface",
     "initialize_a2a_interface",
+    # Temporarily remove these exports until migration is complete
+    # "JSONRPCRequest",
+    # "JSONRPCResponse",
+    # "Message",
+    # "MessageRole",
+    # "MessageSendParams",
+    # "Part",
+    # "PartKind",
+    # "Task",
+    # "TaskIdParams",
+    # "TaskQueryParams",
+    # "TaskState",
+    # "TaskStatus",
 ]

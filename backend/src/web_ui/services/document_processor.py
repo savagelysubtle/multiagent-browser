@@ -405,6 +405,37 @@ Sincerely,
 {{ conclusion }}
 """
 
+    def _create_memo_template(self) -> str:
+        return """
+MEMORANDUM
+
+TO: {{ to }}
+FROM: {{ from }}
+DATE: {{ date }}
+SUBJECT: {{ subject }}
+
+{{ body }}
+"""
+
+    def _create_invoice_template(self) -> str:
+        return """
+INVOICE
+
+Date: {{ date }}
+Invoice #: {{ invoice_number }}
+
+Bill To:
+{{ customer_name }}
+{{ customer_address }}
+
+Items:
+{% for item in items %}
+- {{ item.description }}: {{ item.quantity }} x ${{ item.unit_price }} = ${{ item.total }}
+{% endfor %}
+
+Total: ${{ total_amount }}
+"""
+
     async def _render_template(self, template: str, data: Dict[str, Any]) -> str:
         """Render Jinja2 template with data"""
         template_obj = self.jinja_env.from_string(template)

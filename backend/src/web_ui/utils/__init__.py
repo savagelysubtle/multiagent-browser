@@ -2,6 +2,6 @@
 Web-UI utilities package.
 """
 
-from .logging_config import LoggingConfig, get_logger, setup_logging
+from .logging_config import get_logger, configure_uvicorn_logging
 
-__all__ = ["LoggingConfig", "setup_logging", "get_logger"]
+__all__ = ["get_logger", "configure_uvicorn_logging"]

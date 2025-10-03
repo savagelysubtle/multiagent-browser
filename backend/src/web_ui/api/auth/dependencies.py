@@ -18,8 +18,14 @@ logger = get_logger(__name__)
 security = HTTPBearer(auto_error=False)  # Don't auto-error on missing tokens
 
 
+from sqlalchemy.orm import Session
+from ...database.session import get_db
+
+# ... (rest of the imports)
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    db: Session = Depends(get_db),
 ) -> User:
     """
     Get the current authenticated user from JWT token.
@@ -45,7 +51,7 @@ async def get_current_user(
             )
 
         # Get user from database
-        user = await auth_service.get_user_by_id(user_id)
+        user = await auth_service.get_user_by_id(db, user_id)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
@@ -57,7 +63,7 @@ async def get_current_user(
             )
 
         # Update last login
-        await auth_service.update_last_login(user_id)
+        await auth_service.update_last_login(db, user_id)
 
         return user
 
@@ -72,21 +78,9 @@ async def get_current_user(
         )
 
 
-async def get_current_active_user(
-    current_user: User = Depends(get_current_user),
-) -> User:
-    """
-    Get the current active user.
-
-    This is an additional dependency that ensures the user is active.
-    """
-    if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
-
-
 async def get_optional_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    db: Session = Depends(get_db),
 ) -> User | None:
     """
     Get the current user if authenticated, otherwise return None.
@@ -103,12 +97,12 @@ async def get_optional_user(
         if not user_id:
             return None
 
-        user = await auth_service.get_user_by_id(user_id)
+        user = await auth_service.get_user_by_id(db, user_id)
         if not user or not user.is_active:
             return None
 
         # Update last login
-        await auth_service.update_last_login(user_id)
+        await auth_service.update_last_login(db, user_id)
 
         return user
 
