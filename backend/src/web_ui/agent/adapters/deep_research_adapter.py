@@ -6,7 +6,7 @@ Supports Google A2A (Agent-to-Agent) protocol for inter-agent communication.
 """
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from ...utils.logging_config import get_logger
@@ -305,7 +305,7 @@ class DeepResearchAdapter:
                 "references": result.get("references", []),
                 "confidence_score": result.get("confidence_score", 0.8),
                 "research_time": result.get("research_time", "simulated"),
-                "completed_at": datetime.utcnow().isoformat(),
+                "completed_at": datetime.now(UTC).isoformat(),
             }
 
             if progress_callback:

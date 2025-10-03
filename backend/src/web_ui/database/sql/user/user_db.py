@@ -3,17 +3,29 @@ SQLAlchemy User Database for Authentication and User State.
 """
 
 import json
+from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
-from datetime import datetime
-from typing import Any, Dict, Optional
 
+# Password hashing
+from passlib.context import CryptContext
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from web_ui.utils.logging_config import get_logger
+
 from .models import Base, User, UserState
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
 logger = get_logger(__name__)
+
 
 class UserDatabase:
     """SQLite database for user authentication and management using SQLAlchemy."""
@@ -24,11 +36,11 @@ class UserDatabase:
 
         self.database_url = database_url or DATABASE_URL
         self.engine = create_engine(
-            self.database_url,
-            connect_args={"check_same_thread": False},
-            echo=False
+            self.database_url, connect_args={"check_same_thread": False}, echo=False
         )
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=self.engine
+        )
 
         # Create tables if they don't exist
         Base.metadata.create_all(bind=self.engine)
@@ -43,16 +55,31 @@ class UserDatabase:
         logger.debug(f"Checking if user exists with email: {email}")
         return self.get_user_by_email(db, email) is not None
 
-    def create_user(self, db: Session, email: str, **kwargs) -> User:
+    def create_user(
+        self, db: Session, email: str, password: str = None, **kwargs
+    ) -> User:
+        """Create a new user with optional password hashing."""
         logger.info(f"Attempting to create user with email: {email}")
-        user = User(id=str(uuid4()), email=email, created_at=datetime.utcnow().isoformat(), **kwargs)
+
+        # Hash password if provided
+        password_hash = None
+        if password:
+            password_hash = pwd_context.hash(password)
+            kwargs["password_hash"] = password_hash
+
+        user = User(
+            id=str(uuid4()),
+            email=email,
+            created_at=datetime.now(UTC).isoformat(),
+            **kwargs,
+        )
         db.add(user)
         db.commit()
         db.refresh(user)
         logger.info(f"Successfully created user {user.id} with email {email}.")
         return user
 
-    def get_user_by_email(self, db: Session, email: str) -> Optional[User]:
+    def get_user_by_email(self, db: Session, email: str) -> User | None:
         logger.debug(f"Querying for user with email: {email}")
         user = db.query(User).filter(User.email == email).first()
         if user:
@@ -61,7 +88,7 @@ class UserDatabase:
             logger.debug(f"No user found for email: {email}")
         return user
 
-    def get_user_by_id(self, db: Session, user_id: str) -> Optional[User]:
+    def get_user_by_id(self, db: Session, user_id: str) -> User | None:
         logger.debug(f"Querying for user with ID: {user_id}")
         user = db.query(User).filter(User.id == user_id).first()
         if user:
@@ -88,25 +115,29 @@ class UserDatabase:
         logger.debug(f"Updating last_login for user ID: {user_id}")
         user = db.query(User).filter(User.id == user_id).first()
         if user:
-            user.last_login = datetime.utcnow().isoformat()
+            user.last_login = datetime.now(UTC).isoformat()
             db.commit()
             logger.info(f"Successfully updated last_login for user {user_id}.")
             return True
         logger.warning(f"last_login update failed: User with ID {user_id} not found.")
         return False
 
-    def save_user_state(self, db: Session, user_id: str, state: Dict[str, Any]) -> bool:
+    def save_user_state(self, db: Session, user_id: str, state: dict[str, Any]) -> bool:
         logger.debug(f"Saving state for user ID: {user_id}")
         user = db.query(User).filter(User.id == user_id).first()
         if user:
             state_json = json.dumps(state, default=str)
-            user_state = db.query(UserState).filter(UserState.user_id == user_id).first()
+            user_state = (
+                db.query(UserState).filter(UserState.user_id == user_id).first()
+            )
             if user_state:
                 logger.debug(f"Updating existing state for user {user_id}.")
                 user_state.state_json = state_json
             else:
                 logger.debug(f"Creating new state for user {user_id}.")
-                user_state = UserState(id=str(uuid4()), user_id=user_id, state_json=state_json)
+                user_state = UserState(
+                    id=str(uuid4()), user_id=user_id, state_json=state_json
+                )
                 db.add(user_state)
             db.commit()
             logger.info(f"Successfully saved state for user {user_id}.")
@@ -114,13 +145,27 @@ class UserDatabase:
         logger.warning(f"State save failed: User with ID {user_id} not found.")
         return False
 
-    def get_user_state(self, db: Session, user_id: str) -> Optional[Dict[str, Any]]:
+    def get_user_state(self, db: Session, user_id: str) -> dict[str, Any] | None:
         logger.debug(f"Getting state for user ID: {user_id}")
         user_state = db.query(UserState).filter(UserState.user_id == user_id).first()
         if user_state:
             logger.debug(f"Found state for user {user_id}.")
             return json.loads(user_state.state_json)
         logger.debug(f"No state found for user {user_id}.")
+        return None
+
+    def authenticate_user(self, db: Session, email: str, password: str) -> User | None:
+        """Authenticate user with email and password."""
+        logger.debug(f"Authenticating user with email: {email}")
+        user = self.get_user_by_email(db, email)
+        if (
+            user
+            and user.password_hash
+            and verify_password(password, user.password_hash)
+        ):
+            logger.info(f"Successfully authenticated user {user.id}")
+            return user
+        logger.warning(f"Authentication failed for email: {email}")
         return None
 
     def clear_all_users(self) -> int:

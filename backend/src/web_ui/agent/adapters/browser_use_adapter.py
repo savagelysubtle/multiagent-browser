@@ -6,7 +6,7 @@ Supports Google A2A (Agent-to-Agent) protocol for inter-agent communication.
 """
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from ...utils.logging_config import get_logger
@@ -223,7 +223,7 @@ class BrowserUseAdapter:
                 "url": url,
                 "instruction": instruction,
                 "result": result,
-                "browsed_at": datetime.utcnow().isoformat(),
+                "browsed_at": datetime.now(UTC).isoformat(),
                 "execution_time": "simulated",
             }
 
@@ -309,7 +309,7 @@ class BrowserUseAdapter:
                 "selectors": selectors,
                 "extracted_data": result.get("extracted_data", {}),
                 "selectors_found": result.get("selectors_found", 0),
-                "extracted_at": datetime.utcnow().isoformat(),
+                "extracted_at": datetime.now(UTC).isoformat(),
             }
 
             if progress_callback:
@@ -360,7 +360,7 @@ class BrowserUseAdapter:
                 # Fallback implementation - simulate screenshot
                 result = {
                     "url": url,
-                    "screenshot_path": f"screenshots/screenshot_{datetime.utcnow().timestamp()}.png",
+                    "screenshot_path": f"screenshots/screenshot_{datetime.now(UTC).timestamp()}.png",
                     "format": "png",
                     "status": "simulated",
                 }
@@ -373,7 +373,7 @@ class BrowserUseAdapter:
                 "url": url,
                 "screenshot_path": result.get("screenshot_path"),
                 "format": result.get("format", "png"),
-                "taken_at": datetime.utcnow().isoformat(),
+                "taken_at": datetime.now(UTC).isoformat(),
             }
 
             if progress_callback:

@@ -4,15 +4,31 @@ Centralized, multi-file logging configuration for the web-ui backend.
 
 import logging
 import logging.handlers
-import os
 import sys
 from pathlib import Path
 
 from .paths import get_project_root
 
 # --- Configuration ---
-LOG_DIR = get_project_root() / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    LOG_DIR = get_project_root() / "logs"
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except Exception as e:
+    # Fallback to current directory if project root fails
+    print(
+        f"Warning: Failed to create logs directory at project root: {e}",
+        file=sys.stderr,
+    )
+    LOG_DIR = Path("logs")
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as e2:
+        print(f"Error: Failed to create logs directory: {e2}", file=sys.stderr)
+        # Use temp directory as last resort
+        import tempfile
+
+        LOG_DIR = Path(tempfile.gettempdir()) / "web-ui-logs"
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Mapping from logger name to filename
 LOG_FILES = {
@@ -28,6 +44,7 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # --- State ---
 _loggers = {}
+
 
 def get_logger(name: str) -> logging.Logger:
     """
@@ -45,16 +62,17 @@ def get_logger(name: str) -> logging.Logger:
         A configured logger instance.
     """
     # Determine the logger's component name (e.g., 'api', 'database')
-    if 'web_ui.api' in name:
-        component_name = 'api'
-    elif 'web_ui.database' in name:
-        component_name = 'database'
-    elif 'web_ui.agent' in name:
-        component_name = 'agent'
-    elif 'web_ui.api.auth' in name:
-        component_name = 'auth'
+    # Check more specific paths first!
+    if "web_ui.api.auth" in name or "auth" in name:
+        component_name = "auth"
+    elif "web_ui.api" in name:
+        component_name = "api"
+    elif "web_ui.database" in name:
+        component_name = "database"
+    elif "web_ui.agent" in name:
+        component_name = "agent"
     else:
-        component_name = 'default'
+        component_name = "default"
 
     # Return existing logger if already configured
     if component_name in _loggers:
@@ -79,28 +97,44 @@ def get_logger(name: str) -> logging.Logger:
     log_file_name = LOG_FILES.get(component_name, "backend_default.log")
     log_file_path = LOG_DIR / log_file_name
 
-    file_handler = logging.handlers.RotatingFileHandler(
-        log_file_path, maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8'
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    try:
+        file_handler = logging.handlers.RotatingFileHandler(
+            log_file_path, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        logger.info(
+            f"Logger '{component_name}' initialized. Logging to {log_file_path}"
+        )
+    except Exception as e:
+        # If file logging fails, just use console logging
+        print(
+            f"Warning: Failed to setup file logging for {component_name}: {e}",
+            file=sys.stderr,
+        )
+        logger.warning(
+            f"File logging disabled for '{component_name}' due to error: {e}"
+        )
 
     _loggers[component_name] = logger
-    logger.info(f"Logger '{component_name}' initialized. Logging to {log_file_path}")
 
     return logger
+
 
 def configure_uvicorn_logging():
     """
     Redirects Uvicorn's default loggers to our custom logger setup.
     This ensures Uvicorn's output goes to the 'api.log' file.
     """
-    api_logger = get_logger('web_ui.api') # Get the logger configured for the API
-    
-    # Clear existing handlers from uvicorn loggers and redirect
-    for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
-        log = logging.getLogger(logger_name)
-        log.handlers = api_logger.handlers
-        log.setLevel(api_logger.level)
-        log.propagate = False # Important to prevent duplicate messages
+    try:
+        api_logger = get_logger("web_ui.api")  # Get the logger configured for the API
+
+        # Clear existing handlers from uvicorn loggers and redirect
+        for logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+            log = logging.getLogger(logger_name)
+            log.handlers = api_logger.handlers
+            log.setLevel(api_logger.level)
+            log.propagate = False  # Important to prevent duplicate messages
+    except Exception as e:
+        print(f"Warning: Failed to configure uvicorn logging: {e}", file=sys.stderr)

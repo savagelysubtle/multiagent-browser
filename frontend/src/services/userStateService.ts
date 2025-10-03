@@ -24,7 +24,7 @@ export interface UserState {
 class UserStateService {
   async getUserState(): Promise<UserState | null> {
     try {
-      const response = await api.get<{ state: UserState }>('/api/auth/state');
+      const response = await api.get<{ state: UserState }>('/auth/state');
       return response.data.state;
     } catch (error) {
       console.error('Failed to load user state:', error);
@@ -34,7 +34,7 @@ class UserStateService {
 
   async saveUserState(state: UserState): Promise<boolean> {
     try {
-      await api.put('/api/auth/state', { state });
+      await api.put('/auth/state', { state });
       return true;
     } catch (error) {
       console.error('Failed to save user state:', error);
@@ -44,7 +44,7 @@ class UserStateService {
 
   async updateUserPreference(key: string, value: any): Promise<boolean> {
     try {
-      await api.put('/api/auth/preferences', { key, value });
+      await api.put('/auth/preferences', { key, value });
       return true;
     } catch (error) {
       console.error('Failed to update user preference:', error);

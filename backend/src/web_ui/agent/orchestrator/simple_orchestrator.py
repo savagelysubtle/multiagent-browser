@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -313,7 +313,7 @@ class SimpleAgentOrchestrator:
         return task_id
 
     async def _execute_task(self, agent_instance, task: AgentTask) -> None:
-        task.started_at = datetime.utcnow()
+        task.started_at = datetime.now(UTC)
         task.state = TaskState.WORKING
         task.progress = {"percentage": 25, "message": "Running"}
 
@@ -323,7 +323,7 @@ class SimpleAgentOrchestrator:
             result = await self._run_agent_action(agent_instance, task)
             task.result = result
             task.state = TaskState.COMPLETED
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(UTC)
             task.progress = {"percentage": 100, "message": "Completed"}
             summary = self._summarise_result(result)
             task.status_message = self._make_message(MessageRole.AGENT, summary, task)
@@ -334,7 +334,7 @@ class SimpleAgentOrchestrator:
             logger.exception("Task %s failed", task.id)
             task.error = str(exc)
             task.state = TaskState.FAILED
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(UTC)
             task.progress = {"percentage": 100, "message": "Failed"}
             task.status_message = self._make_message(
                 MessageRole.AGENT, f"Error: {task.error}", task
@@ -398,7 +398,7 @@ class SimpleAgentOrchestrator:
             runner.cancel()
 
         task.state = TaskState.CANCELED
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(UTC)
         task.progress = {"percentage": 100, "message": "Canceled"}
         task.status_message = self._make_message(
             MessageRole.AGENT, "Task was cancelled", task

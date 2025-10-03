@@ -13,9 +13,9 @@ Architecture: Entry point (webui.py) -> Orchestrator (this file) -> Services
 
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
-import os
 
 # Add the backend src to path for imports
 backend_root = Path(__file__).parent.parent.parent  # Navigate up to backend/
@@ -33,26 +33,30 @@ project_root = backend_root
 from dotenv import load_dotenv
 
 # Import centralized logging configuration
-from web_ui.utils.logging_config import LoggingConfig, get_logger
+from .utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 # Load environment variables with intelligent file detection and precedence
 # Explicitly specify the .env file path to ensure it's found and loaded correctly.
-# The project root is two levels up from this file (backend/src/web_ui -> backend -> project_root)
-dotenv_path = Path(__file__).resolve().parents[3] / '.env.development'
+# The project root is the correct location for .env files
+try:
+    from .utils.paths import get_project_root
+    project_root = get_project_root()
+except ImportError:
+    # Fallback to manual calculation
+    project_root = Path(__file__).resolve().parents[4]
+
+dotenv_path = project_root / ".env.development"
 if not dotenv_path.exists():
-    dotenv_path = Path(__file__).resolve().parents[3] / '.env'
+    dotenv_path = project_root / ".env"
 
 load_dotenv(dotenv_path=dotenv_path, override=True)
 logger.debug(f"Dotenv path: {dotenv_path}, exists: {dotenv_path.exists()}")
-logger.debug(f"LLM_PROVIDER after load_dotenv in main.py: {os.environ.get('LLM_PROVIDER')}")
+logger.debug(
+    f"LLM_PROVIDER after load_dotenv in main.py: {os.environ.get('LLM_PROVIDER')}"
+)
 logger.debug(f"LLM_MODEL after load_dotenv in main.py: {os.environ.get('LLM_MODEL')}")
-
-
-def setup_logging(level: str = "INFO") -> None:
-    """Configure logging for the application using centralized configuration."""
-    LoggingConfig.setup_logging(level=level)
 
 
 def start_api_server(args: argparse.Namespace) -> None:
@@ -60,25 +64,25 @@ def start_api_server(args: argparse.Namespace) -> None:
     logger.info("Starting FastAPI backend server...")
 
     try:
-        from web_ui.api.server import run_api_server
-        from fastapi import FastAPI
-        from fastapi.middleware.cors import CORSMiddleware
-        from fastapi.staticfiles import StaticFiles
+        import uvicorn
 
-        # Import API routers
-        from .api.documents.user import router as user_documents_router
-        from .api.routes.router import router as main_api_router # Import the main API router
+        from .api.server import app
 
-        app = FastAPI()
+        # Configure uvicorn logging to prevent duplicates
+        log_config = None
+        try:
+            from .utils.logging_config import configure_uvicorn_logging
 
-        # Include API routes
-        app.include_router(user_documents_router)
-        app.include_router(main_api_router) # Include the main API router
+            log_config = configure_uvicorn_logging()
+        except ImportError:
+            logger.warning("Could not configure uvicorn logging")
 
-        run_api_server(
+        uvicorn.run(
+            app,
             host=args.api_host,
             port=args.api_port,
             reload=args.reload,
+            log_config=log_config,
             log_level=args.log_level.lower(),
         )
 
@@ -97,10 +101,8 @@ async def start_services() -> None:
 
     # Initialize ChromaDB
     try:
-        from web_ui.database.connection import get_chroma_client
-        from web_ui.database.utils import DatabaseUtils
+        from .database.utils import DatabaseUtils
 
-        client = get_chroma_client()
         utils = DatabaseUtils()
         utils.setup_default_collections()
         logger.info("ChromaDB initialized successfully")
@@ -204,8 +206,8 @@ Examples:
 
     args = parser.parse_args()
 
-    # Setup logging
-    setup_logging(args.log_level)
+    # Logging is already configured when get_logger() is called
+    # No need to explicitly setup logging
 
     # Determine mode
     if args.headless:

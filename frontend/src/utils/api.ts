@@ -1,16 +1,19 @@
-import axios, { AxiosError, AxiosResponse } from 'axios';
-import { ApiError } from '../types';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 
-// API configuration
-const BASE_URL = 'http://127.0.0.1:3000';
+// Get API URL from environment variables (set by PowerShell script)
+// Support both Vite and React environment variable formats
+const API_URL = import.meta.env.VITE_API_URL ||
+                process.env.REACT_APP_API_URL ||
+                'http://localhost:8000';
 
-// Create axios instance
+// Create axios instance with base configuration
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || BASE_URL,
-  timeout: 30000,
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
 // Request interceptor to add auth token
@@ -22,56 +25,68 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor for error handling
 api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as any;
+  (response) => response,
+  (error) => {
+    // Extract error details
+    const errorData = error.response?.data?.error || error.response?.data || {};
 
-    // Handle authentication errors
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+    // Create user-friendly error message
+    let errorMessage = 'An unexpected error occurred';
 
-      // Clear invalid token
-      localStorage.removeItem('auth_token');
-
-      // Redirect to login
-      window.location.href = '/login';
-      return Promise.reject(error);
+    if (error.response) {
+      // Server responded with error
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (error.response.status === 401) {
+        errorMessage = 'Authentication required';
+        // Clear invalid token
+        localStorage.removeItem('auth_token');
+        // Redirect to login if not already there
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      } else if (error.response.status === 422) {
+        errorMessage = errorData.message || 'Invalid input data';
+        // Include field errors if available
+        if (errorData.details?.field_errors) {
+          const fieldErrors = errorData.details.field_errors
+            .map((e: any) => `${e.field}: ${e.message}`)
+            .join(', ');
+          errorMessage = `${errorMessage} (${fieldErrors})`;
+        }
+      }
+    } else if (error.request) {
+      // Request made but no response
+      errorMessage = 'Unable to connect to server. Please check your connection.';
     }
 
-    // Transform error to our format
-    const apiError: ApiError = {
-      code: 'UNKNOWN_ERROR',
-      message: 'An unexpected error occurred',
-      timestamp: new Date().toISOString(),
-      retryable: false,
+    // Return a properly formatted error
+    const formattedError = {
+      code: errorData.code || 'UNKNOWN_ERROR',
+      message: errorMessage,
+      timestamp: errorData.timestamp || new Date().toISOString(),
+      retryable: error.response?.status >= 500 || !error.response,
+      field: errorData.details?.field || undefined,
     };
 
-    if (error.response?.data?.error) {
-      const serverError = error.response.data.error;
-      apiError.code = serverError.code || 'SERVER_ERROR';
-      apiError.message = serverError.message || 'Server error occurred';
-      apiError.field = serverError.field;
-      apiError.timestamp = serverError.timestamp || apiError.timestamp;
-      apiError.retryable = isRetryableError(apiError.code);
-    } else if (!error.response) {
-      apiError.code = 'NETWORK_ERROR';
-      apiError.message = 'Network connection failed';
-      apiError.retryable = true;
-    }
-
-    return Promise.reject(apiError);
+    return Promise.reject(formattedError);
   }
 );
 
-// Helper function to determine if an error is retryable
-function isRetryableError(code: string): boolean {
-  const retryableCodes = ['NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMIT', 'SERVICE_UNAVAILABLE'];
-  return retryableCodes.includes(code);
-}
+// Export the API URL for debugging
+export const getApiUrl = () => API_URL;
 
-export default api;
+// WebSocket URL helper
+export const getWebSocketUrl = () => {
+  const wsUrl = import.meta.env.VITE_WS_URL ||
+                process.env.REACT_APP_WS_URL ||
+                API_URL.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws';
+  return wsUrl;
+};

@@ -5,10 +5,10 @@ Implements the Google A2A protocol specification for inter-agent communication
 while maintaining compatibility with the existing agent orchestrator.
 """
 
-from datetime import datetime
+import uuid
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
-import uuid
 
 from ...utils.logging_config import get_logger
 
@@ -58,7 +58,7 @@ class A2AMessage:
         self.payload = payload
         self.conversation_id = conversation_id
         self.message_id = message_id or f"msg_{uuid.uuid4()}"
-        self.timestamp = datetime.utcnow()
+        self.timestamp = datetime.now(UTC)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert message to dictionary format following A2A spec."""
@@ -120,7 +120,7 @@ class GoogleA2AInterface:
         # Enhance capabilities with A2A-specific metadata
         enhanced_capabilities = {
             **capabilities,
-            "a2a_registration_time": datetime.utcnow().isoformat(),
+            "a2a_registration_time": datetime.now(UTC).isoformat(),
             "a2a_interface_version": "0.2.1",  # Google A2A spec version
             "a2a_features": {
                 "message_types": [
@@ -137,7 +137,7 @@ class GoogleA2AInterface:
         self.registered_agents[agent_id] = {
             "id": agent_id,
             "capabilities": enhanced_capabilities,
-            "registered_at": datetime.utcnow().isoformat(),
+            "registered_at": datetime.now(UTC).isoformat(),
             "status": "active",
         }
         logger.info(f"Registered local agent for A2A: {agent_id}")
@@ -568,7 +568,7 @@ def initialize_a2a_interface(orchestrator):
                     agent_id=agent_id,
                     capabilities={
                         **agent,
-                        "a2a_registration_time": datetime.utcnow().isoformat(),
+                        "a2a_registration_time": datetime.now(UTC).isoformat(),
                         "a2a_interface_version": "0.1.0",
                     },
                 )

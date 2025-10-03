@@ -6,7 +6,7 @@ Supports Google A2A (Agent-to-Agent) protocol for inter-agent communication.
 """
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from ...utils.logging_config import get_logger
@@ -85,7 +85,9 @@ class DocumentEditorAdapter:
             return {
                 "success": False,
                 "error": str(e),
-                "message_id": message.message_id if hasattr(message, "message_id") else None,
+                "message_id": message.message_id
+                if hasattr(message, "message_id")
+                else None,
             }
 
     async def _handle_task_request(self, message: Any) -> dict[str, Any]:
@@ -344,16 +346,16 @@ class DocumentEditorAdapter:
                 from ...database.models import DocumentModel
 
                 doc = DocumentModel(
-                    id=f"doc_{filename}_{datetime.utcnow().timestamp()}",
+                    id=f"doc_{filename}_{datetime.now(UTC).timestamp()}",
                     content=content,
                     metadata={
                         "filename": filename,
                         "document_type": document_type,
                         "created_by": "document_editor_agent",
-                        "created_at": datetime.utcnow().isoformat(),
+                        "created_at": datetime.now(UTC).isoformat(),
                     },
                     source="document_editor",
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(UTC),
                 )
 
                 if self.chroma_manager:
@@ -370,7 +372,7 @@ class DocumentEditorAdapter:
                 "filename": filename,
                 "document_type": document_type,
                 "content_length": len(content),
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
             }
 
             if progress_callback:
@@ -440,7 +442,7 @@ class DocumentEditorAdapter:
 
                 # Update the document
                 doc.content = edited_content
-                doc.metadata["last_edited"] = datetime.utcnow().isoformat()
+                doc.metadata["last_edited"] = datetime.now(UTC).isoformat()
                 doc.metadata["edit_instruction"] = instruction
 
                 success = self.chroma_manager.update_document("documents", doc)
@@ -454,7 +456,7 @@ class DocumentEditorAdapter:
                 "success": True,
                 "document_id": document_id,
                 "instruction": instruction,
-                "edited_at": datetime.utcnow().isoformat(),
+                "edited_at": datetime.now(UTC).isoformat(),
                 "changes_applied": True,
             }
 
@@ -525,7 +527,7 @@ class DocumentEditorAdapter:
                 "query": query,
                 "total_results": len(results) if results else 0,
                 "results": results[:limit] if results else [],
-                "searched_at": datetime.utcnow().isoformat(),
+                "searched_at": datetime.now(UTC).isoformat(),
             }
 
             if progress_callback:

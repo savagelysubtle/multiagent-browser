@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { useAppStore } from '../stores/useAppStore';
 import { authService } from '../services/authService';
 import { LoginRequest, RegisterRequest } from '../../types';
+import { getApiUrl } from '../utils/api';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -77,7 +78,7 @@ export default function LoginPage() {
     }
 
     try {
-      const response = await fetch('/api/dev/clear-users', {
+      const response = await fetch(`${getApiUrl()}/api/auth/dev/clear-users`, {
         method: 'POST',
       });
 
@@ -198,6 +199,18 @@ export default function LoginPage() {
             >
               Clear Users (Dev only)
             </button>
+          </div>
+        )}
+
+        {/* Debug section for API connection */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-4 bg-gray-800 rounded-lg text-xs text-gray-400">
+            <h4 className="font-semibold mb-2">Debug Info:</h4>
+            <p>API URL: {import.meta.env.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:8000'}</p>
+            <p>Actual API URL being used: {getApiUrl()}</p>
+            <p>Environment: {process.env.NODE_ENV}</p>
+            <p>Admin Email: admin@localhost</p>
+            <p>Admin Password: admin123</p>
           </div>
         )}
       </div>

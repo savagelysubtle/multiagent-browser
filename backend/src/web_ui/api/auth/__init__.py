@@ -1,6 +1,7 @@
-"""Authentication module for React frontend integration."""
+"""
+Authentication module for user login, registration, and state management.
+"""
 
-from .auth_service import AuthService, User
 from .router import router
 
-__all__ = ["AuthService", "User", "router"]
+__all__ = ["router"]

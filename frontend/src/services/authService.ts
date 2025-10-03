@@ -13,11 +13,14 @@ interface UserMeResponse {
 }
 
 class AuthService {
-  private baseURL = 'http://127.0.0.1:3000/api';
+  private baseURL = '/api';  // Let the proxy handle the backend URL
   private tokenKey = 'auth_token';
 
   async login(credentials: LoginRequest): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/api/auth/login', credentials);
+    console.log('Login attempt - API URL:', api.defaults.baseURL);
+    console.log('Login attempt - Credentials:', { email: credentials.email, password: '***' });
+
+    const response = await api.post<AuthResponse>('/auth/login', credentials);
     const { access_token, user } = response.data;
 
     // Store token
@@ -27,7 +30,7 @@ class AuthService {
   }
 
   async register(userData: RegisterRequest): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/api/auth/register', userData);
+    const response = await api.post<AuthResponse>('/auth/register', userData);
     const { access_token, user } = response.data;
 
     // Store token
@@ -38,7 +41,7 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
-      await api.post('/api/auth/logout');
+      await api.post('/auth/logout');
     } catch (error) {
       // Continue with logout even if server request fails
       console.warn('Logout request failed:', error);
@@ -50,7 +53,7 @@ class AuthService {
 
   async getCurrentUser(): Promise<User | null> {
     try {
-      const response = await api.get<UserMeResponse>('/api/auth/me');
+      const response = await api.get<UserMeResponse>('/auth/me');
       const userData = response.data;
 
       // Convert to our User type format (without state initially)
@@ -79,7 +82,7 @@ class AuthService {
 
       // Get user state separately
       try {
-        const stateResponse = await api.get<{ state: any }>('/api/auth/state');
+        const stateResponse = await api.get<{ state: any }>('/auth/state');
         user.state = stateResponse.data.state;
       } catch (stateError) {
         // State is optional, continue without it
@@ -90,6 +93,7 @@ class AuthService {
     } catch (error) {
       return null;
     }
+
   }
 
   async verifyToken(token: string): Promise<User | null> {
@@ -113,7 +117,7 @@ class AuthService {
 
   async refreshToken(): Promise<string | null> {
     try {
-      const response = await api.post<{ access_token: string }>('/api/auth/refresh');
+      const response = await api.post<{ access_token: string }>('/auth/refresh');
       const { access_token } = response.data;
 
       localStorage.setItem(this.tokenKey, access_token);
@@ -133,11 +137,11 @@ class AuthService {
   }
 
   async updateUserPreferences(preferences: Record<string, any>): Promise<void> {
-    await api.put('/api/auth/preferences', { preferences });
+    await api.put('/auth/preferences', { preferences });
   }
 
   async updateUserState(state: Record<string, any>): Promise<void> {
-    await api.put('/api/auth/state', { state });
+    await api.put('/auth/state', { state });
   }
 }
 
