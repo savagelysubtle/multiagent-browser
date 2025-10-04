@@ -34,9 +34,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(tags=["authentication"])
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 # In production, use proper secret key management
 SECRET_KEY = "your-secret-key-change-in-production"
@@ -72,25 +72,54 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 async def login(credentials: UserLogin, db: Session = Depends(get_db)):
     """Authenticate user and return access token."""
     logger.info(f"Login attempt for email: {credentials.email}")
+    logger.debug(
+        f"Login request details: email={credentials.email}, password_length={len(credentials.password)}"
+    )
 
     try:
+        logger.debug("Initializing UserDatabase for authentication")
         user_db = UserDatabase()
+
+        logger.debug(f"Attempting to authenticate user: {credentials.email}")
         user = user_db.authenticate_user(db, credentials.email, credentials.password)
+
         if not user:
-            logger.warning(f"Failed login attempt for email: {credentials.email}")
+            logger.warning(
+                f"Authentication failed for email: {credentials.email} - user not found or password incorrect"
+            )
+            logger.debug(f"Database query result: user={user}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Update last login
-        user_db.update_last_login(db, str(user.id))
+        logger.debug(
+            f"Authentication successful for user: {user.email} (ID: {user.id})"
+        )
         logger.info(f"User {user.email} successfully logged in.")
+
+        # Update last login
+        try:
+            logger.debug(f"Updating last login for user ID: {user.id}")
+            user_db.update_last_login(db, str(user.id))
+            logger.debug("Last login updated successfully")
+        except Exception as login_error:
+            logger.error(
+                f"Failed to update last login for user {user.id}: {login_error}"
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.error(f"Login error for {credentials.email}: {e}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Exception args: {e.args}")
+        logger.debug("Full exception traceback:", exc_info=True)
+
         # For development, return a mock successful login
-        logger.warning("Returning mock login response for development")
+        logger.warning("Returning mock login response for development due to error")
         user = type(
             "MockUser",
             (),
@@ -129,21 +158,46 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """Register a new user."""
     logger.info(f"Registration attempt for email: {user_data.email}")
-    user_db = UserDatabase()
-
-    # Check if user already exists
-    existing_user = user_db.get_user_by_email(db, user_data.email)
-    if existing_user:
-        logger.warning(f"Registration failed: Email {user_data.email} already exists.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
-        )
-
-    # Create new user with password hashing
-    user = user_db.create_user(
-        db, user_data.email, password=user_data.password, name=user_data.name
+    logger.debug(
+        f"Registration data: email={user_data.email}, name={user_data.name}, password_length={len(user_data.password)}"
     )
-    logger.info(f"User {user.email} successfully registered.")
+
+    try:
+        logger.debug("Initializing UserDatabase for registration")
+        user_db = UserDatabase()
+
+        # Check if user already exists
+        logger.debug(f"Checking if user already exists: {user_data.email}")
+        existing_user = user_db.get_user_by_email(db, user_data.email)
+
+        if existing_user:
+            logger.warning(
+                f"Registration failed: Email {user_data.email} already exists (existing user ID: {existing_user.id})"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered",
+            )
+
+        logger.debug(f"Creating new user: {user_data.email}")
+        # Create new user with password hashing
+        user = user_db.create_user(
+            db, user_data.email, password=user_data.password, name=user_data.name
+        )
+        logger.info(f"User {user.email} successfully registered (ID: {user.id})")
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"Registration error for {user_data.email}: {e}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Exception args: {e.args}")
+        logger.debug("Full exception traceback:", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed due to server error",
+        )
 
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

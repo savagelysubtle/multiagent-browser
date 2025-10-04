@@ -21,44 +21,67 @@ except ImportError:
     logger.warning("Could not import centralized logging, using fallback")
 
 # Database configuration - use absolute path for SQLite
-try:
-    from ..utils.paths import get_project_root
-    project_root = get_project_root()
-    database_path = project_root / "data" / "users.db"
-except ImportError:
-    # Fallback to manual calculation if paths module not available
-    project_root = Path(__file__).parent.parent.parent.parent
-    database_path = project_root / "data" / "users.db"
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{database_path}")
+def get_database_url():
+    """Get database URL, checking for existing database files."""
+    try:
+        from ..utils.paths import get_project_root
+        project_root = get_project_root()
+        database_path = project_root / "data" / "users.db"
+    except ImportError:
+        # Fallback to manual calculation if paths module not available
+        # From backend/src/web_ui/database/session.py
+        # Go up: database/ -> web_ui/ -> src/ -> backend/ -> project_root
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        database_path = project_root / "data" / "users.db"
 
+    # Check if there's an existing dev.db file to use
+    dev_db_path = project_root / "data" / "dev.db"
+    if dev_db_path.exists():
+        logger.info(f"Using existing database: {dev_db_path}")
+        return f"sqlite:///{dev_db_path}"
+
+    # Use users.db as default
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+    return os.getenv("DATABASE_URL", f"sqlite:///{database_path}")
+
+DATABASE_URL = get_database_url()
 logger.info(f"Database URL: {DATABASE_URL}")
 
-# Ensure the data directory exists
-database_path.parent.mkdir(parents=True, exist_ok=True)
+# Create engine and session factory LAZILY (only when first needed)
+_engine = None
+_SessionLocal = None
 
-# Create engine and session factory ONCE at module level (not per request!)
-try:
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        echo=False,  # Set to True for SQL debugging
-    )
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    logger.info("Database engine created successfully")
-except Exception as e:
-    logger.error(f"Failed to create database engine: {e}")
-    # Create mock objects for development if database fails
-    from unittest.mock import MagicMock
+def get_engine():
+    """Get or create database engine."""
+    global _engine
+    if _engine is None:
+        try:
+            _engine = create_engine(
+                DATABASE_URL,
+                connect_args={"check_same_thread": False},
+                echo=False,  # Set to True for SQL debugging
+            )
+            logger.info("Database engine created successfully")
+        except Exception as e:
+            logger.error(f"Failed to create database engine: {e}")
+            # Create mock objects for development if database fails
+            from unittest.mock import MagicMock
+            _engine = MagicMock()
+            logger.warning("Using mock database engine for development")
+    return _engine
 
-    engine = MagicMock()
-    SessionLocal = MagicMock()
-    logger.warning("Using mock database objects for development")
-
-# For development, also support the existing database path
-import os
-
-if os.path.exists("./data/dev.db"):
-    DATABASE_URL = "sqlite:///./data/dev.db"
+def get_session_local():
+    """Get or create session factory."""
+    global _SessionLocal
+    if _SessionLocal is None:
+        engine = get_engine()
+        if engine:
+            _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        else:
+            # Create mock session factory
+            from unittest.mock import MagicMock
+            _SessionLocal = MagicMock()
+    return _SessionLocal
 
 
 def get_db() -> Generator[Session]:
@@ -78,6 +101,7 @@ def get_db() -> Generator[Session]:
             # Use db here
             user = db.query(User).filter(...).first()
     """
+    SessionLocal = get_session_local()
     db = SessionLocal()
     try:
         logger.debug("Database session created")

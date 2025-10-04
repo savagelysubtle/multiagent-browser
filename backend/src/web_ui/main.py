@@ -23,7 +23,7 @@ sys.path.insert(0, str(backend_root))
 sys.path.insert(0, str(backend_root / "src"))
 
 # Import centralized logging configuration
-# from web_ui.utils.logging_config import LoggingConfig, get_logger
+from .utils.logging_config import get_logger
 
 # Project root is the backend directory
 project_root = backend_root
@@ -45,7 +45,9 @@ try:
     project_root = get_project_root()
 except ImportError:
     # Fallback to manual calculation
-    project_root = Path(__file__).resolve().parents[4]
+    # From backend/src/web_ui/main.py
+    # Go up: web_ui/ -> src/ -> backend/ -> project_root
+    project_root = Path(__file__).resolve().parents[5]
 
 dotenv_path = project_root / ".env.development"
 if not dotenv_path.exists():
@@ -64,27 +66,82 @@ def start_api_server(args: argparse.Namespace) -> None:
     logger.info("Starting FastAPI backend server...")
 
     try:
+        logger.info("Importing uvicorn...")
         import uvicorn
 
+        logger.info("Importing FastAPI app...")
         from .api.server import app
+        logger.info("FastAPI app imported successfully")
+
+        # Test the app by checking if it has routes
+        logger.info(f"App has {len(app.routes)} routes configured")
+        for route in app.routes:
+            logger.debug(f"Route: {route.path} - {route.methods}")
+
+        # Test that the app can handle a basic health check
+        try:
+            from fastapi.testclient import TestClient
+            client = TestClient(app)
+            response = client.get("/health")
+            logger.info(f"Health check test: {response.status_code} - {response.json()}")
+        except ImportError:
+            logger.debug("TestClient not available - skipping app test")
+        except Exception as e:
+            logger.warning(f"Health check test failed: {e}")
 
         # Configure uvicorn logging to prevent duplicates
-        log_config = None
         try:
             from .utils.logging_config import configure_uvicorn_logging
+            configure_uvicorn_logging()
+            logger.info("Uvicorn logging configured successfully")
+        except (ImportError, AttributeError) as e:
+            logger.warning(f"Could not configure uvicorn logging: {e}")
 
-            log_config = configure_uvicorn_logging()
-        except ImportError:
-            logger.warning("Could not configure uvicorn logging")
+        logger.info(f"Starting uvicorn server on {args.api_host}:{args.api_port}")
 
-        uvicorn.run(
-            app,
+        # Start uvicorn with explicit configuration
+        logger.debug(f"Creating uvicorn Config with app={type(app).__name__}")
+        config = uvicorn.Config(
+            app=app,
             host=args.api_host,
             port=args.api_port,
-            reload=args.reload,
-            log_config=log_config,
+            reload=False,  # Disable reload for now to avoid issues
             log_level=args.log_level.lower(),
+            access_log=True,
+            log_config=None  # Use our own logging config
         )
+        logger.debug(f"Uvicorn Config created: host={config.host}, port={config.port}, reload={config.reload}")
+
+        logger.debug("Creating uvicorn Server instance...")
+        server = uvicorn.Server(config)
+        logger.info("Uvicorn server instance created successfully")
+
+        logger.info("Calling server.run() - this should start the server...")
+        logger.debug(f"Server config: {server.config}")
+
+        # Simple approach: just call server.run() and let it block
+        # The issue might be that uvicorn isn't producing startup messages
+        logger.info("About to call server.run() - this blocks until server stops")
+
+        # Before starting the server, let's verify it can handle a basic request
+        logger.info("Testing server startup by making a test request...")
+        try:
+            import requests
+            # This should fail since server isn't running yet, but will test if our setup is correct
+            response = requests.get(f"http://{args.api_host}:{args.api_port}/health", timeout=1)
+        except requests.exceptions.ConnectionError:
+            logger.info("Expected connection error - server not started yet")
+        except Exception as e:
+            logger.warning(f"Unexpected error during pre-startup test: {e}")
+
+        try:
+            server.run()
+        except KeyboardInterrupt:
+            logger.info("Server interrupted by user")
+        except Exception as e:
+            logger.error(f"Server.run() raised exception: {e}")
+            logger.error(f"Exception type: {type(e)}")
+            raise
 
     except ImportError as e:
         logger.error(f"Failed to import API server: {e}")

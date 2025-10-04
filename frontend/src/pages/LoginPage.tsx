@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAppStore } from '../stores/useAppStore';
 import { authService } from '../services/authService';
@@ -6,6 +7,7 @@ import { LoginRequest, RegisterRequest } from '../../types';
 import { getApiUrl } from '../utils/api';
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -46,10 +48,12 @@ export default function LoginPage() {
 
       // Set user first
       setUser(response.user);
+      console.log('User set in store:', response.user);
 
       // Apply user state if it exists
       if (response.user.state) {
         const userState = response.user.state;
+        console.log('Applying user state:', userState);
 
         // Apply preferences
         if (userState.preferences) {
@@ -63,6 +67,10 @@ export default function LoginPage() {
       }
 
       toast.success(`${isLogin ? 'Login' : 'Registration'} successful!`);
+      console.log('Login successful, redirecting to dashboard');
+
+      // Navigate to dashboard after successful login
+      navigate('/', { replace: true });
     } catch (error: any) {
       console.error('Auth error:', error);
       toast.error(error.message || `${isLogin ? 'Login' : 'Registration'} failed`);

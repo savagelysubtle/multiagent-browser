@@ -26,6 +26,8 @@ class AuthService {
     // Store token
     localStorage.setItem(this.tokenKey, access_token);
 
+    console.log('Login successful, token stored:', access_token.substring(0, 20) + '...');
+
     return response.data;
   }
 

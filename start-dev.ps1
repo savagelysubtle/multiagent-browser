@@ -199,8 +199,8 @@ function Cleanup {
     }
 
     # Stop all background jobs
-    $runningJobs = Get-Job | Where-Object { $_.State -eq 'Running' }
-    if ($runningJobs) {
+    $runningJobs = @(Get-Job | Where-Object { $_.State -eq 'Running' })
+    if ($runningJobs.Count -gt 0) {
         Write-Host "  Stopping $($runningJobs.Count) background job(s)..." -ForegroundColor Gray
         $runningJobs | Stop-Job -PassThru | Remove-Job
         Write-Host "  ✅ Background jobs stopped" -ForegroundColor Green
@@ -278,7 +278,7 @@ try {
         Write-StatusMessage -Message "✅ Backend will run on port $($script:backendPort). Press Ctrl+C to quit." -Color Cyan -Log
         $env:WEBUI_PORT = $script:backendPort
         $env:LOG_LEVEL = "DEBUG"
-        uv run python -m uvicorn web_ui.api.server:app --host 127.0.0.1 --port $script:backendPort --reload --log-level debug
+        uv run python -m web_ui.main --api-only --port $script:backendPort --reload --log-level DEBUG
     }
     else {
         Write-StatusMessage -Message "🚀 Starting Web-UI Full-Stack Environment..." -Color Green -Log
@@ -320,8 +320,8 @@ try {
             $env:WEBUI_PORT = $backendPort
             $env:LOG_LEVEL = "DEBUG"
 
-            # Run uvicorn directly (same as backend-only mode) with debug logging
-            & uv run python -m uvicorn web_ui.api.server:app --host 127.0.0.1 --port $backendPort --reload --log-level debug
+            # Run through main.py orchestrator with debug logging
+            & uv run python -m web_ui.main --port $backendPort --reload --log-level DEBUG
         } -ArgumentList $script:backendPort, $PWD.Path -Name "Backend"
 
         # --- Wait for Backend with Better Error Handling ---
@@ -331,7 +331,7 @@ try {
         Start-Sleep -Seconds 2  # Give the job a moment to start
 
         $backendStarted = $false
-        foreach ($i in 1..60) {
+        foreach ($i in 1..30) {
             # Check if job failed or stopped
             if ($backendJob.State -eq 'Failed' -or $backendJob.State -eq 'Stopped') {
                 Write-StatusMessage -Message "❌ Backend job failed! State: $($backendJob.State)" -Color Red -Log
@@ -387,7 +387,7 @@ try {
 
             # Health checks failed, but job might still be starting
             if ($i % 5 -eq 0) {
-                Write-Host "  Still waiting... (attempt $i/60)" -ForegroundColor Gray
+                Write-Host "  Still waiting... (attempt $i/30)" -ForegroundColor Gray
                 # Check for any job output
                 $currentOutput = Receive-Job -Job $backendJob -Keep -ErrorAction SilentlyContinue
                 if ($currentOutput) {
@@ -409,7 +409,7 @@ try {
         }
 
         if (-not $backendStarted) {
-            Write-StatusMessage -Message "❌ Backend failed to respond within 60 seconds." -Color Red -Log
+            Write-StatusMessage -Message "❌ Backend failed to respond within 30 seconds." -Color Red -Log
             Write-Host "`nBackend Job State: $($backendJob.State)" -ForegroundColor Yellow
             Write-Host "`nBackend Job Output:" -ForegroundColor Yellow
             $jobOutput = Receive-Job -Job $backendJob -ErrorAction SilentlyContinue

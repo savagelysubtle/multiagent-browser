@@ -1,49 +1,37 @@
 
 import React, { useState } from 'react';
-import EditorRibbon from '../components/EditorRibbon';
+import ReactQuill from 'react-quill';
+import 'quill/dist/quill.snow.css'; // import styles
+import DOMPurify from 'dompurify';
 
-export default function Editor({ theme, setTheme }) {
-  const [document, setDocument] = useState({ content: 'This is a placeholder for the editor.' });
-  const [userSettings, setUserSettings] = useState({
-    fontSize: 'base',
-    fontFamily: 'sans',
-  });
+export default function Editor() {
+  const [content, setContent] = useState('This is a placeholder for the editor.');
 
-  const handleSettingsChange = (newSettings) => {
-    setUserSettings(prev => ({ ...prev, ...newSettings }));
+  const handleContentChange = (newContent) => {
+    const sanitizedContent = DOMPurify.sanitize(newContent);
+    setContent(sanitizedContent);
   };
 
-  const handleContentChange = (e) => {
-    setDocument(prev => ({ ...prev, content: e.target.value }));
+  const modules = {
+    toolbar: [
+      [{ 'header': '1'}, {'header': '2'}, { 'font': [] }],
+      [{size: []}],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+      [{'list': 'ordered'}, {'list': 'bullet'}, 
+       {'indent': '-1'}, {'indent': '+1'}],
+      ['link', 'image', 'video'],
+      ['clean']
+    ],
   };
-
-  const fontClass = {
-    sm: 'text-sm',
-    base: 'text-base',
-    lg: 'text-lg',
-    xl: 'text-xl',
-  }[userSettings.fontSize];
-
-  const familyClass = {
-    mono: 'font-mono',
-    sans: 'font-sans',
-    serif: 'font-serif',
-  }[userSettings.fontFamily];
 
   return (
     <div className="flex flex-col h-full">
-      <EditorRibbon
-        userSettings={userSettings}
-        onSettingsChange={handleSettingsChange}
-        theme={theme}
-        onThemeChange={setTheme}
-        document={document}
-      />
       <div className="flex-1 p-4">
-        <textarea
-          value={document.content}
+        <ReactQuill
+          value={content}
           onChange={handleContentChange}
-          className={`w-full h-full p-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 ${fontClass} ${familyClass}`}
+          modules={modules}
+          className="w-full h-full p-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
         />
       </div>
     </div>

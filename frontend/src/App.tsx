@@ -67,18 +67,31 @@ function App() {
     // Check authentication on app load
     const initAuth = async () => {
       try {
+        console.log('Initializing authentication...');
         const token = localStorage.getItem('auth_token');
+        console.log('Token found:', !!token);
+
         if (token) {
+          console.log('Fetching current user...');
           const userData = await authService.getCurrentUser();
           if (userData) {
+            console.log('User data received:', userData);
             setUser(userData);
+            console.log('User set in store');
             await loadStateFromBackend();
+            console.log('State loaded from backend');
+          } else {
+            console.log('No user data received, clearing token');
+            localStorage.removeItem('auth_token');
           }
+        } else {
+          console.log('No token found');
         }
       } catch (error) {
         console.error('Auth init failed:', error);
         localStorage.removeItem('auth_token');
       } finally {
+        console.log('Auth initialization complete');
         setLoading(false);
       }
     };
@@ -98,11 +111,24 @@ function App() {
               <Routes>
                 <Route
                   path="/login"
-                  element={user ? <Navigate to="/" replace /> : <LoginPage />}
+                  element={
+                    user ? (() => {
+                      console.log('User authenticated, redirecting from login to dashboard');
+                      return <Navigate to="/" replace />;
+                    })() : <LoginPage />
+                  }
                 />
                 <Route
                   path="/*"
-                  element={user ? <DashboardPage theme={theme} setTheme={setTheme} /> : <Navigate to="/login" replace />}
+                  element={
+                    user ? (() => {
+                      console.log('User authenticated, rendering dashboard');
+                      return <DashboardPage theme={theme} setTheme={setTheme} />;
+                    })() : (() => {
+                      console.log('User not authenticated, redirecting to login');
+                      return <Navigate to="/login" replace />;
+                    })()
+                  }
                 />
               </Routes>
 
